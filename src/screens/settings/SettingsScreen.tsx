@@ -25,7 +25,7 @@ interface SettingItem {
 }
 
 export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
-  const { user, logout } = useAuthStore();
+  const { logout: _logout } = useAuthStore();
 
   const [notifications, setNotifications] = useState(true);
   const [soundEnabled, setSoundEnabled] = useState(true);

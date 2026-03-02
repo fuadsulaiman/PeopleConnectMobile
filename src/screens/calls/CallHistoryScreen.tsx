@@ -41,7 +41,7 @@ const CallHistoryScreen: React.FC<CallHistoryScreenProps> = ({ navigation }) => 
   };
 
   const renderCall = ({ item }: { item: Call }) => {
-    const user = item.participants.find(p => p.userId !== item.id)?.user;
+    const user = item.participants?.find(p => p.userId !== item.id)?.user;
     const statusIcon = getCallStatusIcon(item);
     return (
       <TouchableOpacity style={styles.callItem} onPress={() => navigation.getParent()?.navigate("ActiveCall", { call: item })}>
@@ -78,7 +78,7 @@ const CallHistoryScreen: React.FC<CallHistoryScreenProps> = ({ navigation }) => 
   return (
     <View style={styles.container}>
       {isLoading && callHistory.length === 0 ? <View style={styles.loadingContainer}><ActivityIndicator size="large" color={colors.primary} /></View> :
-        <FlatList data={callHistory} renderItem={renderCall} keyExtractor={item => item.id} contentContainerStyle={styles.listContent} ListEmptyComponent={renderEmpty} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} />} />}
+        <FlatList data={callHistory as any} renderItem={renderCall} keyExtractor={item => item.id} contentContainerStyle={styles.listContent} ListEmptyComponent={renderEmpty} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} />} />}
     </View>
   );
 };

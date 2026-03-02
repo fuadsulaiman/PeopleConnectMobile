@@ -1,5 +1,5 @@
-import { create } from 'zustand';
-import { contacts } from '../services/sdk';
+import { create } from "zustand";
+import { contacts } from "../services/sdk";
 
 interface ContactUser {
   id: string;
@@ -34,12 +34,15 @@ interface ContactRequest {
 interface ContactsState {
   contacts: Contact[];
   pendingRequests: ContactRequest[];
+  requests: ContactRequest[];
+  searchResults: Contact[];
   blockedUsers: Contact[];
   isLoading: boolean;
   error: string | null;
 
   fetchContacts: () => Promise<void>;
   fetchPendingRequests: () => Promise<void>;
+  fetchRequests: () => Promise<void>;
   fetchBlockedUsers: () => Promise<void>;
   sendRequest: (userId: string) => Promise<void>;
   acceptRequest: (requestId: string) => Promise<void>;
@@ -48,12 +51,15 @@ interface ContactsState {
   blockUser: (userId: string) => Promise<void>;
   unblockUser: (userId: string) => Promise<void>;
   searchUsers: (query: string) => Promise<Contact[]>;
+  clearSearch: () => void;
   updateContactPresence: (userId: string, isOnline: boolean) => void;
 }
 
 export const useContactsStore = create<ContactsState>((set, get) => ({
   contacts: [],
   pendingRequests: [],
+  requests: [],
+  searchResults: [],
   blockedUsers: [],
   isLoading: false,
   error: null,
@@ -63,36 +69,37 @@ export const useContactsStore = create<ContactsState>((set, get) => ({
     try {
       const result = await contacts.list();
       const contactList = Array.isArray(result) ? result : (result as any).items || [];
-
-      // Map API response to expected format (API returns contactUser, we need user)
       const mappedContacts = contactList.map((c: any) => ({
         id: c.id,
         userId: c.userId || c.contactUser?.id,
         user: {
           id: c.contactUser?.id || c.userId,
-          name: c.contactUser?.name || c.displayName || c.name || '',
-          username: c.contactUser?.username || c.username || '',
+          name: c.contactUser?.name || c.displayName || c.name || "",
+          username: c.contactUser?.username || c.username || "",
           avatarUrl: c.contactUser?.avatarUrl || c.avatarUrl,
           status: c.contactUser?.status || c.status,
         },
         nickname: c.nickname,
         createdAt: c.createdAt,
       }));
-
       set({ contacts: mappedContacts as Contact[], isLoading: false });
     } catch (error: any) {
-      set({ error: error.message || 'Failed to fetch contacts', isLoading: false });
+      set({ error: error.message || "Failed to fetch contacts", isLoading: false });
     }
   },
 
   fetchPendingRequests: async () => {
     try {
-      const result = await contacts.getPendingRequests();
-      const requests = Array.isArray(result) ? result : (result as any).items || [];
-      set({ pendingRequests: requests as ContactRequest[] });
+      const result = await contacts.getRequests();
+      const received = (result as any)?.received || [];
+      set({ pendingRequests: received as ContactRequest[], requests: received as ContactRequest[] });
     } catch (error: any) {
-      console.error('Failed to fetch pending requests:', error);
+      console.error("Failed to fetch pending requests:", error);
     }
+  },
+
+  fetchRequests: async () => {
+    return get().fetchPendingRequests();
   },
 
   fetchBlockedUsers: async () => {
@@ -101,7 +108,7 @@ export const useContactsStore = create<ContactsState>((set, get) => ({
       const blocked = Array.isArray(result) ? result : (result as any).items || [];
       set({ blockedUsers: blocked as Contact[] });
     } catch (error: any) {
-      console.error('Failed to fetch blocked users:', error);
+      console.error("Failed to fetch blocked users:", error);
     }
   },
 
@@ -111,7 +118,7 @@ export const useContactsStore = create<ContactsState>((set, get) => ({
       await contacts.sendRequest(userId);
       set({ isLoading: false });
     } catch (error: any) {
-      set({ error: error.message || 'Failed to send request', isLoading: false });
+      set({ error: error.message || "Failed to send request", isLoading: false });
       throw error;
     }
   },
@@ -121,10 +128,11 @@ export const useContactsStore = create<ContactsState>((set, get) => ({
       const newContact = await contacts.acceptRequest(requestId);
       set((state) => ({
         pendingRequests: state.pendingRequests.filter((r) => r.id !== requestId),
-        contacts: [...state.contacts, newContact as Contact],
+        requests: state.requests.filter((r) => r.id !== requestId),
+        contacts: [...state.contacts, newContact as unknown as Contact],
       }));
     } catch (error: any) {
-      set({ error: error.message || 'Failed to accept request' });
+      set({ error: error.message || "Failed to accept request" });
       throw error;
     }
   },
@@ -134,9 +142,10 @@ export const useContactsStore = create<ContactsState>((set, get) => ({
       await contacts.rejectRequest(requestId);
       set((state) => ({
         pendingRequests: state.pendingRequests.filter((r) => r.id !== requestId),
+        requests: state.requests.filter((r) => r.id !== requestId),
       }));
     } catch (error: any) {
-      set({ error: error.message || 'Failed to reject request' });
+      set({ error: error.message || "Failed to reject request" });
       throw error;
     }
   },
@@ -144,11 +153,9 @@ export const useContactsStore = create<ContactsState>((set, get) => ({
   removeContact: async (contactId) => {
     try {
       await contacts.remove(contactId);
-      set((state) => ({
-        contacts: state.contacts.filter((c) => c.id !== contactId),
-      }));
+      set((state) => ({ contacts: state.contacts.filter((c) => c.id !== contactId) }));
     } catch (error: any) {
-      set({ error: error.message || 'Failed to remove contact' });
+      set({ error: error.message || "Failed to remove contact" });
       throw error;
     }
   },
@@ -159,12 +166,10 @@ export const useContactsStore = create<ContactsState>((set, get) => ({
       const blockedUser = get().contacts.find((c) => c.user.id?.toLowerCase() === userId?.toLowerCase() || c.userId?.toLowerCase() === userId?.toLowerCase());
       set((state) => ({
         contacts: state.contacts.filter((c) => c.user.id !== userId && c.userId !== userId),
-        blockedUsers: blockedUser
-          ? [...state.blockedUsers, blockedUser]
-          : state.blockedUsers,
+        blockedUsers: blockedUser ? [...state.blockedUsers, blockedUser] : state.blockedUsers,
       }));
     } catch (error: any) {
-      set({ error: error.message || 'Failed to block user' });
+      set({ error: error.message || "Failed to block user" });
       throw error;
     }
   },
@@ -176,39 +181,35 @@ export const useContactsStore = create<ContactsState>((set, get) => ({
         blockedUsers: state.blockedUsers.filter((u) => u.user.id !== userId && u.userId !== userId),
       }));
     } catch (error: any) {
-      set({ error: error.message || 'Failed to unblock user' });
+      set({ error: error.message || "Failed to unblock user" });
       throw error;
     }
   },
 
   searchUsers: async (query) => {
     try {
-      const result = await contacts.search(query);
-      const users = Array.isArray(result) ? result : (result as any).items || [];
-
-      // Map search results to Contact format
-      return users.map((u: any) => ({
+      const result = await contacts.searchUsers(query);
+      const users = Array.isArray(result) ? result : [];
+      const mappedResults = users.map((u: any) => ({
         id: u.id,
         userId: u.id,
-        user: {
-          id: u.id,
-          name: u.name || '',
-          username: u.username || '',
-          avatarUrl: u.avatarUrl,
-          status: u.status,
-        },
+        user: { id: u.id, name: u.name || "", username: u.username || "", avatarUrl: u.avatarUrl, status: u.status },
       })) as Contact[];
+      set({ searchResults: mappedResults });
+      return mappedResults;
     } catch (error: any) {
-      console.error('Failed to search users:', error);
+      console.error("Failed to search users:", error);
       return [];
     }
   },
+
+  clearSearch: () => { set({ searchResults: [] }); },
 
   updateContactPresence: (userId, isOnline) => {
     set((state) => ({
       contacts: state.contacts.map((c) =>
         c.user.id?.toLowerCase() === userId?.toLowerCase() || c.userId?.toLowerCase() === userId?.toLowerCase()
-          ? { ...c, user: { ...c.user, status: isOnline ? 'Online' : 'Offline' } }
+          ? { ...c, user: { ...c.user, status: isOnline ? "Online" : "Offline" } }
           : c
       ),
     }));

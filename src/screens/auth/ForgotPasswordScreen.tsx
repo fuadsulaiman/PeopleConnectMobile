@@ -30,7 +30,7 @@ export const ForgotPasswordScreen: React.FC<Props> = ({ navigation }) => {
 
     setIsLoading(true);
     try {
-      await auth.requestPasswordReset({ email: email.trim() });
+      await auth.forgotPassword(email.trim());
       setIsEmailSent(true);
     } catch (error: any) {
       Alert.alert('Error', error.message || 'Failed to send reset email');

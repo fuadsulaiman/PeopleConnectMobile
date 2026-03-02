@@ -812,7 +812,7 @@ class SignalRService {
   // Note: The backend ChatHub does not have a MarkAsRead method.
   // Use the REST API (conversations.markAsRead) instead to mark messages as read.
   // This method is kept for compatibility but will log a warning.
-  async markAsRead(conversationId: string, messageId: string): Promise<void> {
+  async markAsRead(_conversationId: string, _messageId: string): Promise<void> {
     console.warn('SignalR markAsRead is not supported by the backend. Use REST API instead.');
     // The method would invoke 'MarkAsRead' but this doesn't exist on the server
     // if (this.chatConnection?.state === signalR.HubConnectionState.Connected) {

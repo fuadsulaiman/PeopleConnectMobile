@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { conversations, messages, broadcasts } from '../services/sdk';
-import { signalRService } from '../services/signalr';
+import { signalRService as _signalRService } from '../services/signalr';
 import { config } from '../constants';
 
 // Helper to convert relative URLs to absolute URLs
@@ -29,6 +29,8 @@ interface Message {
   status?: MessageStatus;
   isViewOnce?: boolean;
   viewOnceViewedAt?: string;
+  replyToId?: string;
+  replyTo?: Message;
 }
 
 interface User {
@@ -841,7 +843,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   createConversation: async (userId) => {
     try {
-      const conversation = await conversations.createDirect(userId);
+      const conversation = await conversations.createDM({ userId });
       set((state) => ({
         conversations: [conversation as Conversation, ...state.conversations],
       }));
@@ -854,7 +856,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   createGroupConversation: async (name, userIds) => {
     try {
-      const conversation = await conversations.createGroup({ name, participantIds: userIds });
+      const conversation = await conversations.createChatroom({ name, participantIds: userIds });
       set((state) => ({
         conversations: [conversation as Conversation, ...state.conversations],
       }));

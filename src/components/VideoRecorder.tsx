@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -114,7 +114,7 @@ export const VideoRecorder: React.FC<VideoRecorderProps> = ({
       }, 1000);
 
       cameraRef.current.startRecording({
-        onRecordingFinished: (video) => {
+        onRecordingFinished: (video: { path: string; duration: number }) => {
           console.log('Recording finished:', video);
           if (timerRef.current) {
             clearInterval(timerRef.current);
@@ -129,7 +129,7 @@ export const VideoRecorder: React.FC<VideoRecorderProps> = ({
             duration: finalDurationRef.current,
           });
         },
-        onRecordingError: (error) => {
+        onRecordingError: (error: { code: string; message: string }) => {
           console.error('Recording error:', error);
           Alert.alert('Recording Error', error.message || 'Failed to record video');
           setIsRecording(false);
@@ -257,7 +257,7 @@ export const VideoRecorder: React.FC<VideoRecorderProps> = ({
           <>
             <Camera
               ref={cameraRef}
-              style={StyleSheet.absoluteFill}
+              style={{ flex: 1, position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }}
               device={device}
               isActive={visible && !recordedVideo}
               video={true}

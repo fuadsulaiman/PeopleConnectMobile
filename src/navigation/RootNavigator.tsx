@@ -138,7 +138,7 @@ const CallsTabNavigator: React.FC = () => (
     }}
   >
     <CallsStack.Screen name="CallHistory" component={CallHistoryScreen} />
-    <CallsStack.Screen name="Call" component={CallScreen} />
+    <CallsStack.Screen name="Call" component={CallScreen as any} />
   </CallsStack.Navigator>
 );
 
@@ -243,8 +243,8 @@ const RootNavigator: React.FC = () => {
       console.log('Navigating to ActiveCall screen for call:', currentCall.id);
       hasNavigatedToCallRef.current = true;
       navigationRef.current.navigate('ActiveCall', {
-        call: currentCall,
-        user: currentCall.caller,
+        call: currentCall as any,
+        user: currentCall.caller as any,
         type: currentCall.type,
       });
     } else if (callState === 'idle' || callState === 'ended') {
@@ -275,7 +275,7 @@ const RootNavigator: React.FC = () => {
             <RootStack.Screen name="Main" component={MainNavigator} />
             <RootStack.Screen
               name="ActiveCall"
-              component={CallScreen}
+              component={CallScreen as any}
               options={{
                 presentation: 'modal',
                 gestureEnabled: false,

@@ -24,10 +24,10 @@ const AddContactScreen: React.FC<AddContactScreenProps> = ({ navigation }) => {
 
   const handleSendRequest = async (userId: string) => {
     setSendingTo(userId);
-    const success = await sendRequest(userId);
-    if (success) {
+    try {
+      await sendRequest(userId);
       Alert.alert("Success", "Contact request sent", [{ text: "OK", onPress: () => navigation.goBack() }]);
-    } else {
+    } catch {
       Alert.alert("Error", "Failed to send request");
     }
     setSendingTo(null);
@@ -49,33 +49,41 @@ const AddContactScreen: React.FC<AddContactScreenProps> = ({ navigation }) => {
 
   const renderEmpty = () => (
     <View style={styles.emptyContainer}>
-      {searchQuery.length >= 2 ? (
-        <>
-          <Icon name="search-outline" size={64} color={colors.textSecondary} />
-          <Text style={styles.emptyText}>No users found</Text>
-          <Text style={styles.emptySubtext}>Try a different search term</Text>
-        </>
-      ) : (
-        <>
-          <Icon name="people-outline" size={64} color={colors.textSecondary} />
-          <Text style={styles.emptyText}>Search for users</Text>
-          <Text style={styles.emptySubtext}>Enter at least 2 characters to search</Text>
-        </>
-      )}
+      <Icon name="search" size={48} color={colors.textTertiary} />
+      <Text style={styles.emptyText}>{searchQuery ? "No users found" : "Search for users to add"}</Text>
     </View>
   );
 
   return (
     <View style={styles.container}>
       <View style={styles.searchContainer}>
-        <Icon name="search" size={20} color={colors.textSecondary} style={styles.searchIcon} />
-        <TextInput style={styles.searchInput} placeholder="Search by name or username..." placeholderTextColor={colors.textSecondary} value={searchQuery} onChangeText={handleSearch} autoFocus />
-        {searchQuery.length > 0 && (
-          <TouchableOpacity onPress={() => { setSearchQuery(""); clearSearch(); }}><Icon name="close-circle" size={20} color={colors.textSecondary} /></TouchableOpacity>
-        )}
+        <Icon name="search" size={20} color={colors.textTertiary} style={styles.searchIcon} />
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search by username or name..."
+          placeholderTextColor={colors.textTertiary}
+          value={searchQuery}
+          onChangeText={handleSearch}
+          autoCapitalize="none"
+          autoCorrect={false}
+        />
+        {searchQuery ? (
+          <TouchableOpacity onPress={() => { setSearchQuery(""); clearSearch(); }}>
+            <Icon name="close-circle" size={20} color={colors.textTertiary} />
+          </TouchableOpacity>
+        ) : null}
       </View>
-      {isLoading && searchResults.length === 0 ? <View style={styles.loadingContainer}><ActivityIndicator size="large" color={colors.primary} /></View> :
-        <FlatList data={searchResults} renderItem={renderUser} keyExtractor={item => item.id} contentContainerStyle={styles.listContent} ListEmptyComponent={renderEmpty} />}
+      {isLoading ? (
+        <View style={styles.loadingContainer}><ActivityIndicator size="large" color={colors.primary} /></View>
+      ) : (
+        <FlatList
+          data={searchResults as any[]}
+          renderItem={renderUser as any}
+          keyExtractor={item => item.id}
+          contentContainerStyle={searchResults.length === 0 ? styles.emptyListContent : styles.listContent}
+          ListEmptyComponent={renderEmpty}
+        />
+      )}
     </View>
   );
 };
@@ -84,19 +92,19 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   searchContainer: { flexDirection: "row", alignItems: "center", backgroundColor: colors.surface, margin: 16, paddingHorizontal: 12, borderRadius: 10 },
   searchIcon: { marginRight: 8 },
-  searchInput: { flex: 1, height: 44, fontSize: 16, color: colors.text },
+  searchInput: { flex: 1, paddingVertical: 12, fontSize: 16, color: colors.text },
   loadingContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
-  listContent: { paddingBottom: 20, flexGrow: 1 },
-  userItem: { flexDirection: "row", alignItems: "center", padding: 16, borderBottomWidth: 1, borderBottomColor: colors.border },
+  listContent: { padding: 16 },
+  emptyListContent: { flex: 1 },
+  emptyContainer: { flex: 1, justifyContent: "center", alignItems: "center", paddingHorizontal: 32 },
+  emptyText: { fontSize: 16, color: colors.textSecondary, marginTop: 16, textAlign: "center" },
+  userItem: { flexDirection: "row", alignItems: "center", padding: 12, backgroundColor: colors.surface, borderRadius: 12, marginBottom: 8 },
   avatar: { width: 48, height: 48, borderRadius: 24 },
   avatarPlaceholder: { backgroundColor: colors.primary, justifyContent: "center", alignItems: "center" },
   userInfo: { flex: 1, marginLeft: 12 },
   userName: { fontSize: 16, fontWeight: "600", color: colors.text },
   userUsername: { fontSize: 14, color: colors.textSecondary, marginTop: 2 },
-  addButton: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.primary, justifyContent: "center", alignItems: "center" },
-  emptyContainer: { flex: 1, justifyContent: "center", alignItems: "center", padding: 32 },
-  emptyText: { fontSize: 18, fontWeight: "600", color: colors.text, marginTop: 16 },
-  emptySubtext: { fontSize: 14, color: colors.textSecondary, marginTop: 8, textAlign: "center" },
+  addButton: { backgroundColor: colors.primary, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20 },
 });
 
 export default AddContactScreen;

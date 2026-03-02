@@ -389,7 +389,7 @@ export const ConversationInfoSheet: React.FC<ConversationInfoSheetProps> = ({
       useChatStore.getState().updateConversation({
         id: conversation.id,
         disappearingMessagesDuration: duration,
-      });
+      } as any);
     } catch (error) {
       setDisappearingDuration(previousDuration);
       Alert.alert('Error', 'Failed to update disappearing messages setting');
@@ -541,7 +541,7 @@ export const ConversationInfoSheet: React.FC<ConversationInfoSheetProps> = ({
           style: 'destructive',
           onPress: async () => {
             try {
-              await sdk.conversations.removeMember(conversation!.id, member.userId);
+              await sdk.conversations.removeParticipant(conversation!.id, member.userId);
               setParticipants(participants.filter(p => p.userId !== member.userId));
               Alert.alert('Removed', member.name + ' has been removed from the group');
             } catch (error) {

@@ -126,7 +126,7 @@ export const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
     setIsLoading(true);
     try {
       const updatedUser = await users.updateProfile({
-        displayName: displayName.trim(),
+        name: displayName.trim(),
         bio: bio.trim(),
       });
       setUser(updatedUser as any);
@@ -163,8 +163,8 @@ export const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
         <View style={styles.avatarSection}>
           <TouchableOpacity onPress={handlePickImage}>
             <Avatar
-              uri={avatarUri}
-              name={displayName || user?.username}
+              uri={avatarUri || undefined}
+              name={displayName || user?.username || ""}
               size={100}
             />
             <View style={styles.avatarBadge}>

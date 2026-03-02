@@ -1,6 +1,6 @@
-import { NativeStackScreenProps, NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { BottomTabScreenProps, BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
-import { CompositeScreenProps, CompositeNavigationProp, NavigatorScreenParams } from '@react-navigation/native';
+import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
+import { CompositeScreenProps, NavigatorScreenParams } from '@react-navigation/native';
 import { User, Conversation, Call, CallType } from '../types';
 
 // Auth Stack

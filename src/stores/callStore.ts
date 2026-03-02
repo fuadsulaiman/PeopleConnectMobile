@@ -1,9 +1,9 @@
-import { create } from 'zustand';
-import { calls } from '../services/sdk';
-import { signalRService } from '../services/signalr';
+import { create } from "zustand";
+import { calls } from "../services/sdk";
+import { signalRService } from "../services/signalr";
 
-type CallState = 'idle' | 'incoming' | 'connecting' | 'ringing' | 'connected' | 'ended';
-type CallType = 'voice' | 'video';
+type CallState = "idle" | "incoming" | "connecting" | "ringing" | "connected" | "ended";
+type CallType = "voice" | "video";
 
 interface User {
   id: string;
@@ -34,22 +34,24 @@ interface CallStoreState {
   isSpeakerOn: boolean;
   isVideoEnabled: boolean;
   error: string | null;
-
   fetchCallHistory: () => Promise<void>;
   initiateCall: (user: User, type: CallType) => Promise<void>;
   answerCall: () => Promise<void>;
+  acceptCall: () => Promise<void>;
   rejectCall: () => Promise<void>;
   endCall: () => Promise<void>;
   toggleMute: () => void;
   toggleSpeaker: () => void;
   toggleVideo: () => void;
   setIncomingCall: (call: Call) => void;
+  setCallConnected: () => void;
+  addMissedCall: (call: Partial<Call>) => void;
   clearCall: () => void;
 }
 
 export const useCallStore = create<CallStoreState>((set, get) => ({
   currentCall: null,
-  callState: 'idle',
+  callState: "idle",
   callHistory: [],
   isLoading: false,
   isMuted: false,
@@ -64,111 +66,78 @@ export const useCallStore = create<CallStoreState>((set, get) => ({
       const history = Array.isArray(result) ? result : (result as any).items || [];
       set({ callHistory: history as Call[], isLoading: false });
     } catch (error: any) {
-      set({ error: error.message || 'Failed to fetch call history', isLoading: false });
+      set({ error: error.message || "Failed to fetch call history", isLoading: false });
     }
   },
 
   initiateCall: async (user, type) => {
     set({ isLoading: true, error: null });
     try {
-      // Get WebRTC token/config
-      const callConfig = await calls.initiateCall({
-        calleeId: user.id,
-        type,
-      });
-
+      const callConfig = await calls.initiate({ targetUserId: user.id, type });
       set({
         currentCall: {
-          id: (callConfig as any).callId || '',
-          callerId: '',
+          id: (callConfig as any).callId || "",
+          callerId: "",
           calleeId: user.id,
           callee: user,
           type,
-          status: 'Initiating',
+          status: "Initiating",
           startedAt: new Date().toISOString(),
         },
-        callState: 'ringing',
+        callState: "ringing",
         isLoading: false,
-        isVideoEnabled: type === 'video',
+        isVideoEnabled: type === "video",
       });
-
-      // Signal via SignalR
       await signalRService.initiateCall(user.id, type);
     } catch (error: any) {
-      set({ error: error.message || 'Failed to initiate call', isLoading: false });
+      set({ error: error.message || "Failed to initiate call", isLoading: false });
     }
   },
 
   answerCall: async () => {
     const { currentCall } = get();
     if (!currentCall) return;
-
-    set({ callState: 'connecting' });
+    set({ callState: "connecting" });
     try {
       await signalRService.answerCall(currentCall.id);
-      set({ callState: 'connected' });
+      set({ callState: "connected" });
     } catch (error: any) {
-      set({ error: error.message || 'Failed to answer call', callState: 'idle' });
+      set({ error: error.message || "Failed to answer call", callState: "idle" });
     }
   },
+
+  acceptCall: async () => { return get().answerCall(); },
 
   rejectCall: async () => {
     const { currentCall } = get();
     if (!currentCall) return;
-
-    try {
-      await signalRService.rejectCall(currentCall.id);
-    } catch (error) {
-      console.error('Failed to reject call:', error);
-    } finally {
-      set({ currentCall: null, callState: 'idle' });
-    }
+    try { await signalRService.rejectCall(currentCall.id); } catch (e) { console.error("Failed to reject call:", e); }
+    finally { set({ currentCall: null, callState: "idle" }); }
   },
 
   endCall: async () => {
     const { currentCall } = get();
     if (!currentCall) return;
-
-    try {
-      await signalRService.endCall(currentCall.id);
-    } catch (error) {
-      console.error('Failed to end call:', error);
-    } finally {
-      set({ currentCall: null, callState: 'ended' });
-      // Reset to idle after a short delay
-      setTimeout(() => set({ callState: 'idle' }), 1000);
-    }
+    try { await signalRService.endCall(currentCall.id); } catch (e) { console.error("Failed to end call:", e); }
+    finally { set({ currentCall: null, callState: "ended" }); setTimeout(() => set({ callState: "idle" }), 1000); }
   },
 
-  toggleMute: () => {
-    set((state) => ({ isMuted: !state.isMuted }));
+  toggleMute: () => { set((state) => ({ isMuted: !state.isMuted })); },
+  toggleSpeaker: () => { set((state) => ({ isSpeakerOn: !state.isSpeakerOn })); },
+  toggleVideo: () => { set((state) => ({ isVideoEnabled: !state.isVideoEnabled })); },
+  setIncomingCall: (call) => { set({ currentCall: call, callState: "incoming", isVideoEnabled: call.type === "video" }); },
+  setCallConnected: () => { set({ callState: "connected" }); },
+
+  addMissedCall: (call) => {
+    const missedCall: Call = {
+      id: call.id || "", callerId: call.callerId || "", calleeId: call.calleeId || "",
+      caller: call.caller, callee: call.callee, type: call.type || "voice", status: "missed",
+      startedAt: call.startedAt || new Date().toISOString(), endedAt: call.endedAt, duration: call.duration,
+    };
+    set((state) => ({ callHistory: [missedCall, ...state.callHistory] }));
   },
 
-  toggleSpeaker: () => {
-    set((state) => ({ isSpeakerOn: !state.isSpeakerOn }));
-  },
-
-  toggleVideo: () => {
-    set((state) => ({ isVideoEnabled: !state.isVideoEnabled }));
-  },
-
-  setIncomingCall: (call) => {
-    set({
-      currentCall: call,
-      callState: 'incoming',
-      isVideoEnabled: call.type === 'video',
-    });
-  },
-
-  clearCall: () => {
-    set({
-      currentCall: null,
-      callState: 'idle',
-      isMuted: false,
-      isSpeakerOn: false,
-      isVideoEnabled: true,
-    });
-  },
+  clearCall: () => { set({ currentCall: null, callState: "idle", isMuted: false, isSpeakerOn: false, isVideoEnabled: true }); },
 }));
 
 export default useCallStore;

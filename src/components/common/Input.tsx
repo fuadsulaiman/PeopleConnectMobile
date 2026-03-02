@@ -42,7 +42,7 @@ export function Input({
       >
         {leftIcon && <View style={styles.leftIcon}>{leftIcon}</View>}
         <TextInput
-          style={[styles.input, leftIcon && styles.inputWithLeftIcon]}
+          style={[styles.input, leftIcon ? styles.inputWithLeftIcon : undefined]}
           placeholderTextColor={colors.textTertiary}
           secureTextEntry={isSecure}
           onFocus={() => setIsFocused(true)}

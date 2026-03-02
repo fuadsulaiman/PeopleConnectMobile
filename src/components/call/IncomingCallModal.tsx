@@ -65,7 +65,7 @@ const IncomingCallModal: React.FC<IncomingCallModalProps> = ({
       };
     } else {
       slideAnim.setValue(0);
-      return undefined;
+      return () => {};
     }
   }, [visible, pulseAnim, slideAnim]);
 

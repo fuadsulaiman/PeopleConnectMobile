@@ -333,7 +333,7 @@ function App(): React.JSX.Element {
         // If we have the conversationId, try to update directly
         if (conversationId) {
           // Try exact match first, then normalized
-          const convMessages = chatStore.messages[conversationId] || chatStore.messages[normalizedConversationId];
+          const convMessages = chatStore.messages[conversationId] || (normalizedConversationId ? chatStore.messages[normalizedConversationId] : undefined);
           if (convMessages) {
             const message = convMessages.find((m: any) => m.id?.toLowerCase() === normalizedMessageId);
             if (message) {

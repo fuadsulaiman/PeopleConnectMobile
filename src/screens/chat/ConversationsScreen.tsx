@@ -230,7 +230,7 @@ export const ConversationsScreen: React.FC<Props> = ({ navigation }) => {
     }
   };
 
-  const formatMessagePreview = (preview: string | undefined, conversation: Conversation) => {
+  const formatMessagePreview = (preview: string | undefined, _conversation: Conversation) => {
     if (!preview) return 'No messages yet';
 
     // Already formatted with emoji
@@ -245,7 +245,6 @@ export const ConversationsScreen: React.FC<Props> = ({ navigation }) => {
     }
 
     // Check for media URLs in preview
-    const lowerPreview = preview.toLowerCase();
     if (/\.(jpg|jpeg|png|gif|webp|bmp|svg)(\?|$)/i.test(preview)) {
       return '📷 Photo';
     }
@@ -424,7 +423,7 @@ export const ConversationsScreen: React.FC<Props> = ({ navigation }) => {
       </View>
 
       <FlatList
-        data={conversations}
+        data={conversations as any}
         renderItem={renderConversation}
         keyExtractor={(item) => item.id}
         extraData={presenceVersion}

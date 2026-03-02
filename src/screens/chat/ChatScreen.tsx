@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, TextInput, KeyboardAvoidingView, Platform, Image, ActivityIndicator, Dimensions, Linking, Modal, Alert, PermissionsAndroid, Animated, Vibration, ScrollView } from "react-native";
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, TextInput, KeyboardAvoidingView, Platform, Image, ActivityIndicator, Dimensions, Modal, Alert, PermissionsAndroid, Animated, Vibration, ScrollView } from "react-native";
 import { Swipeable } from "react-native-gesture-handler";
 import Icon from "react-native-vector-icons/Ionicons";
 import { launchImageLibrary, launchCamera, MediaType } from "react-native-image-picker";
@@ -41,7 +41,6 @@ try {
 
 // Audio recording is not available without native module
 // Users can use the video recording feature to record audio with video
-const _AudioRecorderPlayer: any = null;
 
 const { width: screenWidth } = Dimensions.get('window');
 const MAX_IMAGE_WIDTH = screenWidth * 0.65;
@@ -93,7 +92,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
   const styles = useMemo(() => createStyles(colors), [colors]);
 
   const [inputText, setInputText] = useState("");
-  const [sending, setSending] = useState(false);
+  const [sending, _setSending] = useState(false);
   const [mediaViewerVisible, setMediaViewerVisible] = useState(false);
   const [attachmentMenuVisible, setAttachmentMenuVisible] = useState(false);
   const [uploadingMedia, setUploadingMedia] = useState(false);
@@ -137,7 +136,6 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
   const contentHeightRef = useRef<number>(0);
   const isNearBottomRef = useRef<boolean>(true);
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const _audioRecorderRef = useRef<any>(null);
   const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
   const recordingAnimValue = useRef(new Animated.Value(1)).current;
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -883,30 +881,6 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
   }, [uploadFile, sendWithAttachment]);
 
   // Process video asset (shared between record and pick)
-  const _processVideoAsset = useCallback(async (asset: any) => {
-    console.log('Processing video:', { uri: asset.uri, fileName: asset.fileName, type: asset.type, fileSize: asset.fileSize });
-    setUploadingMedia(true);
-    try {
-      const fileName = asset.fileName || `video_${Date.now()}.mp4`;
-      const mimeType = asset.type || 'video/mp4';
-      console.log('Uploading video with:', { fileName, mimeType, uri: asset.uri });
-      const uploadResult = await uploadFile(asset.uri, fileName, mimeType);
-      console.log('Video upload result:', uploadResult);
-      if (uploadResult) {
-        console.log('Sending video with attachment:', uploadResult);
-        sendWithAttachment(uploadResult, 'video');
-        console.log('Video sent successfully');
-      } else {
-        console.log('Upload returned null');
-        Alert.alert('Upload Failed', 'Could not upload video.');
-      }
-    } catch (uploadError: any) {
-      console.error('Upload error:', uploadError);
-      Alert.alert('Upload Error', uploadError?.message || 'Failed to upload video');
-    } finally {
-      setUploadingMedia(false);
-    }
-  }, [sendWithAttachment, uploadFile]);
 
   // Start audio recording
   const startAudioRecording = useCallback(async () => {
@@ -966,47 +940,8 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
   const isAudioUrl = (url: string) => /\.(mp3|wav|ogg|m4a|aac|flac|wma|opus|amr|3gpp)(\?|$)/i.test(url);
 
   // Helper to parse location data from message content
-  const parseLocationData = (content: string): { latitude: number; longitude: number; address?: string; name?: string } | null => {
-    try {
-      // Try to parse as JSON first
-      if (content.startsWith('{')) {
-        const data = JSON.parse(content);
-        if (data.latitude && data.longitude) {
-          return {
-            latitude: parseFloat(data.latitude),
-            longitude: parseFloat(data.longitude),
-            address: data.address,
-            name: data.name,
-          };
-        }
-      }
-      return null;
-    } catch {
-      return null;
-    }
-  };
 
   // Open location in maps app
-  const openLocationInMaps = (latitude: number, longitude: number, label?: string) => {
-    const scheme = Platform.select({
-      ios: 'maps:',
-      android: 'geo:',
-    });
-    const latLng = `${latitude},${longitude}`;
-    const labelText = label ? encodeURIComponent(label) : '';
-
-    const url = Platform.select({
-      ios: `${scheme}${latLng}?q=${labelText || latLng}`,
-      android: `${scheme}${latLng}?q=${latLng}(${labelText})`,
-    });
-
-    if (url) {
-      Linking.openURL(url).catch(() => {
-        // Fallback to Google Maps web
-        Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${latLng}`);
-      });
-    }
-  };
 
   // Get attachment URL from message (converts relative URLs to absolute)
   const getAttachmentUrl = (item: any): string | null => {
@@ -2018,7 +1953,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
       {isLoading && conversationMessages.length === 0 ? <View style={styles.loadingContainer}><ActivityIndicator size="large" color={colors.primary} /></View> :
         <FlatList
           ref={flatListRef}
-          data={reversedMessages}
+          data={reversedMessages as any}
           renderItem={renderMessage}
           keyExtractor={item => item.id}
           contentContainerStyle={styles.messagesList}
@@ -2311,7 +2246,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
       {/* Conversation Info Sheet */}
       <ConversationInfoSheet
         visible={infoSheetVisible}
-        conversation={conversation || null}
+        conversation={(conversation || null) as any}
         onClose={() => setInfoSheetVisible(false)}
         onStartCall={handleCall}
         onViewProfile={(userId, userName, userAvatar, username) => {

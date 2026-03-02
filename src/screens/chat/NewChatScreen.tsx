@@ -6,7 +6,7 @@ import { conversations, search as searchService } from "../../services/sdk";
 import { colors } from "../../constants/colors";
 import { config } from "../../constants";
 import { NewChatScreenProps } from "../../navigation/types";
-import { Contact, User } from "../../types";
+import { Contact } from "../../types";
 
 // Helper to convert relative URLs to absolute URLs
 const toAbsoluteUrl = (url: string | null | undefined): string | undefined => {
@@ -90,9 +90,9 @@ const NewChatScreen: React.FC<NewChatScreenProps> = ({ navigation }) => {
   const handleSelectContact = async (contact: Contact) => {
     setCreating(true);
     try {
-      const userId = contact.user?.id || contact.userId;
+      const userId = contact.user?.id || contact.userId || "";
       const conversation = await conversations.createDM({ userId });
-      navigation.replace("Chat", { conversationId: conversation.id, conversation });
+      navigation.replace("Chat", { conversationId: conversation.id, conversation: conversation as any });
     } catch (error) {
       console.error("Failed to create conversation:", error);
     } finally {
@@ -104,7 +104,7 @@ const NewChatScreen: React.FC<NewChatScreenProps> = ({ navigation }) => {
     setCreating(true);
     try {
       const conversation = await conversations.createDM({ userId: user.id });
-      navigation.replace("Chat", { conversationId: conversation.id, conversation });
+      navigation.replace("Chat", { conversationId: conversation.id, conversation: conversation as any });
     } catch (error) {
       console.error("Failed to create conversation:", error);
     } finally {
@@ -193,7 +193,7 @@ const NewChatScreen: React.FC<NewChatScreenProps> = ({ navigation }) => {
       ) : (
         <FlatList
           data={displayData as any[]}
-          renderItem={showSearchResults ? renderSearchResult : renderContact}
+          renderItem={(showSearchResults ? renderSearchResult : renderContact) as any}
           keyExtractor={item => item.id}
           contentContainerStyle={displayData.length === 0 ? styles.emptyListContent : styles.listContent}
           ListEmptyComponent={renderEmpty}

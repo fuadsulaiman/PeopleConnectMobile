@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { COLOR_PROFILES, DEFAULT_COLOR_PROFILE, getColorProfile, type ColorProfile } from '../constants/colorProfiles';
+import { DEFAULT_COLOR_PROFILE, getColorProfile, type ColorProfile } from '../constants/colorProfiles';
 import { config } from '../constants';
 
 interface ThemeColors {
@@ -30,6 +30,7 @@ interface ThemeColors {
   away: string;
   busy: string;
   offline: string;
+  info: string;
   // Message bubble colors
   messageBubbleOwn: string;
   messageBubbleOther: string;
@@ -85,15 +86,6 @@ function lightenColor(hex: string, percent: number): string {
   return '#' + (0x1000000 + R * 0x10000 + G * 0x100 + B).toString(16).slice(1);
 }
 
-// Helper to add alpha to a hex color (returns rgba string)
-function hexToRgba(hex: string, alpha: number): string {
-  const num = parseInt(hex.replace('#', ''), 16);
-  const R = (num >> 16) & 0xFF;
-  const G = (num >> 8) & 0xFF;
-  const B = num & 0xFF;
-  return `rgba(${R}, ${G}, ${B}, ${alpha})`;
-}
-
 // Generate theme colors from a color profile
 function generateThemeColors(profile: ColorProfile, isDarkMode: boolean): ThemeColors {
   // Gray scale - same for both light and dark mode
@@ -137,6 +129,7 @@ function generateThemeColors(profile: ColorProfile, isDarkMode: boolean): ThemeC
       away: '#FF9500',
       busy: '#FF3B30',
       offline: '#8E8E93',
+      info: '#007AFF',
       // Message bubbles - in dark mode
       messageBubbleOwn: profile.primaryColor,
       messageBubbleOther: darkenColor(profile.secondaryColor, 30),
@@ -172,6 +165,7 @@ function generateThemeColors(profile: ColorProfile, isDarkMode: boolean): ThemeC
     away: '#FF9500',
     busy: '#FF3B30',
     offline: '#8E8E93',
+    info: '#007AFF',
     // Message bubbles - in light mode, other's bubble uses a light accent color
     messageBubbleOwn: profile.primaryColor,
     messageBubbleOther: lightenColor(profile.secondaryColor, 45),

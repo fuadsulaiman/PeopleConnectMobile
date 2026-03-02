@@ -136,11 +136,6 @@ export const MediaViewer: React.FC<MediaViewerProps> = ({
     setPaused(!paused);
   };
 
-  const seekVideo = (time: number) => {
-    if (videoRef.current) {
-      videoRef.current.seek(time);
-    }
-  };
 
   // Reset state when modal closes
   const handleClose = () => {

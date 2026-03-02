@@ -18,7 +18,6 @@ import { GroupCallScreenProps } from '../../navigation/types';
 let LiveKitRoom: any = null;
 let VideoView: any = null;
 let useParticipants: any = null;
-let useLocalParticipant: any = null;
 let useTracks: any = null;
 let Track: any = null;
 let isTrackReference: any = null;
@@ -28,7 +27,7 @@ try {
   LiveKitRoom = livekit.LiveKitRoom;
   VideoView = livekit.VideoView;
   useParticipants = livekit.useParticipants;
-  useLocalParticipant = livekit.useLocalParticipant;
+  
   useTracks = livekit.useTracks;
   Track = livekit.Track;
   isTrackReference = livekit.isTrackReference;
@@ -38,13 +37,6 @@ try {
 
 const { width, height } = Dimensions.get('window');
 
-interface Participant {
-  identity: string;
-  name?: string;
-  isSpeaking?: boolean;
-  isMuted?: boolean;
-  isVideoEnabled?: boolean;
-}
 
 const GroupCallScreen: React.FC<GroupCallScreenProps> = ({ route, navigation }) => {
   const { conversationId, conversationName } = route.params;
@@ -162,7 +154,7 @@ const GroupCallScreen: React.FC<GroupCallScreenProps> = ({ route, navigation }) 
       video={isVideoEnabled}
     >
       <RoomContent
-        roomName={roomName || conversationName}
+        roomName={roomName || conversationName || ""}
         isMuted={isMuted}
         isVideoEnabled={isVideoEnabled}
         isSpeakerOn={isSpeakerOn}
@@ -203,7 +195,6 @@ const RoomContent: React.FC<RoomContentProps> = ({
   styles,
 }) => {
   const participants = useParticipants ? useParticipants() : [];
-  const localParticipant = useLocalParticipant ? useLocalParticipant() : null;
   const tracks = useTracks ? useTracks([Track?.Source?.Camera, Track?.Source?.ScreenShare]) : [];
 
   const gridSize = Math.ceil(Math.sqrt(Math.max(participants.length, 1)));

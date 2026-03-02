@@ -74,13 +74,13 @@ const ContactsScreen: React.FC<ContactsScreenProps> = ({ navigation }) => {
           <Text style={[styles.tabText, activeTab === "all" && styles.tabTextActive]}>All ({contacts.length})</Text>
         </TouchableOpacity>
         <TouchableOpacity style={[styles.tab, activeTab === "requests" && styles.tabActive]} onPress={() => setActiveTab("requests")}>
-          <Text style={[styles.tabText, activeTab === "requests" && styles.tabTextActive]}>Requests ({requests.received.length})</Text>
+          <Text style={[styles.tabText, activeTab === "requests" && styles.tabTextActive]}>Requests ({requests.length})</Text>
         </TouchableOpacity>
       </View>
       {isLoading && contacts.length === 0 ? <View style={styles.loadingContainer}><ActivityIndicator size="large" color={colors.primary} /></View> :
         activeTab === "all" ?
-          <FlatList data={filteredContacts} renderItem={renderContact} keyExtractor={item => item.id} contentContainerStyle={styles.listContent} ListEmptyComponent={renderEmpty} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} />} /> :
-          <FlatList data={requests.received} renderItem={renderRequest} keyExtractor={item => item.id} contentContainerStyle={styles.listContent} ListEmptyComponent={renderEmpty} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} />} />}
+          <FlatList data={filteredContacts as any} renderItem={renderContact} keyExtractor={item => item.id} contentContainerStyle={styles.listContent} ListEmptyComponent={renderEmpty} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} />} /> :
+          <FlatList data={requests as any} renderItem={renderRequest} keyExtractor={item => item.id} contentContainerStyle={styles.listContent} ListEmptyComponent={renderEmpty} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} />} />}
       <TouchableOpacity style={styles.fab} onPress={() => navigation.navigate("AddContact")}><Icon name="person-add" size={24} color={colors.white} /></TouchableOpacity>
     </View>
   );

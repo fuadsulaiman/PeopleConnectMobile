@@ -145,7 +145,7 @@ export const ArchivedConversationsScreen: React.FC<Props> = ({ navigation }) => 
       </View>
 
       <FlatList
-        data={archivedConversations}
+        data={archivedConversations as any}
         renderItem={renderConversation}
         keyExtractor={(item) => item.id}
         contentContainerStyle={archivedConversations.length === 0 ? styles.emptyContainer : undefined}

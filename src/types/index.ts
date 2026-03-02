@@ -1,25 +1,25 @@
 // User types
 export interface User {
   id: string;
-  name: string;
-  username: string;
-  email: string;
+  name?: string;
+  username?: string;
+  email?: string;
   avatarUrl?: string;
-  status?: 'online' | 'away' | 'busy' | 'offline';
+  status?: 'online' | 'away' | 'busy' | 'offline' | 'Online' | 'Away' | 'Busy' | 'Offline';
   statusMessage?: string;
   lastSeen?: string;
-  createdAt: string;
+  createdAt?: string;
 }
 
 // Auth types
 export interface LoginRequest {
-  username: string;
+  username?: string;
   password: string;
 }
 
 export interface RegisterRequest {
-  name: string;
-  username: string;
+  name?: string;
+  username?: string;
   email: string;
   password: string;
 }
@@ -37,8 +37,8 @@ export type ConversationType = 'DirectMessage' | 'Chatroom' | 'BroadcastChannel'
 
 export interface ConversationUser {
   id: string;
-  name: string;
-  username: string;
+  name?: string;
+  username?: string;
   avatarUrl?: string;
   status?: 'Online' | 'Away' | 'Busy' | 'Offline';
 }
@@ -74,11 +74,12 @@ export interface Conversation {
   isBroadcast?: boolean;
   isPlatformChannel?: boolean;
   subscriberCount?: number;
+  disappearingMessagesDuration?: string;
 }
 
 // Message types
-export type MessageType = 'text' | 'image' | 'video' | 'audio' | 'file' | 'system';
-export type MessageStatus = 'sending' | 'sent' | 'delivered' | 'read' | 'failed';
+export type MessageType = string | 'text' | 'image' | 'video' | 'audio' | 'file' | 'system' | 'Text' | 'Image' | 'Video' | 'Audio' | 'File' | 'System' | 'Location' | 'VoiceCall' | 'VideoCall';
+export type MessageStatus = 'sending' | 'sent' | 'delivered' | 'read' | 'failed' | 'Sent' | 'Delivered' | 'Read' | 'Deleted' | 'Flagged';
 
 export interface Message {
   id: string;
@@ -92,9 +93,9 @@ export interface Message {
   reactions: Reaction[];
   replyTo?: Message;
   replyToId?: string;
-  isEdited: boolean;
+  isEdited?: boolean;
   editedAt?: string;
-  isDeleted: boolean;
+  isDeleted?: boolean;
   createdAt: string;
 }
 
@@ -120,9 +121,12 @@ export interface Reaction {
 // Contact types
 export interface Contact {
   id: string;
+  userId?: string;
   user: User;
+  contactUser?: User;
   nickname?: string;
-  createdAt: string;
+  createdAt?: string;
+  status?: 'Pending' | 'Accepted' | 'Rejected' | 'Blocked';
 }
 
 export interface ContactRequest {
@@ -135,19 +139,23 @@ export interface ContactRequest {
 
 // Call types
 export type CallType = 'voice' | 'video';
-export type CallStatus = 'ringing' | 'connected' | 'ended' | 'missed' | 'rejected' | 'failed';
+export type CallStatus = 'ringing' | 'connected' | 'ended' | 'missed' | 'rejected' | 'failed' | 'completed';
 
 export interface Call {
   id: string;
-  conversationId: string;
+  conversationId?: string;
   conversationName?: string;
+  callerId?: string;
+  calleeId?: string;
+  caller?: User;
+  callee?: User;
   type: CallType;
-  status: CallStatus;
-  direction: 'incoming' | 'outgoing';
+  status: CallStatus | string;
+  direction?: 'incoming' | 'outgoing';
   startedAt: string;
   endedAt?: string;
   duration?: number;
-  participants: CallParticipant[];
+  participants?: CallParticipant[];
 }
 
 export interface CallParticipant {
@@ -187,4 +195,13 @@ export interface ApiResponse<T> {
   data?: T;
   message?: string;
   errors?: string[];
+}
+
+// Search User type
+export interface SearchUser {
+  id: string;
+  name?: string;
+  username?: string;
+  avatarUrl?: string;
+  status?: string;
 }

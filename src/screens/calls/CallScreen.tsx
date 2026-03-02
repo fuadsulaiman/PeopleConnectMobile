@@ -19,7 +19,7 @@ import { signalRService } from '../../services/signalr';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList, CallsStackParamList } from '../../navigation/types';
 
-const { width, height } = Dimensions.get('window');
+const { width: _screenWidth, height: _screenHeight } = Dimensions.get('window');
 
 // Support both ActiveCall (root level) and Call (within calls stack)
 type ActiveCallScreenProps = NativeStackScreenProps<RootStackParamList, 'ActiveCall'>;
@@ -138,7 +138,7 @@ const CallScreen: React.FC<CallScreenProps> = ({ route }) => {
     };
   }, []);
 
-  const handleCallEnded = useCallback((reason?: string) => {
+  const handleCallEnded = useCallback((_reason?: string) => {
     if (durationIntervalRef.current) {
       clearInterval(durationIntervalRef.current);
     }
