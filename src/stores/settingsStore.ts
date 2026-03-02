@@ -19,6 +19,7 @@ interface PublicMessagingSettings {
   maxAttachmentSize: number;
   allowedFileTypes: string[];
   enableViewOnceMessage?: boolean;
+  linkPreviewEnabled?: boolean;
 }
 
 interface PublicCallSettings {
@@ -34,12 +35,31 @@ interface PublicPrivacySettings {
   showTypingIndicator?: boolean;
 }
 
+interface PublicReplySettings {
+  allowReply?: boolean;
+}
+
+interface PublicEditingSettings {
+  allowEditing?: boolean;
+  editTimeLimitMinutes?: number;
+  showEditHistory?: boolean;
+}
+
+interface PublicDeletionSettings {
+  timeLimitMinutes?: number;
+  deleteForMeAlwaysAllowed?: boolean;
+  showDeleteConfirmation?: boolean;
+}
+
 interface PublicSettings {
   general: PublicGeneralSettings;
   platform?: PublicPlatformSettings;
   messaging?: PublicMessagingSettings;
   calls?: PublicCallSettings;
   privacy?: PublicPrivacySettings;
+  reply?: PublicReplySettings;
+  editing?: PublicEditingSettings;
+  deletion?: PublicDeletionSettings;
 }
 
 interface SettingsState {
@@ -58,6 +78,7 @@ interface SettingsState {
   isVideoCallsEnabled: () => boolean;
   getMaxMessageLength: () => number;
   getPrivacySettings: () => PublicPrivacySettings;
+  isLinkPreviewEnabled: () => boolean;
 }
 
 // Cache duration: 5 minutes
@@ -161,6 +182,11 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   getMaxMessageLength: () => {
     const state = get();
     return state.publicSettings?.messaging?.maxMessageLength ?? 5000;
+  },
+
+  isLinkPreviewEnabled: () => {
+    const state = get();
+    return state.publicSettings?.messaging?.linkPreviewEnabled ?? true;
   },
 
   getPrivacySettings: () => {

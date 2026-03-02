@@ -15,6 +15,10 @@ import { Avatar } from "../../components/common/Avatar";
 import { ConversationInfoSheet } from "../../components/ConversationInfoSheet";
 import { sdk, conversations as conversationsApi, contacts as contactsApi } from "../../services/sdk";
 import { signalRService } from "../../services/signalr";
+import { LinkPreview, extractFirstUrl } from "../../components/chat";
+import { LocationPicker } from "../../components/chat/LocationPicker";
+import { LocationMessage } from "../../components/chat/LocationMessage";
+import { locationService, LocationData } from "../../services/locationService";
 
 // Helper to convert relative URLs to absolute URLs
 const toAbsoluteUrl = (url: string | null | undefined): string | undefined => {
@@ -37,7 +41,7 @@ try {
 
 // Audio recording is not available without native module
 // Users can use the video recording feature to record audio with video
-const AudioRecorderPlayer: any = null;
+const _AudioRecorderPlayer: any = null;
 
 const { width: screenWidth } = Dimensions.get('window');
 const MAX_IMAGE_WIDTH = screenWidth * 0.65;
@@ -76,6 +80,8 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
     deleteForMeAlwaysAllowed: publicSettings?.deletion?.deleteForMeAlwaysAllowed ?? true,
     showDeleteConfirmation: publicSettings?.deletion?.showDeleteConfirmation ?? true,
   };
+  // Link preview setting
+  const linkPreviewEnabled = publicSettings?.messaging?.linkPreviewEnabled !== false;
   const { colors } = useTheme();
 
   // Fetch settings on mount
@@ -101,6 +107,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
   const [emojiPickerVisible, setEmojiPickerVisible] = useState(false);
   const [videoRecorderVisible, setVideoRecorderVisible] = useState(false);
   const [infoSheetVisible, setInfoSheetVisible] = useState(false);
+  const [locationPickerVisible, setLocationPickerVisible] = useState(false);
   const [typingUsers, setTypingUsers] = useState<{ userId: string; userName?: string }[]>([]);
   const [recordingUsers, setRecordingUsers] = useState<{ userId: string; userName?: string }[]>([]);
   const [expandedMessages, setExpandedMessages] = useState<Set<string>>(new Set());
@@ -130,14 +137,14 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
   const contentHeightRef = useRef<number>(0);
   const isNearBottomRef = useRef<boolean>(true);
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const audioRecorderRef = useRef<any>(null);
+  const _audioRecorderRef = useRef<any>(null);
   const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
   const recordingAnimValue = useRef(new Animated.Value(1)).current;
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastTypingSentRef = useRef<number>(0);
   const conversationMessages = messages[conversationId] || [];
-
-  // Memoize reversed messages to prevent unnecessary re-renders
+  // Check if this is a Platform Channel (broadcast) - declared early to use in handleLoadMore
+  const isBroadcast = (conversation as any)?.isBroadcast === true || (conversation as any)?.type === "BroadcastChannel";
   const reversedMessages = useMemo(() => {
     return [...conversationMessages].reverse();
   }, [conversationMessages]);
@@ -158,7 +165,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
     isNearBottomRef.current = offsetY < 100;
   }, []);
 
-  const handleContentSizeChange = useCallback((width: number, height: number) => {
+  const handleContentSizeChange = useCallback((_width: number, height: number) => {
     const prevHeight = contentHeightRef.current;
     contentHeightRef.current = height;
 
@@ -245,10 +252,6 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
     setMediaViewerVisible(false);
     setSelectedMedia(null);
   };
-
-  // Check if this is a Platform Channel (broadcast)
-  const isBroadcast = (conversation as any)?.isBroadcast === true ||
-                       (conversation as any)?.type === 'BroadcastChannel';
 
   useEffect(() => {
     setActiveConversation(conversationId);
@@ -837,82 +840,20 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
   }, [sendWithAttachment, uploadFile]);
 
   // Share location
-  const handleShareLocation = useCallback(async () => {
+  // Share location - open location picker modal
+  const handleShareLocation = useCallback(() => {
     setAttachmentMenuVisible(false);
-    try {
-      // Request location permission on Android
-      if (Platform.OS === 'android') {
-        const granted = await PermissionsAndroid.request(
-          PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
-          {
-            title: 'Location Permission',
-            message: 'This app needs access to your location to share it.',
-            buttonPositive: 'OK',
-          }
-        );
-        if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
-          Alert.alert('Permission Denied', 'Location permission is required');
-          return;
-        }
-      }
+    setLocationPickerVisible(true);
+  }, []);
 
-      // Use Geolocation API
-      setSending(true);
+  // Handle location selected from picker
+  const handleLocationSelect = useCallback((location: LocationData) => {
+    const locationContent = locationService.serializeLocationData(location);
 
-      // Import Geolocation dynamically to handle if not available
-      try {
-        const Geolocation = require('@react-native-community/geolocation').default;
-        Geolocation.getCurrentPosition(
-          (position: any) => {
-            const { latitude, longitude } = position.coords;
-            const locationData = JSON.stringify({
-              latitude,
-              longitude,
-              name: 'My Location',
-              address: `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`,
-            });
-            // Fire and forget - optimistic update happens immediately
-            sendMessage(conversationId, locationData, [{ type: 'location' }]).catch(console.error);
-            setSending(false);
-          },
-          (error: any) => {
-            console.error('Location error:', error);
-            Alert.alert('Error', 'Failed to get current location. Please enable location services.');
-            setSending(false);
-          },
-          { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
-        );
-      } catch (geoError) {
-        // Fallback: Send a placeholder location or prompt user
-        console.error('Geolocation module not available:', geoError);
-        Alert.alert(
-          'Location Not Available',
-          'Would you like to send a manual location?',
-          [
-            { text: 'Cancel', style: 'cancel', onPress: () => setSending(false) },
-            {
-              text: 'Send Default',
-              onPress: () => {
-                // Send a placeholder - user can update in chat
-                const locationData = JSON.stringify({
-                  latitude: 0,
-                  longitude: 0,
-                  name: 'Location',
-                  address: 'Location shared',
-                });
-                // Fire and forget - optimistic update happens immediately
-                sendMessage(conversationId, locationData, [{ type: 'location' }]).catch(console.error);
-                setSending(false);
-              },
-            },
-          ]
-        );
-      }
-    } catch (error) {
-      console.error('Location error:', error);
-      setSending(false);
-    }
+    // Fire and forget - optimistic update happens immediately
+    sendMessage(conversationId, locationContent, [{ type: 'location' }]).catch(console.error);
   }, [conversationId, sendMessage]);
+
 
   // Record video using in-app camera
   const handleRecordVideo = useCallback(() => {
@@ -942,7 +883,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
   }, [uploadFile, sendWithAttachment]);
 
   // Process video asset (shared between record and pick)
-  const processVideoAsset = useCallback(async (asset: any) => {
+  const _processVideoAsset = useCallback(async (asset: any) => {
     console.log('Processing video:', { uri: asset.uri, fileName: asset.fileName, type: asset.type, fileSize: asset.fileSize });
     setUploadingMedia(true);
     try {
@@ -1254,7 +1195,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
         {hasThumbnail ? (
           <View style={styles.replyThumbnailContainer}>
             <Image
-              source={{ uri: mediaInfo.thumbnailUrl }}
+              source={{ uri: mediaInfo.thumbnailUrl || undefined }}
               style={styles.replyThumbnail}
               resizeMode="cover"
             />
@@ -1386,39 +1327,24 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
       );
     }
 
-    // Render location
+    // Render location with LocationMessage component
     if (item.type?.toLowerCase() === 'location' || (hasText && item.content.includes('"latitude"'))) {
-      const locationData = parseLocationData(item.content);
-      if (locationData) {
-        return (
-          <TouchableOpacity
-            style={styles.locationContainer}
-            onPress={() => openLocationInMaps(locationData.latitude, locationData.longitude, locationData.name || locationData.address)}
-          >
-            <View style={[styles.locationMapPreview, isOwn && styles.locationMapPreviewOwn]}>
-              <Icon name="location" size={32} color={isOwn ? colors.white : colors.primary} />
-            </View>
-            <View style={styles.locationInfo}>
-              {locationData.name && (
-                <Text style={[styles.locationName, isOwn && { color: colors.white }]} numberOfLines={1}>
-                  {locationData.name}
-                </Text>
-              )}
-              {locationData.address && (
-                <Text style={[styles.locationAddress, isOwn && { color: 'rgba(255,255,255,0.8)' }]} numberOfLines={2}>
-                  {locationData.address}
-                </Text>
-              )}
-              <Text style={[styles.locationTap, isOwn && { color: 'rgba(255,255,255,0.6)' }]}>
-                Tap to open in Maps
-              </Text>
-            </View>
-          </TouchableOpacity>
-        );
+      const parsedLocation = locationService.parseLocationData(item.content);
+      if (parsedLocation) {
+        return <LocationMessage location={parsedLocation} isOwn={isOwn} />;
       }
       // Fallback for unparseable location
       return (
-        <TouchableOpacity style={styles.locationContainer}>
+        <TouchableOpacity
+          style={styles.locationContainer}
+          onPress={() => {
+            // Try to parse any coordinates from content
+            const match = item.content.match(/(-?\d+\.?\d*),\s*(-?\d+\.?\d*)/);
+            if (match) {
+              locationService.openInMaps(parseFloat(match[1]), parseFloat(match[2]), 'Shared Location');
+            }
+          }}
+        >
           <Icon name="location" size={32} color={isOwn ? colors.white : colors.primary} />
           <Text style={[styles.locationLabel, isOwn && { color: colors.white }]}>
             Location
@@ -1436,6 +1362,9 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
         ? content.substring(0, MAX_MESSAGE_LENGTH) + '...'
         : content;
 
+      // Check for URLs to show link preview
+      const firstUrl = linkPreviewEnabled ? extractFirstUrl(content) : null;
+
       return (
         <View>
           <Text style={[styles.messageText, isOwn && styles.messageTextOwn]}>
@@ -1447,6 +1376,9 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
                 {isExpanded ? 'Show less' : 'Read more'}
               </Text>
             </TouchableOpacity>
+          )}
+          {firstUrl && (
+            <LinkPreview url={firstUrl} isOwn={isOwn} />
           )}
         </View>
       );
@@ -2686,6 +2618,12 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
           </View>
         </View>
       </Modal>
+      {/* Location Picker Modal */}
+      <LocationPicker
+        visible={locationPickerVisible}
+        onClose={() => setLocationPickerVisible(false)}
+        onLocationSelect={handleLocationSelect}
+      />
     </KeyboardAvoidingView>
   );
 };
