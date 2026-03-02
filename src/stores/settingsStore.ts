@@ -9,6 +9,11 @@ interface PublicGeneralSettings {
   maintenanceMessage?: string;
 }
 
+interface PublicPlatformSettings {
+  registrationEnabled?: boolean;
+  inviteOnlyMode?: boolean;
+}
+
 interface PublicMessagingSettings {
   maxMessageLength: number;
   maxAttachmentSize: number;
@@ -22,10 +27,19 @@ interface PublicCallSettings {
   enableVideoCalls: boolean;
 }
 
+interface PublicPrivacySettings {
+  showOnlineStatus?: boolean;
+  showLastSeen?: boolean;
+  showReadReceipts?: boolean;
+  showTypingIndicator?: boolean;
+}
+
 interface PublicSettings {
   general: PublicGeneralSettings;
+  platform?: PublicPlatformSettings;
   messaging?: PublicMessagingSettings;
   calls?: PublicCallSettings;
+  privacy?: PublicPrivacySettings;
 }
 
 interface SettingsState {
@@ -38,6 +52,12 @@ interface SettingsState {
   getSiteName: () => string;
   getSiteLogo: () => string | undefined;
   isViewOnceEnabled: () => boolean;
+  isInviteOnlyMode: () => boolean;
+  isRegistrationEnabled: () => boolean;
+  isVoiceCallsEnabled: () => boolean;
+  isVideoCallsEnabled: () => boolean;
+  getMaxMessageLength: () => number;
+  getPrivacySettings: () => PublicPrivacySettings;
 }
 
 // Cache duration: 5 minutes
@@ -112,7 +132,46 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     const baseUrl = config.API_BASE_URL.replace(/\/api$/, '');
     return `${baseUrl}${logo.startsWith('/') ? '' : '/'}${logo}`;
   },
-isViewOnceEnabled: () => {    const state = get();    return state.publicSettings?.messaging?.enableViewOnceMessage ?? true;  },
+
+  isViewOnceEnabled: () => {
+    const state = get();
+    return state.publicSettings?.messaging?.enableViewOnceMessage ?? true;
+  },
+
+  isInviteOnlyMode: () => {
+    const state = get();
+    return state.publicSettings?.platform?.inviteOnlyMode ?? false;
+  },
+
+  isRegistrationEnabled: () => {
+    const state = get();
+    return state.publicSettings?.platform?.registrationEnabled ?? true;
+  },
+
+  isVoiceCallsEnabled: () => {
+    const state = get();
+    return state.publicSettings?.calls?.enableVoiceCalls ?? true;
+  },
+
+  isVideoCallsEnabled: () => {
+    const state = get();
+    return state.publicSettings?.calls?.enableVideoCalls ?? true;
+  },
+
+  getMaxMessageLength: () => {
+    const state = get();
+    return state.publicSettings?.messaging?.maxMessageLength ?? 5000;
+  },
+
+  getPrivacySettings: () => {
+    const state = get();
+    return state.publicSettings?.privacy ?? {
+      showOnlineStatus: true,
+      showLastSeen: true,
+      showReadReceipts: true,
+      showTypingIndicator: true,
+    };
+  },
 }));
 
 export default useSettingsStore;

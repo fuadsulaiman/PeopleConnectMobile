@@ -24,5 +24,8 @@ export {
 // Export SignalR service for real-time features
 export { signalRService } from './signalr';
 
+// Export biometric authentication service
+export { biometricService } from './biometricService';
+
 // Default export
 export { sdk as default } from './sdk';

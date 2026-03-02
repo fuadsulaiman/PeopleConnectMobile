@@ -4,3 +4,4 @@ export * from './contacts';
 export * from './calls';
 export * from './profile';
 export * from './settings';
+export * from './broadcasts';

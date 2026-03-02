@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { sdk, auth, initializeSDK, storeTokens, clearTokens, setOnUnauthorizedCallback } from '../services/sdk';
+import { auth, initializeSDK, storeTokens, clearTokens, setOnUnauthorizedCallback } from '../services/sdk';
 import { signalRService } from '../services/signalr';
 import { Alert } from 'react-native';
 
@@ -8,8 +8,10 @@ interface User {
   username: string;
   email: string;
   displayName?: string;
+  name?: string;
   avatarUrl?: string;
   bio?: string;
+  statusMessage?: string;
   isOnline?: boolean;
 }
 
@@ -23,12 +25,19 @@ interface AuthState {
   sessionExpired: boolean;
 
   login: (username: string, password: string) => Promise<boolean>;
-  register: (displayName: string, username: string, email: string, password: string) => Promise<boolean>;
+  register: (
+    displayName: string,
+    username: string,
+    email: string,
+    password: string,
+    invitationCode?: string
+  ) => Promise<boolean>;
   verify2FA: (tempToken: string, code: string) => Promise<boolean>;
   logout: () => Promise<void>;
   handleSessionExpired: () => Promise<void>;
   checkAuth: () => Promise<boolean>;
   setUser: (user: User) => void;
+  updateUser: (updates: Partial<User>) => void;
   clearError: () => void;
   clearSessionExpired: () => void;
 }
@@ -47,10 +56,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     try {
       const response = await auth.login({ username, password });
 
+      // Check if 2FA is required
       if (response.requiresTwoFactor) {
+        // For 2FA, we need a way to get the temp token
+        // The userId from the response is used as identifier
         set({
           requiresTwoFactor: true,
-          tempToken: response.tempToken || null,
+          tempToken: (response as any).userId || username,
           isLoading: false,
         });
         return false;
@@ -58,8 +70,22 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
       if (response.user && response.accessToken && response.refreshToken) {
         await storeTokens(response.accessToken, response.refreshToken);
+
+        // Normalize user object
+        const user: User = {
+          id: response.user.id,
+          username: response.user.username,
+          email: response.user.email || '',
+          displayName: response.user.name,
+          name: response.user.name,
+          avatarUrl: response.user.avatarUrl,
+          bio: response.user.description,
+          statusMessage: response.user.statusMessage,
+          isOnline: true,
+        };
+
         set({
-          user: response.user as User,
+          user,
           isAuthenticated: true,
           isLoading: false,
           requiresTwoFactor: false,
@@ -77,20 +103,40 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }
   },
 
-  register: async (displayName, username, email, password) => {
+  register: async (displayName, username, email, password, invitationCode) => {
     set({ isLoading: true, error: null });
     try {
-      const response = await auth.register({
-        displayName,
+      const registerData: any = {
+        name: displayName,
         username,
         email,
         password,
-      });
+      };
+
+      // Add invitation code if provided
+      if (invitationCode) {
+        registerData.invitationCode = invitationCode;
+      }
+
+      const response = await auth.register(registerData);
 
       if (response.user && response.accessToken && response.refreshToken) {
         await storeTokens(response.accessToken, response.refreshToken);
+
+        // Normalize user object
+        const user: User = {
+          id: response.user.id,
+          username: response.user.username,
+          email: response.user.email || email,
+          displayName: response.user.name || displayName,
+          name: response.user.name || displayName,
+          avatarUrl: response.user.avatarUrl,
+          bio: response.user.description,
+          isOnline: true,
+        };
+
         set({
-          user: response.user as User,
+          user,
           isAuthenticated: true,
           isLoading: false,
         });
@@ -106,15 +152,29 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }
   },
 
-  verify2FA: async (tempToken, code) => {
+  verify2FA: async (userId: string, code: string) => {
     set({ isLoading: true, error: null });
     try {
-      const response = await auth.verify2FA({ tempToken, code });
+      const response = await auth.verifyTwoFactor({ userId, code });
 
       if (response.user && response.accessToken && response.refreshToken) {
         await storeTokens(response.accessToken, response.refreshToken);
+
+        // Normalize user object
+        const user: User = {
+          id: response.user.id,
+          username: response.user.username,
+          email: response.user.email || '',
+          displayName: response.user.name,
+          name: response.user.name,
+          avatarUrl: response.user.avatarUrl,
+          bio: response.user.description,
+          statusMessage: response.user.statusMessage,
+          isOnline: true,
+        };
+
         set({
-          user: response.user as User,
+          user,
           isAuthenticated: true,
           isLoading: false,
           requiresTwoFactor: false,
@@ -179,10 +239,23 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       }
 
       // Get current user profile to validate token
-      const user = await auth.getCurrentUser();
-      if (user) {
+      const userData = await auth.getCurrentUser();
+      if (userData) {
+        // Normalize user object
+        const user: User = {
+          id: userData.id,
+          username: userData.username,
+          email: userData.email || '',
+          displayName: userData.name,
+          name: userData.name,
+          avatarUrl: userData.avatarUrl,
+          bio: userData.description,
+          statusMessage: userData.statusMessage,
+          isOnline: true,
+        };
+
         set({
-          user: user as User,
+          user,
           isAuthenticated: true,
           isLoading: false,
         });
@@ -209,6 +282,18 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   setUser: (user) => {
     set({ user });
+  },
+
+  updateUser: (updates) => {
+    const currentUser = get().user;
+    if (currentUser) {
+      set({
+        user: {
+          ...currentUser,
+          ...updates,
+        },
+      });
+    }
   },
 
   clearError: () => {
