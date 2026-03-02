@@ -1,6 +1,4 @@
-import { useChatStore } from '../../../src/stores/chatStore';
-
-// Mock the SDK services
+// Mock the SDK services - must be before import
 jest.mock('../../../src/services/sdk', () => ({
   conversations: {
     list: jest.fn(),
@@ -13,11 +11,25 @@ jest.mock('../../../src/services/sdk', () => ({
     delete: jest.fn(),
     edit: jest.fn(),
     markAsRead: jest.fn(),
+    markViewOnceViewed: jest.fn(),
   },
   broadcasts: {
     getMessages: jest.fn(),
   },
+  auth: {
+    login: jest.fn(),
+    register: jest.fn(),
+    logout: jest.fn(),
+    verify2FA: jest.fn(),
+  },
+  initializeSDK: jest.fn(),
+  storeTokens: jest.fn(() => Promise.resolve()),
+  clearTokens: jest.fn(() => Promise.resolve()),
+  getStoredTokens: jest.fn(() => Promise.resolve(null)),
+  setOnUnauthorizedCallback: jest.fn(),
 }));
+
+import { useChatStore } from '../../../src/stores/chatStore';
 
 jest.mock('../../../src/services/signalr', () => ({
   signalRService: {
