@@ -24,6 +24,10 @@ export {
 // Export SignalR service for real-time features
 export { signalRService } from './signalr';
 
+// Export WebRTC service for 1:1 calls
+export { webRTCService } from './webrtcService';
+export type { CallState, WebRTCEventCallback, IceServer } from './webrtcService';
+
 // Export biometric authentication service
 export { biometricService } from './biometricService';
 
