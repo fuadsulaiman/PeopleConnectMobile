@@ -9,6 +9,8 @@ export type AuthStackParamList = {
   Register: undefined;
   ForgotPassword: undefined;
   TwoFactor: { tempToken: string };
+  ResetPassword: { token?: string };
+  VerifyEmail: { token?: string; email?: string };
 };
 
 // Chat Stack
@@ -42,6 +44,10 @@ export type ProfileStackParamList = {
   Profile: undefined;
   EditProfile: undefined;
   Settings: undefined;
+  ChangePassword: undefined;
+  TwoFactorSettings: undefined;
+  PrivacySettings: undefined;
+  NotificationSettings: undefined;
 };
 
 // Main Tab Navigator
@@ -66,6 +72,8 @@ export type LoginScreenProps = NativeStackScreenProps<AuthStackParamList, 'Login
 export type RegisterScreenProps = NativeStackScreenProps<AuthStackParamList, 'Register'>;
 export type ForgotPasswordScreenProps = NativeStackScreenProps<AuthStackParamList, 'ForgotPassword'>;
 export type TwoFactorScreenProps = NativeStackScreenProps<AuthStackParamList, 'TwoFactor'>;
+export type ResetPasswordScreenProps = NativeStackScreenProps<AuthStackParamList, 'ResetPassword'>;
+export type VerifyEmailScreenProps = NativeStackScreenProps<AuthStackParamList, 'VerifyEmail'>;
 
 export type ConversationsScreenProps = CompositeScreenProps<
   NativeStackScreenProps<ChatStackParamList, 'Conversations'>,
@@ -94,5 +102,9 @@ export type ProfileScreenProps = CompositeScreenProps<
 >;
 export type EditProfileScreenProps = NativeStackScreenProps<ProfileStackParamList, 'EditProfile'>;
 export type SettingsScreenProps = NativeStackScreenProps<ProfileStackParamList, 'Settings'>;
+export type ChangePasswordScreenProps = NativeStackScreenProps<ProfileStackParamList, 'ChangePassword'>;
+export type TwoFactorSettingsScreenProps = NativeStackScreenProps<ProfileStackParamList, 'TwoFactorSettings'>;
+export type PrivacySettingsScreenProps = NativeStackScreenProps<ProfileStackParamList, 'PrivacySettings'>;
+export type NotificationSettingsScreenProps = NativeStackScreenProps<ProfileStackParamList, 'NotificationSettings'>;
 
 export type GroupCallScreenProps = NativeStackScreenProps<RootStackParamList, 'GroupCall'>;

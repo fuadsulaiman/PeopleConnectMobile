@@ -23,6 +23,8 @@ import LoginScreen from '../screens/auth/LoginScreen';
 import RegisterScreen from '../screens/auth/RegisterScreen';
 import TwoFactorScreen from '../screens/auth/TwoFactorScreen';
 import ForgotPasswordScreen from '../screens/auth/ForgotPasswordScreen';
+import ResetPasswordScreen from '../screens/auth/ResetPasswordScreen';
+import VerifyEmailScreen from '../screens/auth/VerifyEmailScreen';
 
 // Chat Screens - default imports
 import ConversationsScreen from '../screens/chat/ConversationsScreen';
@@ -69,6 +71,8 @@ const AuthNavigator: React.FC = () => (
     <AuthStack.Screen name="Register" component={RegisterScreen} />
     <AuthStack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
     <AuthStack.Screen name="TwoFactor" component={TwoFactorScreen} />
+    <AuthStack.Screen name="ResetPassword" component={ResetPasswordScreen} />
+    <AuthStack.Screen name="VerifyEmail" component={VerifyEmailScreen} />
   </AuthStack.Navigator>
 );
 
