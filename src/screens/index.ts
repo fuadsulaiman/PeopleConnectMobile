@@ -5,3 +5,5 @@ export * from './calls';
 export * from './profile';
 export * from './settings';
 export * from './broadcasts';
+export * from './devices';
+export * from './notifications';

@@ -1,11 +1,19 @@
 import React, { useMemo, useState } from "react";
 import { View, Text, TouchableOpacity, StyleSheet, Image, ScrollView, Alert, ActivityIndicator } from "react-native";
 import Icon from "react-native-vector-icons/Ionicons";
+import { useNavigation, CompositeNavigationProp } from "@react-navigation/native";
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useAuthStore } from "../../stores";
 import { useTheme } from "../../hooks";
-import { ProfileScreenProps } from "../../navigation/types";
+import { ProfileScreenProps, RootStackParamList, ProfileStackParamList } from "../../navigation/types";
+
+type NavigationProp = CompositeNavigationProp<
+  NativeStackNavigationProp<ProfileStackParamList>,
+  NativeStackNavigationProp<RootStackParamList>
+>;
 
 const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
+  const rootNavigation = useNavigation<NavigationProp>();
   const { user, logout } = useAuthStore();
   const { colors } = useTheme();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
@@ -16,7 +24,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
   const menuItems = [
     { icon: "person-outline", label: "Edit Profile", onPress: () => navigation.navigate("EditProfile") },
     { icon: "settings-outline", label: "Settings", onPress: () => navigation.navigate("Settings") },
-    { icon: "notifications-outline", label: "Notifications", onPress: () => {} },
+    { icon: "notifications-outline", label: "Notifications", onPress: () => rootNavigation.navigate("Notifications") },
     { icon: "shield-outline", label: "Privacy", onPress: () => {} },
     { icon: "help-circle-outline", label: "Help & Support", onPress: () => {} },
     { icon: "information-circle-outline", label: "About", onPress: () => {} },

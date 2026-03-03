@@ -14,6 +14,9 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Swipeable } from 'react-native-gesture-handler';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { ChatStackParamList } from '../../navigation/types';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { RootStackParamList } from '../../navigation/types';
 import { useChatStore } from '../../stores/chatStore';
 import { useAuthStore } from '../../stores/authStore';
 import { usePresenceStore } from '../../stores/presenceStore';
@@ -31,6 +34,7 @@ export const ConversationsScreen: React.FC<Props> = ({ navigation }) => {
   const { user } = useAuthStore();
   const { onlineUsers, version: presenceVersion } = usePresenceStore();
   const { colors } = useTheme();
+  const rootNavigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
   // Create dynamic styles based on theme colors
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -413,6 +417,9 @@ export const ConversationsScreen: React.FC<Props> = ({ navigation }) => {
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Messages</Text>
         <View style={styles.headerButtons}>
+          <TouchableOpacity style={styles.notificationButton} onPress={() => rootNavigation.navigate('Notifications')}>
+            <Icon name="notifications-outline" size={24} color={colors.textSecondary} />
+          </TouchableOpacity>
           <TouchableOpacity style={styles.archiveButton} onPress={handleArchived}>
             <Icon name="archive-outline" size={24} color={colors.textSecondary} />
           </TouchableOpacity>
@@ -475,6 +482,14 @@ const createStyles = (colors: ReturnType<typeof import('../../hooks').useTheme>[
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
+  },
+  notificationButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   archiveButton: {
     width: 40,

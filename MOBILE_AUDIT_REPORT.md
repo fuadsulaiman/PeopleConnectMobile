@@ -65,6 +65,10 @@
 - [x] View profile
 - [x] Edit profile (name, bio, avatar)
 - [x] Settings screen with toggles
+- [x] **Password Change** (NEW - Mar 3, 2026)
+- [x] **Two-Factor Authentication Management** (NEW - Mar 3, 2026)
+- [x] **Privacy Settings (Server-Synced)** (NEW - Mar 3, 2026)
+- [x] **Notification Preferences (Server-Synced)** (NEW - Mar 3, 2026)
 
 ### Real-Time Features
 - [x] Online/offline status (presence indicators)
@@ -118,26 +122,31 @@ These features are platform-specific requirements and are acceptable:
 These features exist in User Portal and should be implemented in Mobile:
 
 ### High Priority
-1. **Password Change** - User Portal profile has password change functionality
+1. ~~**Password Change**~~ - **COMPLETED (Mar 3, 2026)**
    - Location: profile/page.tsx - handleChangePassword function
-   - Mobile SettingsScreen has "Change Password" menu item but no implementation
+   - **Implemented:** src/screens/settings/ChangePasswordScreen.tsx
+   - Features: Password validation, strength requirements, show/hide password toggle
 
-2. **Two-Factor Authentication Management** - User Portal allows enable/disable 2FA from profile
+2. ~~**Two-Factor Authentication Management**~~ - **COMPLETED (Mar 3, 2026)**
    - Location: profile/page.tsx - 2FA setup/disable dialogs
-   - Mobile only has 2FA during login, no management in settings
+   - **Implemented:** src/screens/settings/TwoFactorSettingsScreen.tsx
+   - Features: Enable/disable 2FA, QR code display, backup codes management
 
-3. **Notification Preferences** - User Portal has detailed notification preference settings
+3. ~~**Notification Preferences**~~ - **COMPLETED (Mar 3, 2026)**
    - Location: profile/page.tsx - notificationPrefs state and toggle switches
-   - Mobile settings toggles don't persist to server
+   - **Implemented:** src/screens/settings/NotificationSettingsScreen.tsx
+   - Features: Server-synced notification preferences, push/sound/vibration toggles
 
-4. **Privacy Settings (Server-Synced)** - User Portal privacy settings sync with server
+4. ~~**Privacy Settings (Server-Synced)**~~ - **COMPLETED (Mar 3, 2026)**
    - Location: profile/page.tsx - userService.getPrivacySettings/updatePrivacySettings
-   - Mobile has local toggles but doesn't call backend API
+   - **Implemented:** src/screens/settings/PrivacySettingsScreen.tsx
+   - Features: Online status, last seen, read receipts, typing indicator toggles synced with backend
 
 ### Medium Priority
-5. **Devices/Sessions Management** - User Portal shows active devices and allows revoking
+5. ~~**Devices/Sessions Management**~~ - **COMPLETED (Mar 3, 2026)**
    - Location: profile/page.tsx - devices tab, devicesService
-   - Mobile doesn't have device management screen
+   - **Implemented:** src/screens/devices/DevicesScreen.tsx
+   - Features: List active sessions, logout from other devices, sign out all other devices, current device indicator
 
 6. ~~**Reset Password Page**~~ - **COMPLETED (Mar 3, 2026)**
    - Location: app/(auth)/reset-password/page.tsx
@@ -170,9 +179,10 @@ These features exist in User Portal and should be implemented in Mobile:
       - Detailed info about what data is exported
       - Privacy notice and compliance information
 
-11. **Notification Center Page** - User Portal has dedicated notifications page
+11. ~~**Notification Center Page**~~ - **COMPLETED (Mar 3, 2026)**
     - Location: app/(chat)/notifications/page.tsx
-    - Mobile doesn't have full notifications list page
+    - **Implemented:** src/screens/notifications/NotificationsScreen.tsx
+    - Features: Full notification list, filter tabs (all/unread/messages/calls/contacts), mark as read, mark all as read, delete notifications, load more pagination
 
 12. **Session Timeout Monitoring** - User Portal monitors session validity
     - Location: hooks/use-session-monitor.ts
@@ -188,25 +198,53 @@ These features exist in User Portal and should be implemented in Mobile:
 
 ### Completed in this session (Mar 3, 2026):
 
+#### Profile & Settings Features
+
+| Feature | File | Description |
+|---------|------|-------------|
+| Change Password Screen | `src/screens/settings/ChangePasswordScreen.tsx` | Complete password change flow with validation, strength requirements, show/hide toggle |
+| Two-Factor Settings Screen | `src/screens/settings/TwoFactorSettingsScreen.tsx` | Enable/disable 2FA, QR code scanning setup, verification code input, backup codes management |
+| Privacy Settings Screen | `src/screens/settings/PrivacySettingsScreen.tsx` | Server-synced privacy settings: online status, last seen, read receipts, typing indicator |
+| Notification Settings Screen | `src/screens/settings/NotificationSettingsScreen.tsx` | Server-synced notification preferences, local settings, push/sound/vibration controls |
+| Updated Settings Screen | `src/screens/settings/SettingsScreen.tsx` | Redesigned with icons, proper navigation to new screens |
+
+#### Auth Features
+
 | Feature | File | Description |
 |---------|------|-------------|
 | Reset Password Screen | `src/screens/auth/ResetPasswordScreen.tsx` | Complete password reset flow with token validation, real-time password requirement validation, success/error states |
 | Email Verification Screen | `src/screens/auth/VerifyEmailScreen.tsx` | Email verification status display, resend verification email option, multiple states (verifying, success, error, no-token) |
-| Navigation Types | `src/navigation/types.ts` | Added ResetPassword and VerifyEmail to AuthStackParamList |
-| Root Navigator | `src/navigation/RootNavigator.tsx` | Registered ResetPassword and VerifyEmail screens in AuthNavigator |
-| Auth Index | `src/screens/auth/index.ts` | Exported new screens |
 
-### Navigation Deep Links
+#### Navigation & Types
 
-The new screens support deep linking via navigation params:
+| File | Description |
+|------|-------------|
+| `src/navigation/types.ts` | Added ChangePassword, TwoFactorSettings, PrivacySettings, NotificationSettings to ProfileStackParamList |
+| `src/navigation/RootNavigator.tsx` | Registered all new screens in ProfileTabNavigator |
+| `src/screens/settings/index.ts` | Exported all new settings screens |
 
-```typescript
-// Reset Password - accepts token from email link
-navigation.navigate('ResetPassword', { token: 'reset-token-from-email' });
+### Navigation Flow
 
-// Email Verification - accepts token and optional email
-navigation.navigate('VerifyEmail', { token: 'verification-token', email: 'user@example.com' });
 ```
+ProfileScreen
+    -> Settings
+        -> ChangePassword (NEW)
+        -> TwoFactorSettings (NEW)
+        -> PrivacySettings (NEW)
+        -> NotificationSettings (NEW)
+```
+
+### API Integration
+
+| Feature | Endpoint | Method |
+|---------|----------|--------|
+| Change Password | `/auth/change-password` | POST (via SDK) |
+| 2FA Enable | `/two-factor/enable` | POST (via SDK) |
+| 2FA Disable | `/two-factor/disable` | POST (via SDK) |
+| 2FA Verify | `/two-factor/verify` | POST (via SDK) |
+| Backup Codes | `/two-factor/backup-codes` | GET (via SDK) |
+| Privacy Settings | `/users/me/privacy-settings` | GET/PUT (direct API) |
+| Notification Settings | `/users/me/notification-settings` | GET/PUT (direct API) |
 
 ---
 
@@ -214,14 +252,30 @@ navigation.navigate('VerifyEmail', { token: 'verification-token', email: 'user@e
 
 | Category | Count | Status |
 |----------|-------|--------|
-| Features to KEEP | 42+ | Complete |
+| Features to KEEP | 46+ | Complete |
 | Features to REMOVE | 0 | N/A |
 | Mobile-Specific (Acceptable) | 6 | Complete |
-| Missing (High Priority) | 4 | Pending |
-| Missing (Medium Priority) | 3 | 2 Completed, 1 Pending |
-| Missing (Low Priority) | 6 | 1 Completed, 5 Pending |
+| Missing (High Priority) | 4 | **ALL COMPLETED** |
+| Missing (Medium Priority) | 3 | **ALL COMPLETED** |
+| Missing (Low Priority) | 6 | 2 Completed, 4 Pending |
 
-**Conclusion:** The Mobile app now has improved feature parity with User Portal. Reset Password and Email Verification screens have been implemented, completing the auth-related medium priority features. No imaginary features were found that need to be removed.
+**High Priority Features - COMPLETED:**
+- [x] Password Change
+- [x] Two-Factor Authentication Management
+- [x] Notification Preferences (Server-Synced)
+- [x] Privacy Settings (Server-Synced)
+
+**Conclusion:** The Mobile app now has significantly improved feature parity with User Portal. All HIGH PRIORITY and MEDIUM PRIORITY features have been implemented:
+- Password Change
+- Two-Factor Authentication Management
+- Notification Preferences (Server-Synced)
+- Privacy Settings (Server-Synced)
+- Reset Password
+- Email Verification
+- Devices/Sessions Management (NEW)
+- Notification Center Page (NEW)
+
+These features bring the Mobile app to near-full parity with User Portal. The notification bell icon has been added to ConversationsScreen header for quick access. No imaginary features were found that need to be removed.
 
 ---
 

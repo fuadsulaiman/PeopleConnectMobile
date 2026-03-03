@@ -49,6 +49,17 @@ import EditProfileScreen from '../screens/profile/EditProfileScreen';
 // Settings Screens - default imports
 import SettingsScreen from '../screens/settings/SettingsScreen';
 
+import ChangePasswordScreen from '../screens/settings/ChangePasswordScreen';
+import TwoFactorSettingsScreen from '../screens/settings/TwoFactorSettingsScreen';
+import PrivacySettingsScreen from '../screens/settings/PrivacySettingsScreen';
+import NotificationSettingsScreen from '../screens/settings/NotificationSettingsScreen';
+
+// Devices Screen - default import
+import DevicesScreen from '../screens/devices/DevicesScreen';
+
+// Notifications Screen - default import
+import NotificationsScreen from '../screens/notifications/NotificationsScreen';
+
 // Broadcasts Screens - default imports
 import BroadcastsScreen from '../screens/broadcasts/BroadcastsScreen';
 
@@ -156,6 +167,11 @@ const ProfileTabNavigator: React.FC = () => (
     <ProfileStack.Screen name="Profile" component={ProfileScreen} />
     <ProfileStack.Screen name="EditProfile" component={EditProfileScreen} />
     <ProfileStack.Screen name="Settings" component={SettingsScreen} />
+    <ProfileStack.Screen name="ChangePassword" component={ChangePasswordScreen} />
+    <ProfileStack.Screen name="TwoFactorSettings" component={TwoFactorSettingsScreen} />
+    <ProfileStack.Screen name="PrivacySettings" component={PrivacySettingsScreen} />
+    <ProfileStack.Screen name="NotificationSettings" component={NotificationSettingsScreen} />
+    <ProfileStack.Screen name="Devices" component={DevicesScreen} />
   </ProfileStack.Navigator>
 );
 
@@ -291,6 +307,13 @@ const RootNavigator: React.FC = () => {
               options={{
                 presentation: 'modal',
                 gestureEnabled: false,
+              }}
+            />
+            <RootStack.Screen
+              name="Notifications"
+              component={NotificationsScreen}
+              options={{
+                presentation: 'modal',
               }}
             />
           </>

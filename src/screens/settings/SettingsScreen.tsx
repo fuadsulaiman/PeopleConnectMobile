@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -9,8 +9,10 @@ import {
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Icon from 'react-native-vector-icons/Ionicons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { ProfileStackParamList } from '../../navigation/types';
+import { useTheme } from '../../hooks';
 import { useAuthStore } from '../../stores/authStore';
 
 type Props = NativeStackScreenProps<ProfileStackParamList, 'Settings'>;
@@ -20,19 +22,17 @@ interface SettingItem {
   title: string;
   type: 'toggle' | 'navigation' | 'action';
   value?: boolean;
+  iconColor?: string;
   onPress?: () => void;
   onToggle?: (value: boolean) => void;
 }
 
-export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
+const SettingsScreen: React.FC<Props> = ({ navigation }) => {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const { logout: _logout } = useAuthStore();
 
-  const [notifications, setNotifications] = useState(true);
-  const [soundEnabled, setSoundEnabled] = useState(true);
-  const [vibrationEnabled, setVibrationEnabled] = useState(true);
   const [darkMode, setDarkMode] = useState(false);
-  const [readReceipts, setReadReceipts] = useState(true);
-  const [onlineStatus, setOnlineStatus] = useState(true);
 
   const handleDeleteAccount = () => {
     Alert.alert(
@@ -53,40 +53,40 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
 
   const sections: { title: string; items: SettingItem[] }[] = [
     {
-      title: 'Notifications',
+      title: 'Account',
       items: [
         {
-          icon: '🔔',
-          title: 'Push Notifications',
-          type: 'toggle',
-          value: notifications,
-          onToggle: setNotifications,
+          icon: 'key-outline',
+          title: 'Change Password',
+          type: 'navigation',
+          iconColor: colors.primary,
+          onPress: () => navigation.navigate('ChangePassword'),
         },
         {
-          icon: '🔊',
-          title: 'Sound',
-          type: 'toggle',
-          value: soundEnabled,
-          onToggle: setSoundEnabled,
+          icon: 'shield-checkmark-outline',
+          title: 'Two-Factor Authentication',
+          type: 'navigation',
+          iconColor: colors.success,
+          onPress: () => navigation.navigate('TwoFactorSettings'),
         },
         {
-          icon: '📳',
-          title: 'Vibration',
-          type: 'toggle',
-          value: vibrationEnabled,
-          onToggle: setVibrationEnabled,
+          icon: 'phone-portrait-outline',
+          title: 'Active Sessions',
+          type: 'navigation',
+          iconColor: colors.secondary,
+          onPress: () => navigation.navigate('Devices'),
         },
       ],
     },
     {
-      title: 'Appearance',
+      title: 'Notifications',
       items: [
         {
-          icon: '🌙',
-          title: 'Dark Mode',
-          type: 'toggle',
-          value: darkMode,
-          onToggle: setDarkMode,
+          icon: 'notifications-outline',
+          title: 'Notification Settings',
+          type: 'navigation',
+          iconColor: colors.warning,
+          onPress: () => navigation.navigate('NotificationSettings'),
         },
       ],
     },
@@ -94,47 +94,31 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
       title: 'Privacy',
       items: [
         {
-          icon: '✓',
-          title: 'Read Receipts',
-          type: 'toggle',
-          value: readReceipts,
-          onToggle: setReadReceipts,
+          icon: 'eye-outline',
+          title: 'Privacy Settings',
+          type: 'navigation',
+          iconColor: colors.primary,
+          onPress: () => navigation.navigate('PrivacySettings'),
         },
         {
-          icon: '🟢',
-          title: 'Show Online Status',
-          type: 'toggle',
-          value: onlineStatus,
-          onToggle: setOnlineStatus,
-        },
-        {
-          icon: '🚫',
+          icon: 'ban-outline',
           title: 'Blocked Users',
           type: 'navigation',
-          onPress: () => {},
+          iconColor: colors.error,
+          onPress: () => Alert.alert('Coming Soon', 'Blocked users management will be available soon.'),
         },
       ],
     },
     {
-      title: 'Security',
+      title: 'Appearance',
       items: [
         {
-          icon: '🔐',
-          title: 'Two-Factor Authentication',
-          type: 'navigation',
-          onPress: () => {},
-        },
-        {
-          icon: '🔑',
-          title: 'Change Password',
-          type: 'navigation',
-          onPress: () => {},
-        },
-        {
-          icon: '📱',
-          title: 'Active Sessions',
-          type: 'navigation',
-          onPress: () => {},
+          icon: 'moon-outline',
+          title: 'Dark Mode',
+          type: 'toggle',
+          value: darkMode,
+          iconColor: colors.textSecondary,
+          onToggle: setDarkMode,
         },
       ],
     },
@@ -142,40 +126,67 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
       title: 'Data & Storage',
       items: [
         {
-          icon: '💾',
+          icon: 'folder-outline',
           title: 'Storage Usage',
           type: 'navigation',
-          onPress: () => {},
+          iconColor: colors.primary,
+          onPress: () => Alert.alert('Coming Soon', 'Storage management will be available soon.'),
         },
         {
-          icon: '📥',
+          icon: 'download-outline',
           title: 'Auto-Download Media',
           type: 'navigation',
-          onPress: () => {},
+          iconColor: colors.success,
+          onPress: () => Alert.alert('Coming Soon', 'Auto-download settings will be available soon.'),
         },
         {
-          icon: '🗑️',
+          icon: 'trash-outline',
           title: 'Clear Cache',
           type: 'action',
+          iconColor: colors.warning,
           onPress: () => {
-            Alert.alert('Cache Cleared', 'Application cache has been cleared.');
+            Alert.alert('Clear Cache', 'Are you sure you want to clear the app cache?', [
+              { text: 'Cancel', style: 'cancel' },
+              { text: 'Clear', onPress: () => Alert.alert('Success', 'Cache has been cleared.') },
+            ]);
           },
         },
       ],
     },
     {
-      title: 'Account',
+      title: 'Support',
       items: [
         {
-          icon: '📤',
-          title: 'Export Data',
-          type: 'action',
-          onPress: () => {},
+          icon: 'help-circle-outline',
+          title: 'Help & Support',
+          type: 'navigation',
+          iconColor: colors.primary,
+          onPress: () => Alert.alert('Help', 'For support, please contact support@example.com'),
         },
         {
-          icon: '❌',
+          icon: 'information-circle-outline',
+          title: 'About',
+          type: 'navigation',
+          iconColor: colors.textSecondary,
+          onPress: () => Alert.alert('About', 'PeopleConnect Mobile v1.0.0'),
+        },
+      ],
+    },
+    {
+      title: 'Danger Zone',
+      items: [
+        {
+          icon: 'cloud-download-outline',
+          title: 'Export My Data',
+          type: 'action',
+          iconColor: colors.primary,
+          onPress: () => Alert.alert('Coming Soon', 'Data export will be available soon.'),
+        },
+        {
+          icon: 'close-circle-outline',
           title: 'Delete Account',
           type: 'action',
+          iconColor: colors.error,
           onPress: handleDeleteAccount,
         },
       ],
@@ -189,19 +200,24 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
         style={styles.settingItem}
         onPress={item.onPress}
         disabled={item.type === 'toggle'}
+        activeOpacity={item.type === 'toggle' ? 1 : 0.7}
       >
-        <Text style={styles.settingIcon}>{item.icon}</Text>
-        <Text style={styles.settingTitle}>{item.title}</Text>
+        <View style={[styles.iconContainer, { backgroundColor: `${item.iconColor || colors.primary}15` }]}>
+          <Icon name={item.icon} size={20} color={item.iconColor || colors.primary} />
+        </View>
+        <Text style={[styles.settingTitle, item.title === 'Delete Account' && { color: colors.error }]}>
+          {item.title}
+        </Text>
         {item.type === 'toggle' && (
           <Switch
             value={item.value}
             onValueChange={item.onToggle}
-            trackColor={{ false: '#e0e0e0', true: '#007AFF' }}
-            thumbColor="#fff"
+            trackColor={{ false: colors.border, true: colors.primary }}
+            thumbColor={colors.white}
           />
         )}
         {item.type === 'navigation' && (
-          <Text style={styles.settingArrow}>{'>'}</Text>
+          <Icon name="chevron-forward" size={20} color={colors.textSecondary} />
         )}
       </TouchableOpacity>
     );
@@ -211,7 +227,7 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-          <Text style={styles.backIcon}>{'<'}</Text>
+          <Icon name="chevron-back" size={24} color={colors.primary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Settings</Text>
         <View style={styles.placeholder} />
@@ -236,90 +252,89 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  backButton: {
-    padding: 8,
-  },
-  backIcon: {
-    fontSize: 24,
-    color: '#007AFF',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1a1a1a',
-  },
-  placeholder: {
-    width: 40,
-  },
-  content: {
-    flex: 1,
-  },
-  section: {
-    marginTop: 24,
-  },
-  sectionTitle: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#666',
-    textTransform: 'uppercase',
-    paddingHorizontal: 16,
-    marginBottom: 8,
-  },
-  sectionContent: {
-    backgroundColor: '#fff',
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: '#f0f0f0',
-  },
-  settingItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f5f5f5',
-  },
-  settingIcon: {
-    fontSize: 20,
-    marginRight: 16,
-  },
-  settingTitle: {
-    flex: 1,
-    fontSize: 16,
-    color: '#1a1a1a',
-  },
-  settingArrow: {
-    fontSize: 18,
-    color: '#ccc',
-  },
-  footer: {
-    alignItems: 'center',
-    paddingVertical: 32,
-  },
-  footerText: {
-    fontSize: 14,
-    color: '#999',
-    marginBottom: 4,
-  },
-  versionText: {
-    fontSize: 12,
-    color: '#ccc',
-  },
-});
+const createStyles = (colors: ReturnType<typeof import('../../hooks').useTheme>['colors']) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      backgroundColor: colors.surface,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    backButton: {
+      padding: 8,
+    },
+    headerTitle: {
+      fontSize: 18,
+      fontWeight: '600',
+      color: colors.text,
+    },
+    placeholder: {
+      width: 40,
+    },
+    content: {
+      flex: 1,
+    },
+    section: {
+      marginTop: 24,
+    },
+    sectionTitle: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: colors.textSecondary,
+      textTransform: 'uppercase',
+      paddingHorizontal: 16,
+      marginBottom: 8,
+      letterSpacing: 0.5,
+    },
+    sectionContent: {
+      backgroundColor: colors.surface,
+      borderTopWidth: 1,
+      borderBottomWidth: 1,
+      borderColor: colors.border,
+    },
+    settingItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    iconContainer: {
+      width: 36,
+      height: 36,
+      borderRadius: 8,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginRight: 12,
+    },
+    settingTitle: {
+      flex: 1,
+      fontSize: 16,
+      color: colors.text,
+    },
+    footer: {
+      alignItems: 'center',
+      paddingVertical: 32,
+    },
+    footerText: {
+      fontSize: 14,
+      color: colors.textSecondary,
+      marginBottom: 4,
+    },
+    versionText: {
+      fontSize: 12,
+      color: colors.textSecondary,
+      opacity: 0.7,
+    },
+  });
 
 export default SettingsScreen;
