@@ -77,9 +77,7 @@ export const TwoFactorScreen: React.FC<Props> = ({ route }) => {
       >
         <View style={styles.header}>
           <Text style={styles.title}>Two-Factor Authentication</Text>
-          <Text style={styles.subtitle}>
-            Enter the 6-digit code from your authenticator app
-          </Text>
+          <Text style={styles.subtitle}>Enter the 6-digit code from your authenticator app</Text>
         </View>
 
         <View style={styles.codeContainer}>
@@ -111,65 +109,65 @@ export const TwoFactorScreen: React.FC<Props> = ({ route }) => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-  },
-  content: {
-    flex: 1,
-    padding: 24,
-    justifyContent: 'center',
-  },
-  header: {
-    alignItems: 'center',
-    marginBottom: 40,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#1a1a1a',
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 14,
-    color: '#666',
-    textAlign: 'center',
-  },
   codeContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: 32,
   },
   codeInput: {
-    width: 48,
-    height: 56,
-    borderWidth: 2,
     borderColor: '#e0e0e0',
     borderRadius: 12,
+    borderWidth: 2,
+    color: '#1a1a1a',
     fontSize: 24,
     fontWeight: 'bold',
+    height: 56,
     textAlign: 'center',
+    width: 48,
+  },
+  container: {
+    backgroundColor: '#fff',
+    flex: 1,
+  },
+  content: {
+    flex: 1,
+    justifyContent: 'center',
+    padding: 24,
+  },
+  header: {
+    alignItems: 'center',
+    marginBottom: 40,
+  },
+  resendButton: {
+    alignItems: 'center',
+    padding: 16,
+  },
+  resendButtonText: {
+    color: '#007AFF',
+    fontSize: 14,
+  },
+  subtitle: {
+    color: '#666',
+    fontSize: 14,
+    textAlign: 'center',
+  },
+  title: {
     color: '#1a1a1a',
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 8,
   },
   verifyButton: {
+    alignItems: 'center',
     backgroundColor: '#007AFF',
     borderRadius: 12,
-    padding: 16,
-    alignItems: 'center',
     marginBottom: 16,
+    padding: 16,
   },
   verifyButtonText: {
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
-  },
-  resendButton: {
-    padding: 16,
-    alignItems: 'center',
-  },
-  resendButtonText: {
-    color: '#007AFF',
-    fontSize: 14,
   },
 });
 

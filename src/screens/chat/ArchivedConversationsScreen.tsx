@@ -12,8 +12,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { ChatStackParamList } from '../../navigation/types';
-import { useChatStore } from '../../stores/chatStore';
-import { conversations as conversationsApi } from '../../services/sdk';
+// Import chatStore module - we'll access useChatStore from it
+import * as chatStoreModule from '../../stores/chatStore';
+// CRITICAL: Do NOT import SDK at top level - it causes module initialization failures on Windows
+const getConversations = () => {
+  const sdkModule = require('../../services/sdk');
+  return sdkModule.conversations;
+};
+const conversationsApi = { unarchive: (id: string) => getConversations().unarchive(id), delete: (id: string) => getConversations().delete(id) };
 import { Conversation } from '../../types';
 import { Avatar } from '../../components/common/Avatar';
 import { EmptyState } from '../../components/common/EmptyState';
@@ -21,25 +27,32 @@ import { EmptyState } from '../../components/common/EmptyState';
 type Props = NativeStackScreenProps<ChatStackParamList, 'ArchivedConversations'>;
 
 export const ArchivedConversationsScreen: React.FC<Props> = ({ navigation }) => {
-  const { archivedConversations, isLoading, fetchArchivedConversations, updateConversation } = useChatStore();
+  const { archivedConversations, isLoading, fetchArchivedConversations, updateConversation } =
+    chatStoreModule.useChatStore();
 
   useEffect(() => {
     fetchArchivedConversations();
   }, [fetchArchivedConversations]);
 
-  const handleConversationPress = useCallback((conversation: Conversation) => {
-    navigation.navigate('Chat', { conversationId: conversation.id, conversation });
-  }, [navigation]);
+  const handleConversationPress = useCallback(
+    (conversation: Conversation) => {
+      navigation.navigate('Chat', { conversationId: conversation.id, conversation });
+    },
+    [navigation]
+  );
 
-  const handleUnarchive = useCallback(async (item: Conversation) => {
-    try {
-      await conversationsApi.unarchive(item.id);
-      updateConversation({ id: item.id, isArchived: false });
-    } catch (error) {
-      console.error('Failed to unarchive conversation:', error);
-      Alert.alert('Error', 'Failed to unarchive conversation');
-    }
-  }, [updateConversation]);
+  const handleUnarchive = useCallback(
+    async (item: Conversation) => {
+      try {
+        await conversationsApi.unarchive(item.id);
+        updateConversation({ id: item.id, isArchived: false });
+      } catch (error) {
+        console.error('Failed to unarchive conversation:', error);
+        Alert.alert('Error', 'Failed to unarchive conversation');
+      }
+    },
+    [updateConversation]
+  );
 
   const handleDelete = useCallback((item: Conversation) => {
     const isDM = item.type === 'DirectMessage';
@@ -56,7 +69,8 @@ export const ArchivedConversationsScreen: React.FC<Props> = ({ navigation }) => 
         onPress: async () => {
           try {
             await conversationsApi.delete(item.id);
-            useChatStore.setState((state) => ({
+            // Update archived conversations in store
+            chatStoreModule.useChatStore.setState((state) => ({
               archivedConversations: state.archivedConversations.filter((c) => c.id !== item.id),
             }));
           } catch (error) {
@@ -69,7 +83,9 @@ export const ArchivedConversationsScreen: React.FC<Props> = ({ navigation }) => 
   }, []);
 
   const formatLastMessageTime = (date: string | undefined) => {
-    if (!date) return '';
+    if (!date) {
+      return '';
+    }
     const messageDate = new Date(date);
     const now = new Date();
     const diffDays = Math.floor((now.getTime() - messageDate.getTime()) / (1000 * 60 * 60 * 24));
@@ -97,11 +113,7 @@ export const ArchivedConversationsScreen: React.FC<Props> = ({ navigation }) => 
           onPress={() => handleConversationPress(item)}
           activeOpacity={0.7}
         >
-          <Avatar
-            uri={avatarUrl}
-            name={displayName}
-            size={56}
-          />
+          <Avatar uri={avatarUrl} name={displayName} size={56} />
           <View style={styles.conversationContent}>
             <View style={styles.conversationHeader}>
               <Text style={styles.conversationName} numberOfLines={1}>
@@ -148,7 +160,9 @@ export const ArchivedConversationsScreen: React.FC<Props> = ({ navigation }) => 
         data={archivedConversations as any}
         renderItem={renderConversation}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={archivedConversations.length === 0 ? styles.emptyContainer : undefined}
+        contentContainerStyle={
+          archivedConversations.length === 0 ? styles.emptyContainer : undefined
+        }
         refreshControl={
           <RefreshControl
             refreshing={isLoading}
@@ -171,91 +185,91 @@ export const ArchivedConversationsScreen: React.FC<Props> = ({ navigation }) => 
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-  },
-  header: {
-    flexDirection: 'row',
+  actionButton: {
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderRadius: 18,
+    height: 36,
+    justifyContent: 'center',
+    width: 36,
+  },
+  actionButtons: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingRight: 12,
   },
   backButton: {
-    width: 40,
+    alignItems: 'center',
     height: 40,
-    alignItems: 'center',
     justifyContent: 'center',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1a1a1a',
-  },
-  placeholder: {
     width: 40,
   },
-  emptyContainer: {
+  container: {
+    backgroundColor: '#fff',
     flex: 1,
-  },
-  conversationRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: '#f5f5f5',
-  },
-  conversationItem: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
   },
   conversationContent: {
     flex: 1,
     marginLeft: 12,
   },
   conversationHeader: {
-    flexDirection: 'row',
     alignItems: 'center',
+    flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: 4,
   },
+  conversationItem: {
+    alignItems: 'center',
+    flex: 1,
+    flexDirection: 'row',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
   conversationName: {
+    color: '#1a1a1a',
     flex: 1,
     fontSize: 16,
     fontWeight: '600',
-    color: '#1a1a1a',
     marginRight: 8,
   },
-  conversationTime: {
-    fontSize: 12,
-    color: '#999',
-  },
-  lastMessage: {
-    fontSize: 14,
-    color: '#666',
-  },
-  actionButtons: {
-    flexDirection: 'row',
-    paddingRight: 12,
-    gap: 8,
-  },
-  actionButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+  conversationRow: {
     alignItems: 'center',
-    justifyContent: 'center',
+    borderBottomColor: '#f5f5f5',
+    borderBottomWidth: 1,
+    flexDirection: 'row',
   },
-  unarchiveButton: {
-    backgroundColor: '#eef2ff',
+  conversationTime: {
+    color: '#999',
+    fontSize: 12,
   },
   deleteButton: {
     backgroundColor: '#fef2f2',
+  },
+  emptyContainer: {
+    flex: 1,
+  },
+  header: {
+    alignItems: 'center',
+    borderBottomColor: '#f0f0f0',
+    borderBottomWidth: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  headerTitle: {
+    color: '#1a1a1a',
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  lastMessage: {
+    color: '#666',
+    fontSize: 14,
+  },
+  placeholder: {
+    width: 40,
+  },
+  unarchiveButton: {
+    backgroundColor: '#eef2ff',
   },
 });
 

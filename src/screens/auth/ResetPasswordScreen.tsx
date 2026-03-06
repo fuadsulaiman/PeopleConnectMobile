@@ -14,7 +14,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { AuthStackParamList } from '../../navigation/types';
-import { auth } from '../../services/sdk';
+// CRITICAL: Do NOT import SDK at top level - it causes module initialization failures on Windows
+const getAuth = () => {
+  const sdkModule = require('../../services/sdk');
+  return sdkModule.auth;
+};
+const auth = { resetPassword: (data: { token: string; newPassword: string }) => getAuth().resetPassword(data) };
 import { LoadingScreen } from '../../components/common/LoadingScreen';
 import { colors } from '../../constants';
 
@@ -79,7 +84,10 @@ export const ResetPasswordScreen: React.FC<Props> = ({ navigation, route }) => {
       await auth.resetPassword({ token, newPassword: password });
       setIsSuccess(true);
     } catch (err: any) {
-      const message = err?.response?.data?.message || err.message || 'Failed to reset password. The link may have expired.';
+      const message =
+        err?.response?.data?.message ||
+        err.message ||
+        'Failed to reset password. The link may have expired.';
       setError(message);
       Alert.alert('Error', message);
     } finally {
@@ -156,10 +164,7 @@ export const ResetPasswordScreen: React.FC<Props> = ({ navigation, route }) => {
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
         >
-          <TouchableOpacity
-            style={styles.backNav}
-            onPress={() => navigation.goBack()}
-          >
+          <TouchableOpacity style={styles.backNav} onPress={() => navigation.goBack()}>
             <Icon name="arrow-back" size={24} color={colors.primary} />
             <Text style={styles.backNavText}>Back</Text>
           </TouchableOpacity>
@@ -169,9 +174,7 @@ export const ResetPasswordScreen: React.FC<Props> = ({ navigation, route }) => {
               <Icon name="lock-closed" size={48} color={colors.primary} />
             </View>
             <Text style={styles.title}>Reset Password</Text>
-            <Text style={styles.subtitle}>
-              Enter your new password below.
-            </Text>
+            <Text style={styles.subtitle}>Enter your new password below.</Text>
           </View>
 
           <View style={styles.form}>
@@ -246,7 +249,9 @@ export const ResetPasswordScreen: React.FC<Props> = ({ navigation, route }) => {
                   size={16}
                   color={validation.minLength ? '#22c55e' : '#999'}
                 />
-                <Text style={[styles.requirementText, validation.minLength && styles.requirementMet]}>
+                <Text
+                  style={[styles.requirementText, validation.minLength && styles.requirementMet]}
+                >
                   At least 8 characters
                 </Text>
               </View>
@@ -256,7 +261,9 @@ export const ResetPasswordScreen: React.FC<Props> = ({ navigation, route }) => {
                   size={16}
                   color={validation.hasUppercase ? '#22c55e' : '#999'}
                 />
-                <Text style={[styles.requirementText, validation.hasUppercase && styles.requirementMet]}>
+                <Text
+                  style={[styles.requirementText, validation.hasUppercase && styles.requirementMet]}
+                >
                   One uppercase letter
                 </Text>
               </View>
@@ -266,7 +273,9 @@ export const ResetPasswordScreen: React.FC<Props> = ({ navigation, route }) => {
                   size={16}
                   color={validation.hasLowercase ? '#22c55e' : '#999'}
                 />
-                <Text style={[styles.requirementText, validation.hasLowercase && styles.requirementMet]}>
+                <Text
+                  style={[styles.requirementText, validation.hasLowercase && styles.requirementMet]}
+                >
                   One lowercase letter
                 </Text>
               </View>
@@ -276,7 +285,9 @@ export const ResetPasswordScreen: React.FC<Props> = ({ navigation, route }) => {
                   size={16}
                   color={validation.hasNumber ? '#22c55e' : '#999'}
                 />
-                <Text style={[styles.requirementText, validation.hasNumber && styles.requirementMet]}>
+                <Text
+                  style={[styles.requirementText, validation.hasNumber && styles.requirementMet]}
+                >
                   One number
                 </Text>
               </View>
@@ -309,20 +320,9 @@ export const ResetPasswordScreen: React.FC<Props> = ({ navigation, route }) => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-  },
-  content: {
-    flex: 1,
-  },
-  scrollContent: {
-    flexGrow: 1,
-    padding: 24,
-  },
   backNav: {
-    flexDirection: 'row',
     alignItems: 'center',
+    flexDirection: 'row',
     marginBottom: 24,
   },
   backNavText: {
@@ -330,109 +330,157 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginLeft: 4,
   },
+  centerContainer: {
+    alignItems: 'center',
+    flex: 1,
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+  },
+  container: {
+    backgroundColor: '#fff',
+    flex: 1,
+  },
+  content: {
+    flex: 1,
+  },
+  errorContainer: {
+    alignItems: 'center',
+    backgroundColor: '#fef2f2',
+    borderRadius: 8,
+    flexDirection: 'row',
+    marginBottom: 16,
+    padding: 12,
+  },
+  errorIconContainer: {
+    marginBottom: 24,
+  },
+  errorMessage: {
+    color: '#ef4444',
+    flex: 1,
+    fontSize: 14,
+    marginLeft: 8,
+  },
+  errorText: {
+    color: '#666',
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: 32,
+    textAlign: 'center',
+  },
+  errorTitle: {
+    color: '#1a1a1a',
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 12,
+  },
+  eyeButton: {
+    padding: 16,
+  },
+  form: {
+    flex: 1,
+  },
   header: {
     alignItems: 'center',
     marginBottom: 32,
   },
   iconContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    alignItems: 'center',
     backgroundColor: colors.primary + '15',
+    borderRadius: 40,
+    height: 80,
     justifyContent: 'center',
-    alignItems: 'center',
     marginBottom: 16,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#1a1a1a',
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 14,
-    color: '#666',
-    textAlign: 'center',
-  },
-  form: {
-    flex: 1,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1a1a1a',
-    marginBottom: 8,
-  },
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-    borderRadius: 12,
-    marginBottom: 16,
+    width: 80,
   },
   input: {
-    flex: 1,
-    padding: 16,
-    fontSize: 16,
     color: '#1a1a1a',
-  },
-  eyeButton: {
+    flex: 1,
+    fontSize: 16,
     padding: 16,
+  },
+  inputContainer: {
+    alignItems: 'center',
+    borderColor: '#e0e0e0',
+    borderRadius: 12,
+    borderWidth: 1,
+    flexDirection: 'row',
+    marginBottom: 16,
+  },
+  label: {
+    color: '#1a1a1a',
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 8,
   },
   matchIndicator: {
-    flexDirection: 'row',
     alignItems: 'center',
+    flexDirection: 'row',
     marginBottom: 16,
   },
   matchText: {
     fontSize: 12,
     marginLeft: 6,
   },
-  requirementsContainer: {
-    backgroundColor: '#f5f5f5',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 24,
-  },
-  requirementsTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1a1a1a',
-    marginBottom: 12,
-  },
-  requirementRow: {
-    flexDirection: 'row',
+  primaryButton: {
     alignItems: 'center',
-    marginBottom: 8,
+    backgroundColor: colors.primary,
+    borderRadius: 12,
+    marginBottom: 16,
+    paddingHorizontal: 48,
+    paddingVertical: 16,
+    width: '100%',
   },
-  requirementText: {
-    fontSize: 13,
-    color: '#666',
-    marginLeft: 8,
+  primaryButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
   requirementMet: {
     color: '#22c55e',
   },
-  errorContainer: {
-    flexDirection: 'row',
+  requirementRow: {
     alignItems: 'center',
-    backgroundColor: '#fef2f2',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 16,
+    flexDirection: 'row',
+    marginBottom: 8,
   },
-  errorMessage: {
-    color: '#ef4444',
-    fontSize: 14,
+  requirementText: {
+    color: '#666',
+    fontSize: 13,
     marginLeft: 8,
-    flex: 1,
+  },
+  requirementsContainer: {
+    backgroundColor: '#f5f5f5',
+    borderRadius: 12,
+    marginBottom: 24,
+    padding: 16,
+  },
+  requirementsTitle: {
+    color: '#1a1a1a',
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 12,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    padding: 24,
+  },
+  secondaryButton: {
+    alignItems: 'center',
+    borderRadius: 12,
+    paddingHorizontal: 48,
+    paddingVertical: 16,
+    width: '100%',
+  },
+  secondaryButtonText: {
+    color: colors.primary,
+    fontSize: 16,
+    fontWeight: '600',
   },
   submitButton: {
+    alignItems: 'center',
     backgroundColor: colors.primary,
     borderRadius: 12,
     padding: 16,
-    alignItems: 'center',
   },
   submitButtonDisabled: {
     opacity: 0.5,
@@ -442,69 +490,32 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-  centerContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 24,
+  subtitle: {
+    color: '#666',
+    fontSize: 14,
+    textAlign: 'center',
   },
   successIconContainer: {
     marginBottom: 24,
   },
-  successTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#1a1a1a',
-    marginBottom: 12,
-  },
   successText: {
-    fontSize: 14,
     color: '#666',
-    textAlign: 'center',
+    fontSize: 14,
     lineHeight: 20,
     marginBottom: 32,
+    textAlign: 'center',
   },
-  errorIconContainer: {
-    marginBottom: 24,
-  },
-  errorTitle: {
+  successTitle: {
+    color: '#1a1a1a',
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#1a1a1a',
     marginBottom: 12,
   },
-  errorText: {
-    fontSize: 14,
-    color: '#666',
-    textAlign: 'center',
-    lineHeight: 20,
-    marginBottom: 32,
-  },
-  primaryButton: {
-    backgroundColor: colors.primary,
-    borderRadius: 12,
-    paddingVertical: 16,
-    paddingHorizontal: 48,
-    marginBottom: 16,
-    width: '100%',
-    alignItems: 'center',
-  },
-  primaryButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  secondaryButton: {
-    borderRadius: 12,
-    paddingVertical: 16,
-    paddingHorizontal: 48,
-    width: '100%',
-    alignItems: 'center',
-  },
-  secondaryButtonText: {
-    color: colors.primary,
-    fontSize: 16,
-    fontWeight: '600',
+  title: {
+    color: '#1a1a1a',
+    fontSize: 28,
+    fontWeight: 'bold',
+    marginBottom: 8,
   },
 });
 

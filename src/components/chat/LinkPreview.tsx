@@ -35,7 +35,8 @@ interface LinkPreviewProps {
 }
 
 // URL detection regex - matches most common URL patterns
-export const URL_REGEX = /https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)/gi;
+export const URL_REGEX =
+  /https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)/gi;
 
 // Extract domain from URL
 const extractDomain = (url: string): string => {
@@ -124,7 +125,7 @@ const fetchLinkPreview = async (url: string): Promise<LinkPreviewData> => {
       method: 'GET',
       headers: {
         'User-Agent': 'Mozilla/5.0 (compatible; PeopleConnect/1.0)',
-        'Accept': 'text/html',
+        Accept: 'text/html',
       },
       signal: controller.signal,
     });
@@ -146,11 +147,23 @@ const fetchLinkPreview = async (url: string): Promise<LinkPreviewData> => {
     // Parse Open Graph tags
     const getMetaContent = (property: string): string | undefined => {
       // Pattern for property attribute
-      const propPattern1 = new RegExp('<meta[^>]+property=["\']' + property + '["\'][^>]+content=["\']([^"\']+)["\']', 'i');
-      const propPattern2 = new RegExp('<meta[^>]+content=["\']([^"\']+)["\'][^>]+property=["\']' + property + '["\']', 'i');
+      const propPattern1 = new RegExp(
+        '<meta[^>]+property=["\']' + property + '["\'][^>]+content=["\']([^"\']+)["\']',
+        'i'
+      );
+      const propPattern2 = new RegExp(
+        '<meta[^>]+content=["\']([^"\']+)["\'][^>]+property=["\']' + property + '["\']',
+        'i'
+      );
       // Pattern for name attribute
-      const namePattern1 = new RegExp('<meta[^>]+name=["\']' + property + '["\'][^>]+content=["\']([^"\']+)["\']', 'i');
-      const namePattern2 = new RegExp('<meta[^>]+content=["\']([^"\']+)["\'][^>]+name=["\']' + property + '["\']', 'i');
+      const namePattern1 = new RegExp(
+        '<meta[^>]+name=["\']' + property + '["\'][^>]+content=["\']([^"\']+)["\']',
+        'i'
+      );
+      const namePattern2 = new RegExp(
+        '<meta[^>]+content=["\']([^"\']+)["\'][^>]+name=["\']' + property + '["\']',
+        'i'
+      );
 
       const patterns = [propPattern1, propPattern2, namePattern1, namePattern2];
 
@@ -171,7 +184,8 @@ const fetchLinkPreview = async (url: string): Promise<LinkPreviewData> => {
     }
 
     // Get description
-    const description = getMetaContent('og:description') ||
+    const description =
+      getMetaContent('og:description') ||
       getMetaContent('twitter:description') ||
       getMetaContent('description');
 
@@ -246,7 +260,9 @@ export const LinkPreview: React.FC<LinkPreviewProps> = memo(({ url, isOwn = fals
         if (mounted) {
           setError(true);
           setLoading(false);
-          if (onError) onError(err as Error);
+          if (onError) {
+            onError(err as Error);
+          }
         }
       }
     };
@@ -292,7 +308,7 @@ export const LinkPreview: React.FC<LinkPreviewProps> = memo(({ url, isOwn = fals
       {hasImage && (
         <View style={styles.imageContainer}>
           <Image
-            source={{ uri: previewData!.image }}
+            source={{ uri: previewData.image }}
             style={styles.image}
             resizeMode="cover"
             onError={handleImageError}
@@ -304,7 +320,11 @@ export const LinkPreview: React.FC<LinkPreviewProps> = memo(({ url, isOwn = fals
       <View style={styles.contentContainer}>
         {/* Domain/site name */}
         <View style={styles.domainRow}>
-          <Icon name="globe-outline" size={12} color={isOwn ? 'rgba(255,255,255,0.7)' : colors.textSecondary} />
+          <Icon
+            name="globe-outline"
+            size={12}
+            color={isOwn ? 'rgba(255,255,255,0.7)' : colors.textSecondary}
+          />
           <Text style={styles.domain} numberOfLines={1}>
             {previewData?.siteName || previewData?.domain}
           </Text>
@@ -327,7 +347,11 @@ export const LinkPreview: React.FC<LinkPreviewProps> = memo(({ url, isOwn = fals
 
       {/* External link indicator */}
       <View style={styles.externalIndicator}>
-        <Icon name="open-outline" size={14} color={isOwn ? 'rgba(255,255,255,0.6)' : colors.textSecondary} />
+        <Icon
+          name="open-outline"
+          size={14}
+          color={isOwn ? 'rgba(255,255,255,0.6)' : colors.textSecondary}
+        />
       </View>
     </TouchableOpacity>
   );
@@ -338,66 +362,66 @@ LinkPreview.displayName = 'LinkPreview';
 const createStyles = (colors: any, isOwn: boolean) =>
   StyleSheet.create({
     container: {
-      flexDirection: 'column',
       backgroundColor: isOwn ? 'rgba(0,0,0,0.15)' : colors.cardBackground,
-      borderRadius: 8,
-      overflow: 'hidden',
-      marginTop: 8,
-      borderWidth: isOwn ? 0 : 1,
       borderColor: colors.border,
+      borderRadius: 8,
+      borderWidth: isOwn ? 0 : 1,
+      flexDirection: 'column',
+      marginTop: 8,
+      overflow: 'hidden',
       position: 'relative',
-    },
-    loadingContainer: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      padding: 12,
-      gap: 8,
-    },
-    loadingText: {
-      fontSize: 12,
-      color: isOwn ? 'rgba(255,255,255,0.7)' : colors.textSecondary,
-    },
-    imageContainer: {
-      width: '100%',
-      height: 150,
-      backgroundColor: colors.border,
-    },
-    image: {
-      width: '100%',
-      height: '100%',
     },
     contentContainer: {
       padding: 10,
     },
+    description: {
+      color: isOwn ? 'rgba(255,255,255,0.8)' : colors.textSecondary,
+      fontSize: 12,
+      lineHeight: 16,
+    },
+    domain: {
+      color: isOwn ? 'rgba(255,255,255,0.7)' : colors.textSecondary,
+      flex: 1,
+      fontSize: 11,
+    },
     domainRow: {
-      flexDirection: 'row',
       alignItems: 'center',
+      flexDirection: 'row',
       gap: 4,
       marginBottom: 4,
     },
-    domain: {
-      fontSize: 11,
-      color: isOwn ? 'rgba(255,255,255,0.7)' : colors.textSecondary,
-      flex: 1,
-    },
-    title: {
-      fontSize: 14,
-      fontWeight: '600',
-      color: isOwn ? colors.white : colors.text,
-      marginBottom: 4,
-    },
-    description: {
-      fontSize: 12,
-      color: isOwn ? 'rgba(255,255,255,0.8)' : colors.textSecondary,
-      lineHeight: 16,
-    },
     externalIndicator: {
-      position: 'absolute',
-      top: 8,
-      right: 8,
       backgroundColor: isOwn ? 'rgba(0,0,0,0.3)' : 'rgba(0,0,0,0.05)',
       borderRadius: 12,
       padding: 4,
+      position: 'absolute',
+      right: 8,
+      top: 8,
+    },
+    image: {
+      height: '100%',
+      width: '100%',
+    },
+    imageContainer: {
+      backgroundColor: colors.border,
+      height: 150,
+      width: '100%',
+    },
+    loadingContainer: {
+      alignItems: 'center',
+      flexDirection: 'row',
+      gap: 8,
+      padding: 12,
+    },
+    loadingText: {
+      color: isOwn ? 'rgba(255,255,255,0.7)' : colors.textSecondary,
+      fontSize: 12,
+    },
+    title: {
+      color: isOwn ? colors.white : colors.text,
+      fontSize: 14,
+      fontWeight: '600',
+      marginBottom: 4,
     },
   });
 

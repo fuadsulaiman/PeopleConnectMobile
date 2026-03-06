@@ -75,19 +75,9 @@ const IncomingCallModal: React.FC<IncomingCallModalProps> = ({
   });
 
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="fade"
-      statusBarTranslucent
-    >
+    <Modal visible={visible} transparent animationType="fade" statusBarTranslucent>
       <View style={styles.overlay}>
-        <Animated.View
-          style={[
-            styles.container,
-            { transform: [{ translateY }] },
-          ]}
-        >
+        <Animated.View style={[styles.container, { transform: [{ translateY }] }]}>
           {/* Call Type Indicator */}
           <View style={styles.callTypeContainer}>
             <Icon
@@ -101,12 +91,7 @@ const IncomingCallModal: React.FC<IncomingCallModalProps> = ({
           </View>
 
           {/* Caller Info */}
-          <Animated.View
-            style={[
-              styles.avatarContainer,
-              { transform: [{ scale: pulseAnim }] },
-            ]}
-          >
+          <Animated.View style={[styles.avatarContainer, { transform: [{ scale: pulseAnim }] }]}>
             {callerAvatar ? (
               <Image source={{ uri: callerAvatar }} style={styles.avatar} />
             ) : (
@@ -151,82 +136,82 @@ const IncomingCallModal: React.FC<IncomingCallModalProps> = ({
 };
 
 const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.85)',
+  acceptButton: {
+    alignItems: 'center',
+    backgroundColor: colors.success,
+    borderRadius: 40,
+    height: 80,
     justifyContent: 'center',
-    alignItems: 'center',
+    width: 80,
   },
-  container: {
-    width: width - 48,
-    backgroundColor: colors.gray[800],
-    borderRadius: 24,
-    padding: 32,
-    alignItems: 'center',
-  },
-  callTypeContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  callTypeText: {
-    color: colors.white,
-    fontSize: 16,
-    marginLeft: 8,
-    fontWeight: '500',
+  avatar: {
+    borderColor: colors.primary,
+    borderRadius: 50,
+    borderWidth: 3,
+    height: 100,
+    width: 100,
   },
   avatarContainer: {
     marginBottom: 16,
   },
-  avatar: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    borderWidth: 3,
-    borderColor: colors.primary,
-  },
   avatarPlaceholder: {
+    alignItems: 'center',
     backgroundColor: colors.primary,
     justifyContent: 'center',
-    alignItems: 'center',
   },
-  callerName: {
-    fontSize: 24,
-    fontWeight: 'bold',
+  button: {
+    alignItems: 'center',
+    padding: 16,
+  },
+  buttonText: {
     color: colors.white,
-    marginBottom: 32,
-    textAlign: 'center',
+    fontSize: 12,
+    fontWeight: '500',
+    marginTop: 8,
   },
   buttonsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-around',
     width: '100%',
   },
-  button: {
+  callTypeContainer: {
     alignItems: 'center',
-    padding: 16,
+    flexDirection: 'row',
+    marginBottom: 24,
+  },
+  callTypeText: {
+    color: colors.white,
+    fontSize: 16,
+    fontWeight: '500',
+    marginLeft: 8,
+  },
+  callerName: {
+    color: colors.white,
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 32,
+    textAlign: 'center',
+  },
+  container: {
+    alignItems: 'center',
+    backgroundColor: colors.gray[800],
+    borderRadius: 24,
+    padding: 32,
+    width: width - 48,
+  },
+  overlay: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.85)',
+    flex: 1,
+    justifyContent: 'center',
   },
   rejectButton: {
+    alignItems: 'center',
     backgroundColor: colors.error,
     borderRadius: 40,
-    width: 80,
     height: 80,
     justifyContent: 'center',
-    alignItems: 'center',
-  },
-  acceptButton: {
-    backgroundColor: colors.success,
-    borderRadius: 40,
     width: 80,
-    height: 80,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  buttonText: {
-    color: colors.white,
-    fontSize: 12,
-    marginTop: 8,
-    fontWeight: '500',
   },
 });
 

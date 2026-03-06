@@ -1,5 +1,24 @@
-import { create } from "zustand";
-import { contacts } from "../services/sdk";
+import { create } from 'zustand';
+
+// CRITICAL: Do NOT import SDK at top level - it causes module initialization failures on Windows
+// Use lazy loading pattern instead - SDK is loaded only when needed
+type ContactsService = {
+  list: () => Promise<any>;
+  getRequests: () => Promise<any>;
+  getBlocked: () => Promise<any>;
+  sendRequest: (userId: string) => Promise<void>;
+  acceptRequest: (requestId: string) => Promise<any>;
+  rejectRequest: (requestId: string) => Promise<void>;
+  remove: (contactId: string) => Promise<void>;
+  block: (userId: string) => Promise<void>;
+  unblock: (userId: string) => Promise<void>;
+  searchUsers: (query: string) => Promise<any>;
+};
+
+const getContactsService = (): ContactsService => {
+  const sdk = require('../services/sdk');
+  return sdk.contacts;
+};
 
 interface ContactUser {
   id: string;
@@ -67,6 +86,7 @@ export const useContactsStore = create<ContactsState>((set, get) => ({
   fetchContacts: async () => {
     set({ isLoading: true, error: null });
     try {
+      const contacts = getContactsService();
       const result = await contacts.list();
       const contactList = Array.isArray(result) ? result : (result as any).items || [];
       const mappedContacts = contactList.map((c: any) => ({
@@ -74,8 +94,8 @@ export const useContactsStore = create<ContactsState>((set, get) => ({
         userId: c.userId || c.contactUser?.id,
         user: {
           id: c.contactUser?.id || c.userId,
-          name: c.contactUser?.name || c.displayName || c.name || "",
-          username: c.contactUser?.username || c.username || "",
+          name: c.contactUser?.name || c.displayName || c.name || '',
+          username: c.contactUser?.username || c.username || '',
           avatarUrl: c.contactUser?.avatarUrl || c.avatarUrl,
           status: c.contactUser?.status || c.status,
         },
@@ -84,17 +104,21 @@ export const useContactsStore = create<ContactsState>((set, get) => ({
       }));
       set({ contacts: mappedContacts as Contact[], isLoading: false });
     } catch (error: any) {
-      set({ error: error.message || "Failed to fetch contacts", isLoading: false });
+      set({ error: error.message || 'Failed to fetch contacts', isLoading: false });
     }
   },
 
   fetchPendingRequests: async () => {
     try {
+      const contacts = getContactsService();
       const result = await contacts.getRequests();
       const received = (result as any)?.received || [];
-      set({ pendingRequests: received as ContactRequest[], requests: received as ContactRequest[] });
+      set({
+        pendingRequests: received as ContactRequest[],
+        requests: received as ContactRequest[],
+      });
     } catch (error: any) {
-      console.error("Failed to fetch pending requests:", error);
+      console.error('Failed to fetch pending requests:', error);
     }
   },
 
@@ -104,27 +128,30 @@ export const useContactsStore = create<ContactsState>((set, get) => ({
 
   fetchBlockedUsers: async () => {
     try {
+      const contacts = getContactsService();
       const result = await contacts.getBlocked();
       const blocked = Array.isArray(result) ? result : (result as any).items || [];
       set({ blockedUsers: blocked as Contact[] });
     } catch (error: any) {
-      console.error("Failed to fetch blocked users:", error);
+      console.error('Failed to fetch blocked users:', error);
     }
   },
 
   sendRequest: async (userId) => {
     set({ isLoading: true, error: null });
     try {
+      const contacts = getContactsService();
       await contacts.sendRequest(userId);
       set({ isLoading: false });
     } catch (error: any) {
-      set({ error: error.message || "Failed to send request", isLoading: false });
+      set({ error: error.message || 'Failed to send request', isLoading: false });
       throw error;
     }
   },
 
   acceptRequest: async (requestId) => {
     try {
+      const contacts = getContactsService();
       const newContact = await contacts.acceptRequest(requestId);
       set((state) => ({
         pendingRequests: state.pendingRequests.filter((r) => r.id !== requestId),
@@ -132,84 +159,102 @@ export const useContactsStore = create<ContactsState>((set, get) => ({
         contacts: [...state.contacts, newContact as unknown as Contact],
       }));
     } catch (error: any) {
-      set({ error: error.message || "Failed to accept request" });
+      set({ error: error.message || 'Failed to accept request' });
       throw error;
     }
   },
 
   rejectRequest: async (requestId) => {
     try {
+      const contacts = getContactsService();
       await contacts.rejectRequest(requestId);
       set((state) => ({
         pendingRequests: state.pendingRequests.filter((r) => r.id !== requestId),
         requests: state.requests.filter((r) => r.id !== requestId),
       }));
     } catch (error: any) {
-      set({ error: error.message || "Failed to reject request" });
+      set({ error: error.message || 'Failed to reject request' });
       throw error;
     }
   },
 
   removeContact: async (contactId) => {
     try {
+      const contacts = getContactsService();
       await contacts.remove(contactId);
       set((state) => ({ contacts: state.contacts.filter((c) => c.id !== contactId) }));
     } catch (error: any) {
-      set({ error: error.message || "Failed to remove contact" });
+      set({ error: error.message || 'Failed to remove contact' });
       throw error;
     }
   },
 
   blockUser: async (userId) => {
     try {
+      const contacts = getContactsService();
       await contacts.block(userId);
-      const blockedUser = get().contacts.find((c) => c.user.id?.toLowerCase() === userId?.toLowerCase() || c.userId?.toLowerCase() === userId?.toLowerCase());
+      const blockedUser = get().contacts.find(
+        (c) =>
+          c.user.id?.toLowerCase() === userId?.toLowerCase() ||
+          c.userId?.toLowerCase() === userId?.toLowerCase()
+      );
       set((state) => ({
         contacts: state.contacts.filter((c) => c.user.id !== userId && c.userId !== userId),
         blockedUsers: blockedUser ? [...state.blockedUsers, blockedUser] : state.blockedUsers,
       }));
     } catch (error: any) {
-      set({ error: error.message || "Failed to block user" });
+      set({ error: error.message || 'Failed to block user' });
       throw error;
     }
   },
 
   unblockUser: async (userId) => {
     try {
+      const contacts = getContactsService();
       await contacts.unblock(userId);
       set((state) => ({
         blockedUsers: state.blockedUsers.filter((u) => u.user.id !== userId && u.userId !== userId),
       }));
     } catch (error: any) {
-      set({ error: error.message || "Failed to unblock user" });
+      set({ error: error.message || 'Failed to unblock user' });
       throw error;
     }
   },
 
   searchUsers: async (query) => {
     try {
+      const contacts = getContactsService();
       const result = await contacts.searchUsers(query);
       const users = Array.isArray(result) ? result : [];
       const mappedResults = users.map((u: any) => ({
         id: u.id,
         userId: u.id,
-        user: { id: u.id, name: u.name || "", username: u.username || "", avatarUrl: u.avatarUrl, status: u.status },
+        user: {
+          id: u.id,
+          name: u.name || '',
+          username: u.username || '',
+          avatarUrl: u.avatarUrl,
+          status: u.status,
+        },
       })) as Contact[];
       set({ searchResults: mappedResults });
       return mappedResults;
     } catch (error: any) {
-      console.error("Failed to search users:", error);
+      console.error('Failed to search users:', error);
       return [];
     }
   },
 
-  clearSearch: () => { set({ searchResults: [] }); },
+  clearSearch: () => {
+    set({ searchResults: [] });
+  },
 
   updateContactPresence: (userId, isOnline) => {
     set((state) => ({
       contacts: state.contacts.map((c) =>
-        c.user.id?.toLowerCase() === userId?.toLowerCase() || c.userId?.toLowerCase() === userId?.toLowerCase()
-          ? { ...c, user: { ...c.user, status: isOnline ? "Online" : "Offline" } }
+        c.user.id?.toLowerCase() === userId?.toLowerCase() ||
+        c.userId?.toLowerCase() === userId?.toLowerCase()
+          ? { ...c, user: { ...c.user, status: isOnline ? 'Online' : 'Offline' } }
           : c
       ),
     }));

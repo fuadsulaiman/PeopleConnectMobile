@@ -14,7 +14,17 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { ProfileStackParamList } from '../../navigation/types';
 import { useAuthStore } from '../../stores/authStore';
-import { users, getAccessToken } from '../../services/sdk';
+// CRITICAL: Do NOT import SDK at top level - it causes module initialization failures on Windows
+const getUsers = () => {
+  const sdkModule = require('../../services/sdk');
+  return sdkModule.users;
+};
+const getAccessTokenFn = () => {
+  const sdkModule = require('../../services/sdk');
+  return sdkModule.getAccessToken();
+};
+const users = { updateProfile: (data: any) => getUsers().updateProfile(data), uploadAvatar: (data: any) => getUsers().uploadAvatar(data) };
+const getAccessToken = getAccessTokenFn;
 import { config } from '../../constants';
 import { Avatar } from '../../components/common/Avatar';
 import * as ImagePicker from 'react-native-image-picker';
@@ -40,7 +50,9 @@ export const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
 
       if (result.assets && result.assets[0]) {
         const asset = result.assets[0];
-        if (!asset.uri) return;
+        if (!asset.uri) {
+          return;
+        }
 
         setAvatarUri(asset.uri);
         setIsLoading(true);
@@ -58,13 +70,17 @@ export const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
             80, // quality
             0, // rotation
             undefined, // outputPath (use default)
-            false, // keepMeta
+            false // keepMeta
           );
 
           console.log('[AVATAR] Resized to JPEG:', resizedImage.uri);
 
           let fileUri = resizedImage.uri;
-          if (Platform.OS === 'android' && !fileUri.startsWith('file://') && !fileUri.startsWith('content://')) {
+          if (
+            Platform.OS === 'android' &&
+            !fileUri.startsWith('file://') &&
+            !fileUri.startsWith('content://')
+          ) {
             fileUri = 'file://' + fileUri;
           }
 
@@ -83,7 +99,7 @@ export const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
           const response = await fetch(uploadUrl, {
             method: 'POST',
             headers: {
-              'Authorization': 'Bearer ' + token,
+              Authorization: 'Bearer ' + token,
             },
             body: formData,
           });
@@ -146,11 +162,7 @@ export const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
           <Text style={styles.backIcon}>Back</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Edit Profile</Text>
-        <TouchableOpacity
-          style={styles.saveButton}
-          onPress={handleSave}
-          disabled={isLoading}
-        >
+        <TouchableOpacity style={styles.saveButton} onPress={handleSave} disabled={isLoading}>
           {isLoading ? (
             <ActivityIndicator size="small" color="#007AFF" />
           ) : (
@@ -164,7 +176,7 @@ export const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
           <TouchableOpacity onPress={handlePickImage}>
             <Avatar
               uri={avatarUri || undefined}
-              name={displayName || user?.username || ""}
+              name={displayName || user?.username || ''}
               size={100}
             />
             <View style={styles.avatarBadge}>
@@ -229,59 +241,30 @@ export const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  backButton: {
-    padding: 8,
-  },
-  backIcon: {
-    fontSize: 16,
-    color: '#007AFF',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1a1a1a',
-  },
-  saveButton: {
-    padding: 8,
-  },
-  saveButtonText: {
-    fontSize: 16,
-    color: '#007AFF',
-    fontWeight: '600',
-  },
-  content: {
-    flex: 1,
-  },
-  avatarSection: {
-    alignItems: 'center',
-    paddingVertical: 24,
-  },
   avatarBadge: {
-    position: 'absolute',
-    bottom: 0,
-    right: 0,
     backgroundColor: '#007AFF',
     borderRadius: 12,
+    bottom: 0,
     paddingHorizontal: 8,
     paddingVertical: 4,
+    position: 'absolute',
+    right: 0,
   },
   avatarBadgeText: {
     color: '#fff',
     fontSize: 10,
     fontWeight: '600',
+  },
+  avatarSection: {
+    alignItems: 'center',
+    paddingVertical: 24,
+  },
+  backButton: {
+    padding: 8,
+  },
+  backIcon: {
+    color: '#007AFF',
+    fontSize: 16,
   },
   changePhotoButton: {
     marginTop: 12,
@@ -291,38 +274,67 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
-  formSection: {
-    paddingHorizontal: 16,
+  container: {
+    backgroundColor: '#fff',
+    flex: 1,
   },
-  inputGroup: {
-    marginBottom: 20,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1a1a1a',
-    marginBottom: 8,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-    borderRadius: 12,
-    padding: 14,
-    fontSize: 16,
-    color: '#1a1a1a',
+  content: {
+    flex: 1,
   },
   disabledInput: {
     backgroundColor: '#f5f5f5',
     color: '#999',
   },
+  formSection: {
+    paddingHorizontal: 16,
+  },
+  header: {
+    alignItems: 'center',
+    borderBottomColor: '#f0f0f0',
+    borderBottomWidth: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  headerTitle: {
+    color: '#1a1a1a',
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  hint: {
+    color: '#999',
+    fontSize: 12,
+    marginTop: 4,
+  },
+  input: {
+    borderColor: '#e0e0e0',
+    borderRadius: 12,
+    borderWidth: 1,
+    color: '#1a1a1a',
+    fontSize: 16,
+    padding: 14,
+  },
+  inputGroup: {
+    marginBottom: 20,
+  },
+  label: {
+    color: '#1a1a1a',
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  saveButton: {
+    padding: 8,
+  },
+  saveButtonText: {
+    color: '#007AFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
   textArea: {
     height: 100,
     textAlignVertical: 'top',
-  },
-  hint: {
-    fontSize: 12,
-    color: '#999',
-    marginTop: 4,
   },
 });
 

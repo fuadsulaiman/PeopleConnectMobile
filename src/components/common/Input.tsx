@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState } from 'react';
 import {
   View,
   TextInput,
@@ -7,8 +7,8 @@ import {
   TouchableOpacity,
   TextInputProps,
   ViewStyle,
-} from "react-native";
-import { colors } from "../../constants";
+} from 'react-native';
+import { colors } from '../../constants';
 
 interface InputProps extends TextInputProps {
   label?: string;
@@ -36,8 +36,8 @@ export function Input({
       <View
         style={[
           styles.inputContainer,
-          isFocused && styles.inputFocused,
-          error && styles.inputError,
+          isFocused ? styles.inputFocused : undefined,
+          error ? styles.inputError : undefined,
         ]}
       >
         {leftIcon && <View style={styles.leftIcon}>{leftIcon}</View>}
@@ -50,11 +50,8 @@ export function Input({
           {...props}
         />
         {secureTextEntry && (
-          <TouchableOpacity
-            style={styles.rightIcon}
-            onPress={() => setIsSecure(!isSecure)}
-          >
-            <Text style={styles.toggleText}>{isSecure ? "Show" : "Hide"}</Text>
+          <TouchableOpacity style={styles.rightIcon} onPress={() => setIsSecure(!isSecure)}>
+            <Text style={styles.toggleText}>{isSecure ? 'Show' : 'Hide'}</Text>
           </TouchableOpacity>
         )}
         {rightIcon && <View style={styles.rightIcon}>{rightIcon}</View>}
@@ -68,35 +65,40 @@ const styles = StyleSheet.create({
   container: {
     marginBottom: 16,
   },
-  label: {
-    fontSize: 14,
-    fontWeight: "500",
+  error: {
+    color: colors.error,
+    fontSize: 12,
+    marginTop: 4,
+  },
+  input: {
     color: colors.text,
-    marginBottom: 8,
+    flex: 1,
+    fontSize: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
   },
   inputContainer: {
-    flexDirection: "row",
-    alignItems: "center",
+    alignItems: 'center',
     backgroundColor: colors.surface,
-    borderWidth: 1,
     borderColor: colors.border,
     borderRadius: 12,
-  },
-  inputFocused: {
-    borderColor: colors.primary,
+    borderWidth: 1,
+    flexDirection: 'row',
   },
   inputError: {
     borderColor: colors.error,
   },
-  input: {
-    flex: 1,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    fontSize: 16,
-    color: colors.text,
+  inputFocused: {
+    borderColor: colors.primary,
   },
   inputWithLeftIcon: {
     paddingLeft: 8,
+  },
+  label: {
+    color: colors.text,
+    fontSize: 14,
+    fontWeight: '500',
+    marginBottom: 8,
   },
   leftIcon: {
     paddingLeft: 16,
@@ -107,12 +109,7 @@ const styles = StyleSheet.create({
   toggleText: {
     color: colors.primary,
     fontSize: 14,
-    fontWeight: "500",
-  },
-  error: {
-    fontSize: 12,
-    color: colors.error,
-    marginTop: 4,
+    fontWeight: '500',
   },
 });
 

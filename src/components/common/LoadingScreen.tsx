@@ -1,6 +1,6 @@
-import React from "react";
-import { View, ActivityIndicator, Text, StyleSheet } from "react-native";
-import { colors } from "../../constants";
+import React from 'react';
+import { View, ActivityIndicator, Text, StyleSheet } from 'react-native';
+import { colors } from '../../constants';
 
 interface LoadingScreenProps {
   message?: string;
@@ -17,15 +17,15 @@ export function LoadingScreen({ message }: LoadingScreenProps) {
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
+    alignItems: 'center',
     backgroundColor: colors.background,
+    flex: 1,
+    justifyContent: 'center',
   },
   message: {
-    marginTop: 16,
-    fontSize: 16,
     color: colors.textSecondary,
+    fontSize: 16,
+    marginTop: 16,
   },
 });
 

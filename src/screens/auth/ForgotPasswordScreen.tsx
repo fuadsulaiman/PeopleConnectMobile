@@ -12,7 +12,12 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { AuthStackParamList } from '../../navigation/types';
-import { auth } from '../../services/sdk';
+// CRITICAL: Do NOT import SDK at top level - it causes module initialization failures on Windows
+const getAuth = () => {
+  const sdkModule = require('../../services/sdk');
+  return sdkModule.auth;
+};
+const auth = { forgotPassword: (email: string) => getAuth().forgotPassword(email) };
 import { LoadingScreen } from '../../components/common/LoadingScreen';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'ForgotPassword'>;
@@ -51,7 +56,8 @@ export const ForgotPasswordScreen: React.FC<Props> = ({ navigation }) => {
             <Text style={styles.successIcon}>✉️</Text>
             <Text style={styles.successTitle}>Check Your Email</Text>
             <Text style={styles.successText}>
-              We have sent a password reset link to {email}. Please check your inbox and follow the instructions.
+              We have sent a password reset link to {email}. Please check your inbox and follow the
+              instructions.
             </Text>
             <TouchableOpacity
               style={styles.backButton}
@@ -71,10 +77,7 @@ export const ForgotPasswordScreen: React.FC<Props> = ({ navigation }) => {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.content}
       >
-        <TouchableOpacity
-          style={styles.backNav}
-          onPress={() => navigation.goBack()}
-        >
+        <TouchableOpacity style={styles.backNav} onPress={() => navigation.goBack()}>
           <Text style={styles.backNavText}>Back</Text>
         </TouchableOpacity>
 
@@ -108,13 +111,16 @@ export const ForgotPasswordScreen: React.FC<Props> = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
+  backButton: {
+    backgroundColor: '#007AFF',
+    borderRadius: 12,
+    paddingHorizontal: 48,
+    paddingVertical: 16,
   },
-  content: {
-    flex: 1,
-    padding: 24,
+  backButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
   backNav: {
     marginBottom: 24,
@@ -123,82 +129,79 @@ const styles = StyleSheet.create({
     color: '#007AFF',
     fontSize: 16,
   },
-  header: {
-    marginBottom: 32,
+  container: {
+    backgroundColor: '#fff',
+    flex: 1,
   },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#1a1a1a',
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 14,
-    color: '#666',
-    lineHeight: 20,
+  content: {
+    flex: 1,
+    padding: 24,
   },
   form: {
     flex: 1,
   },
-  label: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1a1a1a',
-    marginBottom: 8,
+  header: {
+    marginBottom: 32,
   },
   input: {
-    borderWidth: 1,
     borderColor: '#e0e0e0',
     borderRadius: 12,
-    padding: 16,
-    fontSize: 16,
+    borderWidth: 1,
     color: '#1a1a1a',
+    fontSize: 16,
     marginBottom: 24,
+    padding: 16,
+  },
+  label: {
+    color: '#1a1a1a',
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 8,
   },
   submitButton: {
+    alignItems: 'center',
     backgroundColor: '#007AFF',
     borderRadius: 12,
     padding: 16,
-    alignItems: 'center',
   },
   submitButtonText: {
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
   },
+  subtitle: {
+    color: '#666',
+    fontSize: 14,
+    lineHeight: 20,
+  },
   successContainer: {
+    alignItems: 'center',
     flex: 1,
     justifyContent: 'center',
-    alignItems: 'center',
   },
   successIcon: {
     fontSize: 64,
     marginBottom: 24,
   },
-  successTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#1a1a1a',
-    marginBottom: 12,
-  },
   successText: {
-    fontSize: 14,
     color: '#666',
-    textAlign: 'center',
+    fontSize: 14,
     lineHeight: 20,
     marginBottom: 32,
     paddingHorizontal: 24,
+    textAlign: 'center',
   },
-  backButton: {
-    backgroundColor: '#007AFF',
-    borderRadius: 12,
-    paddingVertical: 16,
-    paddingHorizontal: 48,
+  successTitle: {
+    color: '#1a1a1a',
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 12,
   },
-  backButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
+  title: {
+    color: '#1a1a1a',
+    fontSize: 28,
+    fontWeight: 'bold',
+    marginBottom: 8,
   },
 });
 

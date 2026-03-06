@@ -257,9 +257,18 @@ const RootNavigator: React.FC = () => {
 
   // Watch for incoming calls and navigate to ActiveCall screen
   useEffect(() => {
-    if (!isAuthenticated || !navigationRef.current) return;
+    if (!isAuthenticated || !navigationRef.current) {
+      return;
+    }
 
-    if ((callState === 'incoming' || callState === 'ringing' || callState === 'connecting' || callState === 'connected') && currentCall && !hasNavigatedToCallRef.current) {
+    if (
+      (callState === 'incoming' ||
+        callState === 'ringing' ||
+        callState === 'connecting' ||
+        callState === 'connected') &&
+      currentCall &&
+      !hasNavigatedToCallRef.current
+    ) {
       console.log('Navigating to ActiveCall screen for call:', currentCall.id);
       hasNavigatedToCallRef.current = true;
       navigationRef.current.navigate('ActiveCall', {
@@ -325,10 +334,10 @@ const RootNavigator: React.FC = () => {
 
 const styles = StyleSheet.create({
   loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: colors.background,
+    flex: 1,
+    justifyContent: 'center',
   },
 });
 

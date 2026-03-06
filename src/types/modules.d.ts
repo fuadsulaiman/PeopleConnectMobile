@@ -2,9 +2,9 @@
  * Type declarations for third-party modules
  */
 
-declare module "react-native-video" {
-  import { Component } from "react";
-  import { ViewStyle } from "react-native";
+declare module 'react-native-video' {
+  import { Component } from 'react';
+  import { ViewStyle } from 'react-native';
 
   export interface OnLoadData {
     duration: number;
@@ -26,9 +26,9 @@ declare module "react-native-video" {
     muted?: boolean;
     volume?: number;
     rate?: number;
-    resizeMode?: "contain" | "cover" | "stretch" | "none";
+    resizeMode?: 'contain' | 'cover' | 'stretch' | 'none';
     poster?: string;
-    posterResizeMode?: "contain" | "cover" | "stretch" | "repeat" | "center";
+    posterResizeMode?: 'contain' | 'cover' | 'stretch' | 'repeat' | 'center';
     onLoad?: (data: OnLoadData) => void;
     onLoadStart?: () => void;
     onProgress?: (data: OnProgressData) => void;
@@ -38,7 +38,7 @@ declare module "react-native-video" {
     controls?: boolean;
     fullscreen?: boolean;
     fullscreenAutorotate?: boolean;
-    fullscreenOrientation?: "all" | "landscape" | "portrait";
+    fullscreenOrientation?: 'all' | 'landscape' | 'portrait';
     useTextureView?: boolean;
     audioOnly?: boolean;
   }
@@ -50,13 +50,13 @@ declare module "react-native-video" {
   }
 }
 
-declare module "react-native-vision-camera" {
-  import { Component } from "react";
-  import { ViewStyle, ViewProps } from "react-native";
+declare module 'react-native-vision-camera' {
+  import { Component } from 'react';
+  import { ViewStyle, ViewProps } from 'react-native';
 
   export type CameraDevice = {
     id: string;
-    position: "front" | "back" | "external";
+    position: 'front' | 'back' | 'external';
     name: string;
     hasFlash: boolean;
     hasTorch: boolean;
@@ -67,7 +67,7 @@ declare module "react-native-vision-camera" {
     formats: CameraDeviceFormat[];
     supportsLowLightBoost: boolean;
     supportsFocus: boolean;
-    hardwareLevel?: "legacy" | "limited" | "full";
+    hardwareLevel?: 'legacy' | 'limited' | 'full';
   };
 
   export type CameraDeviceFormat = {
@@ -81,13 +81,18 @@ declare module "react-native-vision-camera" {
     maxZoom: number;
     supportsVideoHDR: boolean;
     supportsPhotoHDR: boolean;
-    autoFocusSystem: "none" | "contrast-detection" | "phase-detection";
+    autoFocusSystem: 'none' | 'contrast-detection' | 'phase-detection';
     videoStabilizationModes: VideoStabilizationMode[];
     pixelFormat: PixelFormat;
   };
 
-  export type VideoStabilizationMode = "off" | "standard" | "cinematic" | "cinematic-extended" | "auto";
-  export type PixelFormat = "yuv" | "rgb" | "native" | "unknown";
+  export type VideoStabilizationMode =
+    | 'off'
+    | 'standard'
+    | 'cinematic'
+    | 'cinematic-extended'
+    | 'auto';
+  export type PixelFormat = 'yuv' | 'rgb' | 'native' | 'unknown';
 
   export interface CameraProps extends ViewProps {
     device: CameraDevice;
@@ -95,7 +100,7 @@ declare module "react-native-vision-camera" {
     photo?: boolean;
     video?: boolean;
     audio?: boolean;
-    torch?: "off" | "on";
+    torch?: 'off' | 'on';
     zoom?: number;
     enableZoomGesture?: boolean;
     fps?: number;
@@ -119,7 +124,7 @@ declare module "react-native-vision-camera" {
     height: number;
     path: string;
     isRawPhoto: boolean;
-    orientation: "portrait" | "landscape-left" | "portrait-upside-down" | "landscape-right";
+    orientation: 'portrait' | 'landscape-left' | 'portrait-upside-down' | 'landscape-right';
     isMirrored: boolean;
   }
 
@@ -129,15 +134,15 @@ declare module "react-native-vision-camera" {
   }
 
   export type TakePhotoOptions = {
-    flash?: "off" | "on" | "auto";
+    flash?: 'off' | 'on' | 'auto';
     enableAutoRedEyeReduction?: boolean;
     enableAutoStabilization?: boolean;
     skipMetadata?: boolean;
   };
 
   export type RecordVideoOptions = {
-    flash?: "off" | "on";
-    fileType?: "mp4" | "mov";
+    flash?: 'off' | 'on';
+    fileType?: 'mp4' | 'mov';
     onRecordingError?: (error: CameraRuntimeError) => void;
     onRecordingFinished?: (video: VideoFile) => void;
   };
@@ -162,29 +167,54 @@ declare module "react-native-vision-camera" {
     focus(point: { x: number; y: number }): Promise<void>;
   }
 
-  export function useCameraDevice(position: "front" | "back" | "external"): CameraDevice | undefined;
-  export function useCameraDevices(): { back: CameraDevice | undefined; front: CameraDevice | undefined; external: CameraDevice | undefined; };
-  export function useCameraFormat(device: CameraDevice | undefined, filters?: any): CameraDeviceFormat | undefined;
-  export function useCameraPermission(): { hasPermission: boolean; requestPermission: () => Promise<boolean>; };
-  export function useMicrophonePermission(): { hasPermission: boolean; requestPermission: () => Promise<boolean>; };
+  export function useCameraDevice(
+    position: 'front' | 'back' | 'external'
+  ): CameraDevice | undefined;
+  export function useCameraDevices(): {
+    back: CameraDevice | undefined;
+    front: CameraDevice | undefined;
+    external: CameraDevice | undefined;
+  };
+  export function useCameraFormat(
+    device: CameraDevice | undefined,
+    filters?: any
+  ): CameraDeviceFormat | undefined;
+  export function useCameraPermission(): {
+    hasPermission: boolean;
+    requestPermission: () => Promise<boolean>;
+  };
+  export function useMicrophonePermission(): {
+    hasPermission: boolean;
+    requestPermission: () => Promise<boolean>;
+  };
 }
 
-declare module "react-native-webrtc" {
-  export interface RTCSessionDescription {
-    type: "offer" | "answer" | "pranswer" | "rollback";
-    sdp: string;
+declare module 'react-native-qrcode-svg' {
+  import { Component } from 'react';
+
+  export interface QRCodeProps {
+    value: string;
+    size?: number;
+    color?: string;
+    backgroundColor?: string;
+    logo?: any;
+    logoSize?: number;
+    logoMargin?: number;
+    logoBorderRadius?: number;
+    logoBackgroundColor?: string;
+    quietZone?: number;
+    enableLinearGradient?: boolean;
+    linearGradient?: string[];
+    gradientDirection?: string[];
+    ecl?: 'L' | 'M' | 'Q' | 'H';
+    getRef?: (c: any) => void;
+    onError?: (error: Error) => void;
   }
 
-  export type RTCSessionDescriptionType = RTCSessionDescription;
+  export default class QRCode extends Component<QRCodeProps> {}
+}
 
-  export interface RTCIceCandidate {
-    candidate: string;
-    sdpMid: string | null;
-    sdpMLineIndex: number | null;
-  }
-
-  export type RTCIceCandidateType = RTCIceCandidate;
-
+declare module '@livekit/react-native-webrtc' {
   export interface MediaStream {
     id: string;
     active: boolean;
@@ -199,15 +229,15 @@ declare module "react-native-webrtc" {
 
   export interface MediaStreamTrack {
     id: string;
-    kind: "audio" | "video";
+    kind: 'audio' | 'video';
     label: string;
     enabled: boolean;
     muted: boolean;
-    readyState: "live" | "ended";
+    readyState: 'live' | 'ended';
     stop(): void;
   }
 
-  export interface RTCPeerConnection {
+  export class RTCPeerConnection {
     localDescription: RTCSessionDescription | null;
     remoteDescription: RTCSessionDescription | null;
     connectionState: string;
@@ -220,34 +250,65 @@ declare module "react-native-webrtc" {
     oniceconnectionstatechange: (() => void) | null;
     onsignalingstatechange: (() => void) | null;
     ontrack: ((event: { track: MediaStreamTrack; streams: MediaStream[] }) => void) | null;
-    createOffer(options?: any): Promise<RTCSessionDescription>;
-    createAnswer(options?: any): Promise<RTCSessionDescription>;
+    constructor(configuration?: Record<string, unknown>);
+    createOffer(options?: Record<string, unknown>): Promise<RTCSessionDescription>;
+    createAnswer(options?: Record<string, unknown>): Promise<RTCSessionDescription>;
     setLocalDescription(description: RTCSessionDescription): Promise<void>;
     setRemoteDescription(description: RTCSessionDescription): Promise<void>;
     addIceCandidate(candidate: RTCIceCandidate): Promise<void>;
     addTrack(track: MediaStreamTrack, stream: MediaStream): void;
-    removeTrack(sender: any): void;
-    getSenders(): any[];
-    getReceivers(): any[];
+    removeTrack(sender: RTCRtpSender): void;
+    getSenders(): RTCRtpSender[];
+    getReceivers(): RTCRtpReceiver[];
     close(): void;
   }
 
+  export interface RTCRtpSender {
+    track: MediaStreamTrack | null;
+    replaceTrack(track: MediaStreamTrack | null): Promise<void>;
+  }
 
-  export class RTCPeerConnection {
-    constructor(configuration?: any);
+  export interface RTCRtpReceiver {
+    track: MediaStreamTrack;
   }
 
   export class RTCSessionDescription {
+    type: 'offer' | 'answer' | 'pranswer' | 'rollback';
+    sdp: string;
     constructor(init?: { type: string; sdp: string });
   }
 
+  export type RTCSessionDescriptionType = RTCSessionDescription;
+
   export class RTCIceCandidate {
+    candidate: string;
+    sdpMid: string | null;
+    sdpMLineIndex: number | null;
     constructor(init?: { candidate: string; sdpMid: string; sdpMLineIndex: number });
   }
 
-  export const RTCView: any;
+  export type RTCIceCandidateType = RTCIceCandidate;
+
+  export const RTCView: React.ComponentType<{
+    streamURL?: string;
+    objectFit?: 'contain' | 'cover';
+    mirror?: boolean;
+    zOrder?: number;
+    style?: React.CSSProperties;
+  }>;
+
   export const mediaDevices: {
-    getUserMedia(constraints: { audio?: boolean | object; video?: boolean | object }): Promise<MediaStream>;
-    enumerateDevices(): Promise<any[]>;
+    getUserMedia(constraints: {
+      audio?: boolean | Record<string, unknown>;
+      video?: boolean | Record<string, unknown>;
+    }): Promise<MediaStream>;
+    enumerateDevices(): Promise<MediaDeviceInfo[]>;
   };
+
+  export interface MediaDeviceInfo {
+    deviceId: string;
+    groupId: string;
+    kind: 'audioinput' | 'audiooutput' | 'videoinput';
+    label: string;
+  }
 }

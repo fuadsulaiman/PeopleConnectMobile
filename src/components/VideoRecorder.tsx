@@ -12,7 +12,12 @@ import {
   StatusBar,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { Camera, useCameraDevice, useCameraPermission, useMicrophonePermission } from 'react-native-vision-camera';
+import {
+  Camera,
+  useCameraDevice,
+  useCameraPermission,
+  useMicrophonePermission,
+} from 'react-native-vision-camera';
 import { colors } from '../constants/colors';
 
 interface VideoRecorderProps {
@@ -37,13 +42,17 @@ export const VideoRecorder: React.FC<VideoRecorderProps> = ({
   const [recordingDuration, setRecordingDuration] = useState(0);
   const [cameraPosition, setCameraPosition] = useState<'front' | 'back'>('back');
   const [isInitializing, setIsInitializing] = useState(true);
-  const [recordedVideo, setRecordedVideo] = useState<{ path: string; duration: number } | null>(null);
+  const [recordedVideo, setRecordedVideo] = useState<{ path: string; duration: number } | null>(
+    null
+  );
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const finalDurationRef = useRef(0);
 
   const device = useCameraDevice(cameraPosition);
-  const { hasPermission: hasCameraPermission, requestPermission: requestCameraPermission } = useCameraPermission();
-  const { hasPermission: hasMicPermission, requestPermission: requestMicPermission } = useMicrophonePermission();
+  const { hasPermission: hasCameraPermission, requestPermission: requestCameraPermission } =
+    useCameraPermission();
+  const { hasPermission: hasMicPermission, requestPermission: requestMicPermission } =
+    useMicrophonePermission();
 
   useEffect(() => {
     if (visible) {
@@ -90,7 +99,9 @@ export const VideoRecorder: React.FC<VideoRecorderProps> = ({
   };
 
   const startRecording = async () => {
-    if (!cameraRef.current || isRecording) return;
+    if (!cameraRef.current || isRecording) {
+      return;
+    }
 
     try {
       setIsRecording(true);
@@ -149,7 +160,9 @@ export const VideoRecorder: React.FC<VideoRecorderProps> = ({
   };
 
   const stopRecording = async () => {
-    if (!cameraRef.current || !isRecording) return;
+    if (!cameraRef.current || !isRecording) {
+      return;
+    }
 
     try {
       if (timerRef.current) {
@@ -257,7 +270,7 @@ export const VideoRecorder: React.FC<VideoRecorderProps> = ({
           <>
             <Camera
               ref={cameraRef}
-              style={{ flex: 1, position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }}
+              style={{ flex: 1, position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
               device={device}
               isActive={visible && !recordedVideo}
               video={true}
@@ -285,7 +298,11 @@ export const VideoRecorder: React.FC<VideoRecorderProps> = ({
                   onPress={toggleCamera}
                   disabled={isRecording}
                 >
-                  <Icon name="camera-reverse" size={28} color={isRecording ? '#666' : colors.white} />
+                  <Icon
+                    name="camera-reverse"
+                    size={28}
+                    color={isRecording ? '#666' : colors.white}
+                  />
                 </TouchableOpacity>
               </View>
             </SafeAreaView>
@@ -323,19 +340,19 @@ export const VideoRecorder: React.FC<VideoRecorderProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
     backgroundColor: '#000',
+    flex: 1,
   },
   loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#000',
+    flex: 1,
+    justifyContent: 'center',
   },
   loadingText: {
     color: colors.white,
-    marginTop: 16,
     fontSize: 16,
+    marginTop: 16,
   },
   cancelLoadingButton: {
     marginTop: 24,
@@ -346,48 +363,48 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   topControlsContainer: {
-    position: 'absolute',
-    top: 0,
     left: 0,
+    position: 'absolute',
     right: 0,
+    top: 0,
   },
   topControls: {
+    alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingTop: Platform.OS === 'android' ? 40 : 10,
-    paddingHorizontal: 16,
     paddingBottom: 16,
+    paddingHorizontal: 16,
+    paddingTop: Platform.OS === 'android' ? 40 : 10,
   },
   topButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    borderRadius: 22,
+    height: 44,
+    justifyContent: 'center',
+    width: 44,
   },
   disabledButton: {
     opacity: 0.5,
   },
   placeholder: {
-    width: 44,
     height: 44,
+    width: 44,
   },
   recordingIndicator: {
-    flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(0,0,0,0.6)',
+    borderRadius: 20,
+    flexDirection: 'row',
     paddingHorizontal: 16,
     paddingVertical: 8,
-    borderRadius: 20,
   },
   recordingDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
     backgroundColor: '#FF0000',
+    borderRadius: 6,
+    height: 12,
     marginRight: 8,
+    width: 12,
   },
   durationText: {
     color: colors.white,
@@ -395,42 +412,42 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   bottomControls: {
-    position: 'absolute',
+    alignItems: 'center',
     bottom: 0,
     left: 0,
-    right: 0,
-    alignItems: 'center',
     paddingBottom: Platform.OS === 'android' ? 40 : 50,
     paddingTop: 20,
+    position: 'absolute',
+    right: 0,
   },
   recordButton: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    borderWidth: 4,
-    borderColor: colors.white,
-    justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: 'transparent',
+    borderColor: colors.white,
+    borderRadius: 40,
+    borderWidth: 4,
+    height: 80,
+    justifyContent: 'center',
+    width: 80,
   },
   recordButtonInner: {
-    width: 68,
-    height: 68,
-    borderRadius: 34,
-    justifyContent: 'center',
     alignItems: 'center',
+    borderRadius: 34,
+    height: 68,
+    justifyContent: 'center',
+    width: 68,
   },
   recordIcon: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
     backgroundColor: '#FF0000',
+    borderRadius: 30,
+    height: 60,
+    width: 60,
   },
   stopIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 6,
     backgroundColor: '#FF0000',
+    borderRadius: 6,
+    height: 32,
+    width: 32,
   },
   hintText: {
     color: colors.white,
@@ -442,10 +459,10 @@ const styles = StyleSheet.create({
   },
   // Preview screen styles
   previewContainer: {
-    flex: 1,
-    justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#000',
+    flex: 1,
+    justifyContent: 'center',
     padding: 24,
   },
   previewContent: {
@@ -468,13 +485,13 @@ const styles = StyleSheet.create({
     gap: 20,
   },
   retakeButton: {
-    flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#333',
+    borderRadius: 12,
+    flexDirection: 'row',
+    gap: 8,
     paddingHorizontal: 24,
     paddingVertical: 14,
-    borderRadius: 12,
-    gap: 8,
   },
   retakeButtonText: {
     color: colors.white,
@@ -482,13 +499,13 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   sendButton: {
-    flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.primary,
+    borderRadius: 12,
+    flexDirection: 'row',
+    gap: 8,
     paddingHorizontal: 24,
     paddingVertical: 14,
-    borderRadius: 12,
-    gap: 8,
   },
   sendButtonText: {
     color: colors.white,

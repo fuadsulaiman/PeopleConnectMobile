@@ -12,7 +12,8 @@ import {
   Alert,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { useAuthStore, useSettingsStore } from '../../stores';
+import { useAuthStore } from '../../stores/authStore';
+import { useSettingsStore } from '../../stores/settingsStore';
 import { useTheme } from '../../hooks';
 import { RegisterScreenProps } from '../../navigation/types';
 
@@ -43,10 +44,18 @@ const RegisterScreen: React.FC<RegisterScreenProps> = ({ navigation }) => {
 
   const validatePassword = (pwd: string): string[] => {
     const errors: string[] = [];
-    if (pwd.length < 8) errors.push('At least 8 characters');
-    if (!/[A-Z]/.test(pwd)) errors.push('One uppercase letter');
-    if (!/[a-z]/.test(pwd)) errors.push('One lowercase letter');
-    if (!/[0-9]/.test(pwd)) errors.push('One number');
+    if (pwd.length < 8) {
+      errors.push('At least 8 characters');
+    }
+    if (!/[A-Z]/.test(pwd)) {
+      errors.push('One uppercase letter');
+    }
+    if (!/[a-z]/.test(pwd)) {
+      errors.push('One lowercase letter');
+    }
+    if (!/[0-9]/.test(pwd)) {
+      errors.push('One number');
+    }
     return errors;
   };
 
@@ -72,7 +81,10 @@ const RegisterScreen: React.FC<RegisterScreenProps> = ({ navigation }) => {
     // Validate password requirements
     const passwordErrors = validatePassword(password);
     if (passwordErrors.length > 0) {
-      Alert.alert('Password Requirements', 'Password must have:\n' + passwordErrors.map(e => '- ' + e).join('\n'));
+      Alert.alert(
+        'Password Requirements',
+        'Password must have:\n' + passwordErrors.map((e) => '- ' + e).join('\n')
+      );
       return;
     }
 
@@ -111,8 +123,8 @@ const RegisterScreen: React.FC<RegisterScreenProps> = ({ navigation }) => {
           <Icon name="lock-closed-outline" size={64} color={colors.textSecondary} />
           <Text style={styles.disabledTitle}>Registration Closed</Text>
           <Text style={styles.disabledText}>
-            New account registration is currently not available.
-            Please contact the administrator for access.
+            New account registration is currently not available. Please contact the administrator
+            for access.
           </Text>
           <TouchableOpacity
             style={styles.backToLoginButton}
@@ -130,15 +142,9 @@ const RegisterScreen: React.FC<RegisterScreenProps> = ({ navigation }) => {
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled"
-      >
+      <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
         <View style={styles.header}>
-          <TouchableOpacity
-            onPress={() => navigation.goBack()}
-            style={styles.backButton}
-          >
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
             <Icon name="arrow-back" size={24} color={colors.text} />
           </TouchableOpacity>
           <Text style={styles.title}>Create Account</Text>
@@ -245,10 +251,7 @@ const RegisterScreen: React.FC<RegisterScreenProps> = ({ navigation }) => {
               secureTextEntry={!showPassword}
               editable={!isLoading}
             />
-            <TouchableOpacity
-              onPress={() => setShowPassword(!showPassword)}
-              style={styles.eyeIcon}
-            >
+            <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eyeIcon}>
               <Icon
                 name={showPassword ? 'eye-off-outline' : 'eye-outline'}
                 size={20}
@@ -266,12 +269,7 @@ const RegisterScreen: React.FC<RegisterScreenProps> = ({ navigation }) => {
                 size={14}
                 color={password.length >= 8 ? colors.success : colors.textSecondary}
               />
-              <Text
-                style={[
-                  styles.requirementText,
-                  password.length >= 8 && styles.requirementMet,
-                ]}
-              >
+              <Text style={[styles.requirementText, password.length >= 8 && styles.requirementMet]}>
                 At least 8 characters
               </Text>
             </View>
@@ -282,10 +280,7 @@ const RegisterScreen: React.FC<RegisterScreenProps> = ({ navigation }) => {
                 color={/[A-Z]/.test(password) ? colors.success : colors.textSecondary}
               />
               <Text
-                style={[
-                  styles.requirementText,
-                  /[A-Z]/.test(password) && styles.requirementMet,
-                ]}
+                style={[styles.requirementText, /[A-Z]/.test(password) && styles.requirementMet]}
               >
                 One uppercase letter
               </Text>
@@ -297,10 +292,7 @@ const RegisterScreen: React.FC<RegisterScreenProps> = ({ navigation }) => {
                 color={/[a-z]/.test(password) ? colors.success : colors.textSecondary}
               />
               <Text
-                style={[
-                  styles.requirementText,
-                  /[a-z]/.test(password) && styles.requirementMet,
-                ]}
+                style={[styles.requirementText, /[a-z]/.test(password) && styles.requirementMet]}
               >
                 One lowercase letter
               </Text>
@@ -312,10 +304,7 @@ const RegisterScreen: React.FC<RegisterScreenProps> = ({ navigation }) => {
                 color={/[0-9]/.test(password) ? colors.success : colors.textSecondary}
               />
               <Text
-                style={[
-                  styles.requirementText,
-                  /[0-9]/.test(password) && styles.requirementMet,
-                ]}
+                style={[styles.requirementText, /[0-9]/.test(password) && styles.requirementMet]}
               >
                 One number
               </Text>
@@ -387,54 +376,64 @@ const RegisterScreen: React.FC<RegisterScreenProps> = ({ navigation }) => {
 
 const createStyles = (colors: any) =>
   StyleSheet.create({
-    container: { flex: 1, backgroundColor: colors.background },
-    scrollContent: { flexGrow: 1, padding: 24 },
-    header: { marginBottom: 24, marginTop: 20 },
     backButton: { marginBottom: 16 },
-    title: { fontSize: 32, fontWeight: 'bold', color: colors.text },
-    subtitle: { fontSize: 16, color: colors.textSecondary, marginTop: 8 },
-    form: { marginBottom: 32 },
-    inputContainer: {
+    backToLoginButton: {
+      backgroundColor: colors.primary,
+      borderRadius: 8,
+      marginTop: 24,
+      paddingHorizontal: 32,
+      paddingVertical: 12,
+    },
+    backToLoginText: {
+      color: colors.white,
+      fontSize: 16,
+      fontWeight: '600',
+    },
+    container: { backgroundColor: colors.background, flex: 1 },
+    disabledContainer: {
+      alignItems: 'center',
+      flex: 1,
+      justifyContent: 'center',
+      padding: 32,
+    },
+    disabledText: {
+      color: colors.textSecondary,
+      fontSize: 14,
+      lineHeight: 20,
+      marginTop: 8,
+      textAlign: 'center',
+    },
+    disabledTitle: {
+      color: colors.text,
+      fontSize: 24,
+      fontWeight: 'bold',
+      marginTop: 16,
+    },
+    eyeIcon: { padding: 4 },
+    footer: {
+      alignItems: 'center',
       flexDirection: 'row',
+      justifyContent: 'center',
+    },
+    footerText: { color: colors.textSecondary, fontSize: 14 },
+    form: { marginBottom: 32 },
+    header: { marginBottom: 24, marginTop: 20 },
+    input: { color: colors.text, flex: 1, fontSize: 16, height: 52 },
+    inputContainer: {
       alignItems: 'center',
       backgroundColor: colors.surface,
+      borderColor: colors.border,
       borderRadius: 12,
+      borderWidth: 1,
+      flexDirection: 'row',
       marginBottom: 16,
       paddingHorizontal: 16,
-      borderWidth: 1,
-      borderColor: colors.border,
     },
     inputIcon: { marginRight: 12 },
-    input: { flex: 1, height: 52, fontSize: 16, color: colors.text },
-    eyeIcon: { padding: 4 },
-    passwordRequirements: {
-      backgroundColor: colors.surface,
-      borderRadius: 8,
-      padding: 12,
-      marginBottom: 16,
-    },
-    requirementsTitle: {
-      fontSize: 12,
-      fontWeight: '600',
-      color: colors.textSecondary,
-      marginBottom: 8,
-    },
-    requirementRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      marginVertical: 2,
-    },
-    requirementText: {
-      fontSize: 12,
-      color: colors.textSecondary,
-      marginLeft: 6,
-    },
-    requirementMet: {
-      color: colors.success,
-    },
+    loginLink: { color: colors.primary, fontSize: 14, fontWeight: '600', marginLeft: 4 },
     matchIndicator: {
-      flexDirection: 'row',
       alignItems: 'center',
+      flexDirection: 'row',
       marginBottom: 16,
       marginLeft: 4,
     },
@@ -442,54 +441,44 @@ const createStyles = (colors: any) =>
       fontSize: 12,
       marginLeft: 6,
     },
+    passwordRequirements: {
+      backgroundColor: colors.surface,
+      borderRadius: 8,
+      marginBottom: 16,
+      padding: 12,
+    },
     registerButton: {
+      alignItems: 'center',
       backgroundColor: colors.primary,
       borderRadius: 12,
       height: 52,
       justifyContent: 'center',
-      alignItems: 'center',
       marginTop: 8,
     },
     registerButtonDisabled: { opacity: 0.7 },
     registerButtonText: { color: colors.white, fontSize: 18, fontWeight: '600' },
-    footer: {
+    requirementMet: {
+      color: colors.success,
+    },
+    requirementRow: {
+      alignItems: 'center',
       flexDirection: 'row',
-      justifyContent: 'center',
-      alignItems: 'center',
+      marginVertical: 2,
     },
-    footerText: { color: colors.textSecondary, fontSize: 14 },
-    loginLink: { color: colors.primary, fontSize: 14, fontWeight: '600', marginLeft: 4 },
-    disabledContainer: {
-      flex: 1,
-      justifyContent: 'center',
-      alignItems: 'center',
-      padding: 32,
-    },
-    disabledTitle: {
-      fontSize: 24,
-      fontWeight: 'bold',
-      color: colors.text,
-      marginTop: 16,
-    },
-    disabledText: {
-      fontSize: 14,
+    requirementText: {
       color: colors.textSecondary,
-      textAlign: 'center',
-      marginTop: 8,
-      lineHeight: 20,
+      fontSize: 12,
+      marginLeft: 6,
     },
-    backToLoginButton: {
-      backgroundColor: colors.primary,
-      paddingHorizontal: 32,
-      paddingVertical: 12,
-      borderRadius: 8,
-      marginTop: 24,
-    },
-    backToLoginText: {
-      color: colors.white,
-      fontSize: 16,
+    requirementsTitle: {
+      color: colors.textSecondary,
+      fontSize: 12,
       fontWeight: '600',
+      marginBottom: 8,
     },
+    scrollContent: { flexGrow: 1, padding: 24 },
+    subtitle: { color: colors.textSecondary, fontSize: 16, marginTop: 8 },
+    title: { color: colors.text, fontSize: 32, fontWeight: 'bold' },
   });
 
 export default RegisterScreen;

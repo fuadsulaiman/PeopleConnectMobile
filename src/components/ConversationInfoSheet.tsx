@@ -20,8 +20,21 @@ import { colors } from '../constants/colors';
 import { config } from '../constants/config';
 import { Conversation } from '../types';
 import { Avatar } from './common/Avatar';
-import { sdk, getAccessToken } from '../services/sdk';
-import { useAuthStore, usePresenceStore, useChatStore } from '../stores';
+// CRITICAL: Do NOT import SDK at top level - it causes module initialization failures on Windows
+// Use lazy loading pattern with require() to defer SDK initialization
+const getSDK = () => {
+  const sdkModule = require('../services/sdk');
+  return sdkModule.sdk;
+};
+const getAccessTokenFn = () => {
+  const sdkModule = require('../services/sdk');
+  return sdkModule.getAccessToken();
+};
+const sdk = { get conversations() { return getSDK().conversations; }, get contacts() { return getSDK().contacts; }, get media() { return getSDK().media; }, get reports() { return getSDK().reports; } };
+import { useAuthStore } from '../stores/authStore';
+import { usePresenceStore } from '../stores/presenceStore';
+// Import chatStore module - we'll access useChatStore from it
+import * as chatStoreModule from '../stores/chatStore';
 
 const { height: screenHeight, width: screenWidth } = Dimensions.get('window');
 
@@ -32,7 +45,12 @@ interface ConversationInfoSheetProps {
   onStartCall?: (type: 'voice' | 'video') => void;
   onLeaveGroup?: () => void;
   onDeleteConversation?: () => void;
-  onViewProfile?: (userId: string, userName?: string, userAvatar?: string, username?: string) => void;
+  onViewProfile?: (
+    userId: string,
+    userName?: string,
+    userAvatar?: string,
+    username?: string
+  ) => void;
   onAddMembers?: () => void;
 }
 
@@ -111,7 +129,7 @@ export const ConversationInfoSheet: React.FC<ConversationInfoSheetProps> = ({
 
   let isDM = conversationType === 'directmessage' || conversationType === 'dm';
   let isChatroom = conversationType === 'chatroom' || conversationType === 'group';
-  let isBroadcast = conversationType === 'broadcastchannel' || conversationType === 'broadcast';
+  const isBroadcast = conversationType === 'broadcastchannel' || conversationType === 'broadcast';
   const isPlatformChannel = (conversation as any)?.isPlatformChannel === true || isBroadcast;
 
   if (!isDM && !isChatroom && !isBroadcast) {
@@ -130,9 +148,10 @@ export const ConversationInfoSheet: React.FC<ConversationInfoSheetProps> = ({
       setEditGroupName(conversation.name || '');
       setEditGroupDescription(conversation.description || '');
       // Initialize disappearing messages duration
-      const convDisappearing = (conversation as any).disappearingMessagesDuration ||
-                               (conversation as any).DisappearingMessagesDuration ||
-                               'off';
+      const convDisappearing =
+        (conversation as any).disappearingMessagesDuration ||
+        (conversation as any).DisappearingMessagesDuration ||
+        'off';
       setDisappearingDuration(convDisappearing);
       setShowDisappearingPicker(false);
       setSharedMedia([]);
@@ -141,8 +160,9 @@ export const ConversationInfoSheet: React.FC<ConversationInfoSheetProps> = ({
       setShowMediaGallery(false);
       setMediaSubTab('media');
       // Set default tab to 'media' for platform channels (no members tab)
-      const isBroadcastType = conversation.type?.toLowerCase() === 'broadcastchannel' ||
-                              conversation.type?.toLowerCase() === 'broadcast';
+      const isBroadcastType =
+        conversation.type?.toLowerCase() === 'broadcastchannel' ||
+        conversation.type?.toLowerCase() === 'broadcast';
       const isPlatform = (conversation as any)?.isPlatformChannel === true || isBroadcastType;
       setActiveTab(isPlatform ? 'media' : 'members');
       // Auto-fetch media for platform channels since media tab is default
@@ -161,7 +181,9 @@ export const ConversationInfoSheet: React.FC<ConversationInfoSheetProps> = ({
   const checkBlockedStatus = async () => {
     try {
       const otherUserId = (conversation as any)?.otherUserId;
-      if (!otherUserId) return;
+      if (!otherUserId) {
+        return;
+      }
 
       const blockedContacts = await sdk.contacts.getBlocked();
       const isBlocked = blockedContacts.some((bc) => bc.userId === otherUserId);
@@ -172,7 +194,9 @@ export const ConversationInfoSheet: React.FC<ConversationInfoSheetProps> = ({
   };
 
   const fetchConversationDetails = async () => {
-    if (!conversation?.id) return;
+    if (!conversation?.id) {
+      return;
+    }
 
     // Skip fetching members for platform/broadcast channels
     const convType = conversation.type?.toLowerCase() || '';
@@ -251,31 +275,48 @@ export const ConversationInfoSheet: React.FC<ConversationInfoSheetProps> = ({
   };
 
   const formatFileSize = (bytes?: number): string => {
-    if (!bytes) return '';
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    if (!bytes) {
+      return '';
+    }
+    if (bytes < 1024) {
+      return `${bytes} B`;
+    }
+    if (bytes < 1024 * 1024) {
+      return `${(bytes / 1024).toFixed(1)} KB`;
+    }
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
   const getDocColor = (fileType: string): string => {
     const type = fileType.toUpperCase();
     switch (type) {
-      case 'PDF': return '#E74C3C';
+      case 'PDF':
+        return '#E74C3C';
       case 'DOC':
-      case 'DOCX': return '#2980B9';
+      case 'DOCX':
+        return '#2980B9';
       case 'XLS':
       case 'XLSX':
-      case 'CSV': return '#27AE60';
+      case 'CSV':
+        return '#27AE60';
       case 'PPT':
-      case 'PPTX': return '#E67E22';
+      case 'PPTX':
+        return '#E67E22';
       case 'TXT':
-      case 'RTF': return '#95A5A6';
-      default: return '#7F8C8D';
+      case 'RTF':
+        return '#95A5A6';
+      default:
+        return '#7F8C8D';
     }
   };
 
   const fetchSharedMedia = async () => {
-    if (!conversation?.id || (sharedMedia.length > 0 && sharedLinks.length > 0 && sharedDocs.length > 0)) return;
+    if (
+      !conversation?.id ||
+      (sharedMedia.length > 0 && sharedLinks.length > 0 && sharedDocs.length > 0)
+    ) {
+      return;
+    }
 
     setIsLoadingMedia(true);
     try {
@@ -323,7 +364,9 @@ export const ConversationInfoSheet: React.FC<ConversationInfoSheetProps> = ({
   };
 
   const handleMuteToggle = async () => {
-    if (!conversation?.id) return;
+    if (!conversation?.id) {
+      return;
+    }
     const newMuted = !isMuted;
     setIsMuted(newMuted);
     try {
@@ -333,7 +376,7 @@ export const ConversationInfoSheet: React.FC<ConversationInfoSheetProps> = ({
         await sdk.conversations.unmute(conversation.id);
       }
       // Sync with chat store so conversation list reflects the change
-      useChatStore.getState().updateConversation({
+      chatStoreModule.useChatStore.getState().updateConversation({
         id: conversation.id,
         isMuted: newMuted,
       });
@@ -344,7 +387,9 @@ export const ConversationInfoSheet: React.FC<ConversationInfoSheetProps> = ({
   };
 
   const handlePinToggle = async () => {
-    if (!conversation?.id) return;
+    if (!conversation?.id) {
+      return;
+    }
     const newPinned = !isPinned;
     setIsPinned(newPinned);
     try {
@@ -354,7 +399,7 @@ export const ConversationInfoSheet: React.FC<ConversationInfoSheetProps> = ({
         await sdk.conversations.unpin(conversation.id);
       }
       // Sync with chat store so conversation list reflects the change
-      useChatStore.getState().updateConversation({
+      chatStoreModule.useChatStore.getState().updateConversation({
         id: conversation.id,
         isPinned: newPinned,
       });
@@ -365,19 +410,21 @@ export const ConversationInfoSheet: React.FC<ConversationInfoSheetProps> = ({
   };
 
   const handleDisappearingChange = async (duration: string) => {
-    if (!conversation?.id) return;
+    if (!conversation?.id) {
+      return;
+    }
     const previousDuration = disappearingDuration;
     setDisappearingDuration(duration);
     setShowDisappearingPicker(false);
     try {
-      const token = getAccessToken();
+      const token = getAccessTokenFn();
       const response = await fetch(
         `${config.API_BASE_URL}/conversations/${conversation.id}/disappearing-messages`,
         {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
+            Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify({ duration }),
         }
@@ -386,7 +433,7 @@ export const ConversationInfoSheet: React.FC<ConversationInfoSheetProps> = ({
         throw new Error('Failed to update disappearing messages');
       }
       // Update the conversation in chat store so it persists when reopening
-      useChatStore.getState().updateConversation({
+      chatStoreModule.useChatStore.getState().updateConversation({
         id: conversation.id,
         disappearingMessagesDuration: duration,
       } as any);
@@ -398,11 +445,16 @@ export const ConversationInfoSheet: React.FC<ConversationInfoSheetProps> = ({
 
   const getDisappearingLabel = (duration: string): string => {
     switch (duration) {
-      case '24h': return '24 Hours';
-      case '7d': return '7 Days';
-      case '30d': return '30 Days';
-      case '90d': return '90 Days';
-      default: return 'Off';
+      case '24h':
+        return '24 Hours';
+      case '7d':
+        return '7 Days';
+      case '30d':
+        return '30 Days';
+      case '90d':
+        return '90 Days';
+      default:
+        return 'Off';
     }
   };
 
@@ -411,7 +463,9 @@ export const ConversationInfoSheet: React.FC<ConversationInfoSheetProps> = ({
     const otherUserId = otherUser?.userId || (conversation as any)?.otherUserId;
     const otherUserName = otherUser?.name || conversation?.name || 'this user';
 
-    if (!otherUserId) return;
+    if (!otherUserId) {
+      return;
+    }
 
     Alert.alert(
       isOtherUserBlocked ? 'Unblock User' : 'Block User',
@@ -448,27 +502,25 @@ export const ConversationInfoSheet: React.FC<ConversationInfoSheetProps> = ({
 
   const handleReportUser = () => {
     const otherUser = getOtherParticipant();
-    if (!otherUser) return;
+    if (!otherUser) {
+      return;
+    }
 
-    Alert.alert(
-      'Report User',
-      'Why are you reporting ' + otherUser.name + '?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Spam',
-          onPress: () => submitReport(otherUser.userId, 'spam'),
-        },
-        {
-          text: 'Harassment',
-          onPress: () => submitReport(otherUser.userId, 'harassment'),
-        },
-        {
-          text: 'Inappropriate Content',
-          onPress: () => submitReport(otherUser.userId, 'inappropriate'),
-        },
-      ]
-    );
+    Alert.alert('Report User', 'Why are you reporting ' + otherUser.name + '?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Spam',
+        onPress: () => submitReport(otherUser.userId, 'spam'),
+      },
+      {
+        text: 'Harassment',
+        onPress: () => submitReport(otherUser.userId, 'harassment'),
+      },
+      {
+        text: 'Inappropriate Content',
+        onPress: () => submitReport(otherUser.userId, 'inappropriate'),
+      },
+    ]);
   };
 
   const submitReport = async (userId: string, reportType: string) => {
@@ -488,7 +540,9 @@ export const ConversationInfoSheet: React.FC<ConversationInfoSheetProps> = ({
     const chatType = isDM ? 'conversation' : 'group';
     Alert.alert(
       isDM ? 'Delete Chat' : 'Delete Group',
-      'Are you sure you want to delete this ' + chatType + '? This action cannot be undone and all messages will be lost.',
+      'Are you sure you want to delete this ' +
+        chatType +
+        '? This action cannot be undone and all messages will be lost.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -521,7 +575,12 @@ export const ConversationInfoSheet: React.FC<ConversationInfoSheetProps> = ({
     );
   };
 
-  const handleViewProfile = (userId: string, userName?: string, userAvatar?: string, username?: string) => {
+  const handleViewProfile = (
+    userId: string,
+    userName?: string,
+    userAvatar?: string,
+    username?: string
+  ) => {
     if (onViewProfile) {
       onViewProfile(userId, userName, userAvatar, username);
       onClose();
@@ -542,7 +601,7 @@ export const ConversationInfoSheet: React.FC<ConversationInfoSheetProps> = ({
           onPress: async () => {
             try {
               await sdk.conversations.removeParticipant(conversation!.id, member.userId);
-              setParticipants(participants.filter(p => p.userId !== member.userId));
+              setParticipants(participants.filter((p) => p.userId !== member.userId));
               Alert.alert('Removed', member.name + ' has been removed from the group');
             } catch (error) {
               Alert.alert('Error', 'Failed to remove member');
@@ -557,9 +616,9 @@ export const ConversationInfoSheet: React.FC<ConversationInfoSheetProps> = ({
   const handleMakeAdmin = async (member: Participant) => {
     try {
       await sdk.conversations.updateParticipantRole(conversation!.id, member.userId, 'Admin');
-      setParticipants(participants.map(p =>
-        p.userId === member.userId ? { ...p, role: 'Admin' } : p
-      ));
+      setParticipants(
+        participants.map((p) => (p.userId === member.userId ? { ...p, role: 'Admin' } : p))
+      );
       Alert.alert('Success', member.name + ' is now an admin');
     } catch (error) {
       Alert.alert('Error', 'Failed to update member role');
@@ -570,9 +629,9 @@ export const ConversationInfoSheet: React.FC<ConversationInfoSheetProps> = ({
   const handleRemoveAdmin = async (member: Participant) => {
     try {
       await sdk.conversations.updateParticipantRole(conversation!.id, member.userId, 'Member');
-      setParticipants(participants.map(p =>
-        p.userId === member.userId ? { ...p, role: 'Member' } : p
-      ));
+      setParticipants(
+        participants.map((p) => (p.userId === member.userId ? { ...p, role: 'Member' } : p))
+      );
       Alert.alert('Success', member.name + ' is no longer an admin');
     } catch (error) {
       Alert.alert('Error', 'Failed to update member role');
@@ -581,7 +640,9 @@ export const ConversationInfoSheet: React.FC<ConversationInfoSheetProps> = ({
   };
 
   const handleSaveGroupSettings = async () => {
-    if (!conversation?.id) return;
+    if (!conversation?.id) {
+      return;
+    }
 
     try {
       await sdk.conversations.update(conversation.id, {
@@ -609,7 +670,9 @@ export const ConversationInfoSheet: React.FC<ConversationInfoSheetProps> = ({
   };
 
   const getOtherParticipant = (): Participant | null => {
-    if (!isDM) return null;
+    if (!isDM) {
+      return null;
+    }
     return participants.find((p) => p.userId !== user?.id) || null;
   };
 
@@ -630,7 +693,9 @@ export const ConversationInfoSheet: React.FC<ConversationInfoSheetProps> = ({
   };
 
   const getOnlineStatus = (): 'online' | 'offline' | undefined => {
-    if (!isDM) return undefined;
+    if (!isDM) {
+      return undefined;
+    }
     const otherUserId = (conversation as any)?.otherUserId;
     if (otherUserId && onlineUsers[otherUserId]) {
       return 'online';
@@ -646,15 +711,20 @@ export const ConversationInfoSheet: React.FC<ConversationInfoSheetProps> = ({
       )
     : participants;
 
-  const currentUserRole = participants.find((p) => p.userId?.toLowerCase() === user?.id?.toLowerCase())?.role;
+  const currentUserRole = participants.find(
+    (p) => p.userId?.toLowerCase() === user?.id?.toLowerCase()
+  )?.role;
   const isAdmin = currentUserRole === 'Owner' || currentUserRole === 'Admin';
   const isOwner = currentUserRole === 'Owner';
 
   const getRoleBadgeColor = (role: string) => {
     switch (role) {
-      case 'Owner': return '#EAB308';
-      case 'Admin': return '#3B82F6';
-      default: return 'transparent';
+      case 'Owner':
+        return '#EAB308';
+      case 'Admin':
+        return '#3B82F6';
+      default:
+        return 'transparent';
     }
   };
 
@@ -666,7 +736,9 @@ export const ConversationInfoSheet: React.FC<ConversationInfoSheetProps> = ({
     return (
       <TouchableOpacity
         style={styles.memberItem}
-        onPress={() => !isCurrentUser && handleViewProfile(item.userId, item.name, item.avatarUrl, item.username)}
+        onPress={() =>
+          !isCurrentUser && handleViewProfile(item.userId, item.name, item.avatarUrl, item.username)
+        }
         onLongPress={() => canManage && setShowMemberActions(item.userId)}
       >
         <Avatar
@@ -703,7 +775,9 @@ export const ConversationInfoSheet: React.FC<ConversationInfoSheetProps> = ({
           <View style={styles.memberActionsMenu}>
             <TouchableOpacity
               style={styles.memberActionItem}
-              onPress={() => handleViewProfile(item.userId, item.name, item.avatarUrl, item.username)}
+              onPress={() =>
+                handleViewProfile(item.userId, item.name, item.avatarUrl, item.username)
+              }
             >
               <Icon name="person-outline" size={18} color={colors.text} />
               <Text style={styles.memberActionText}>View Profile</Text>
@@ -723,7 +797,9 @@ export const ConversationInfoSheet: React.FC<ConversationInfoSheetProps> = ({
                 onPress={() => handleRemoveAdmin(item)}
               >
                 <Icon name="shield-outline" size={18} color={colors.warning} />
-                <Text style={[styles.memberActionText, { color: colors.warning }]}>Remove Admin</Text>
+                <Text style={[styles.memberActionText, { color: colors.warning }]}>
+                  Remove Admin
+                </Text>
               </TouchableOpacity>
             )}
             <TouchableOpacity
@@ -731,7 +807,9 @@ export const ConversationInfoSheet: React.FC<ConversationInfoSheetProps> = ({
               onPress={() => handleRemoveMember(item)}
             >
               <Icon name="person-remove-outline" size={18} color={colors.error} />
-              <Text style={[styles.memberActionText, { color: colors.error }]}>Remove from Group</Text>
+              <Text style={[styles.memberActionText, { color: colors.error }]}>
+                Remove from Group
+              </Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.memberActionItem, styles.memberActionCancel]}
@@ -746,10 +824,7 @@ export const ConversationInfoSheet: React.FC<ConversationInfoSheetProps> = ({
   };
 
   const renderMediaItem = ({ item, index }: { item: SharedMedia; index: number }) => (
-    <TouchableOpacity
-      style={styles.mediaItem}
-      onPress={() => handleMediaPress(index)}
-    >
+    <TouchableOpacity style={styles.mediaItem} onPress={() => handleMediaPress(index)}>
       {item.type === 'image' ? (
         <Image source={{ uri: item.thumbnailUrl || item.url }} style={styles.mediaImage} />
       ) : item.type === 'video' ? (
@@ -759,13 +834,17 @@ export const ConversationInfoSheet: React.FC<ConversationInfoSheetProps> = ({
       ) : (
         <View style={styles.mediaFile}>
           <Icon name="document-text" size={24} color={colors.textSecondary} />
-          <Text style={styles.mediaFileName} numberOfLines={1}>{item.fileName || 'File'}</Text>
+          <Text style={styles.mediaFileName} numberOfLines={1}>
+            {item.fileName || 'File'}
+          </Text>
         </View>
       )}
     </TouchableOpacity>
   );
 
-  if (!visible || !conversation) return null;
+  if (!visible || !conversation) {
+    return null;
+  }
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
@@ -810,7 +889,9 @@ export const ConversationInfoSheet: React.FC<ConversationInfoSheetProps> = ({
                 </Text>
               )}
               {isDM && (
-                <Text style={[styles.statusText, getOnlineStatus() === 'online' && styles.statusOnline]}>
+                <Text
+                  style={[styles.statusText, getOnlineStatus() === 'online' && styles.statusOnline]}
+                >
                   {getOnlineStatus() === 'online' ? 'Online' : 'Offline'}
                 </Text>
               )}
@@ -855,7 +936,12 @@ export const ConversationInfoSheet: React.FC<ConversationInfoSheetProps> = ({
                       onPress={() => {
                         const other = getOtherParticipant();
                         if (other) {
-                          handleViewProfile(other.userId, other.name, other.avatarUrl, other.username);
+                          handleViewProfile(
+                            other.userId,
+                            other.name,
+                            other.avatarUrl,
+                            other.username
+                          );
                         }
                       }}
                     >
@@ -903,8 +989,17 @@ export const ConversationInfoSheet: React.FC<ConversationInfoSheetProps> = ({
                         style={[styles.subTab, mediaSubTab === 'media' && styles.subTabActive]}
                         onPress={() => setMediaSubTab('media')}
                       >
-                        <Icon name="images-outline" size={18} color={mediaSubTab === 'media' ? colors.primary : colors.textSecondary} />
-                        <Text style={[styles.subTabText, mediaSubTab === 'media' && styles.subTabTextActive]}>
+                        <Icon
+                          name="images-outline"
+                          size={18}
+                          color={mediaSubTab === 'media' ? colors.primary : colors.textSecondary}
+                        />
+                        <Text
+                          style={[
+                            styles.subTabText,
+                            mediaSubTab === 'media' && styles.subTabTextActive,
+                          ]}
+                        >
                           Media ({sharedMedia.length})
                         </Text>
                       </TouchableOpacity>
@@ -912,8 +1007,17 @@ export const ConversationInfoSheet: React.FC<ConversationInfoSheetProps> = ({
                         style={[styles.subTab, mediaSubTab === 'links' && styles.subTabActive]}
                         onPress={() => setMediaSubTab('links')}
                       >
-                        <Icon name="link-outline" size={18} color={mediaSubTab === 'links' ? colors.primary : colors.textSecondary} />
-                        <Text style={[styles.subTabText, mediaSubTab === 'links' && styles.subTabTextActive]}>
+                        <Icon
+                          name="link-outline"
+                          size={18}
+                          color={mediaSubTab === 'links' ? colors.primary : colors.textSecondary}
+                        />
+                        <Text
+                          style={[
+                            styles.subTabText,
+                            mediaSubTab === 'links' && styles.subTabTextActive,
+                          ]}
+                        >
                           Links ({sharedLinks.length})
                         </Text>
                       </TouchableOpacity>
@@ -921,8 +1025,17 @@ export const ConversationInfoSheet: React.FC<ConversationInfoSheetProps> = ({
                         style={[styles.subTab, mediaSubTab === 'docs' && styles.subTabActive]}
                         onPress={() => setMediaSubTab('docs')}
                       >
-                        <Icon name="document-outline" size={18} color={mediaSubTab === 'docs' ? colors.primary : colors.textSecondary} />
-                        <Text style={[styles.subTabText, mediaSubTab === 'docs' && styles.subTabTextActive]}>
+                        <Icon
+                          name="document-outline"
+                          size={18}
+                          color={mediaSubTab === 'docs' ? colors.primary : colors.textSecondary}
+                        />
+                        <Text
+                          style={[
+                            styles.subTabText,
+                            mediaSubTab === 'docs' && styles.subTabTextActive,
+                          ]}
+                        >
                           Docs ({sharedDocs.length})
                         </Text>
                       </TouchableOpacity>
@@ -931,7 +1044,11 @@ export const ConversationInfoSheet: React.FC<ConversationInfoSheetProps> = ({
                     {/* Sub-tab Content */}
                     <View style={styles.subTabContent}>
                       {isLoadingMedia ? (
-                        <ActivityIndicator size="large" color={colors.primary} style={styles.loader} />
+                        <ActivityIndicator
+                          size="large"
+                          color={colors.primary}
+                          style={styles.loader}
+                        />
                       ) : mediaSubTab === 'media' ? (
                         sharedMedia.length > 0 ? (
                           <FlatList
@@ -960,8 +1077,12 @@ export const ConversationInfoSheet: React.FC<ConversationInfoSheetProps> = ({
                                   <Icon name="globe-outline" size={24} color={colors.primary} />
                                 </View>
                                 <View style={styles.linkContent}>
-                                  <Text style={styles.linkTitle} numberOfLines={1}>{link.title}</Text>
-                                  <Text style={styles.linkUrl} numberOfLines={1}>{link.url}</Text>
+                                  <Text style={styles.linkTitle} numberOfLines={1}>
+                                    {link.title}
+                                  </Text>
+                                  <Text style={styles.linkUrl} numberOfLines={1}>
+                                    {link.url}
+                                  </Text>
                                 </View>
                                 <Icon name="open-outline" size={20} color={colors.textSecondary} />
                               </TouchableOpacity>
@@ -973,34 +1094,47 @@ export const ConversationInfoSheet: React.FC<ConversationInfoSheetProps> = ({
                             <Text style={styles.emptyText}>No shared links</Text>
                           </View>
                         )
-                      ) : (
-                        sharedDocs.length > 0 ? (
-                          <View style={styles.docsList}>
-                            {sharedDocs.map((doc) => (
-                              <TouchableOpacity
-                                key={doc.id}
-                                style={styles.docItem}
-                                onPress={() => Linking.openURL(doc.url)}
+                      ) : sharedDocs.length > 0 ? (
+                        <View style={styles.docsList}>
+                          {sharedDocs.map((doc) => (
+                            <TouchableOpacity
+                              key={doc.id}
+                              style={styles.docItem}
+                              onPress={() => Linking.openURL(doc.url)}
+                            >
+                              <View
+                                style={[
+                                  styles.docIcon,
+                                  { backgroundColor: getDocColor(doc.fileType) },
+                                ]}
                               >
-                                <View style={[styles.docIcon, { backgroundColor: getDocColor(doc.fileType) }]}>
-                                  <Text style={styles.docIconText}>{doc.fileType.substring(0, 3)}</Text>
-                                </View>
-                                <View style={styles.docContent}>
-                                  <Text style={styles.docName} numberOfLines={1}>{doc.fileName}</Text>
-                                  <Text style={styles.docMeta}>
-                                    {doc.fileType} {formatFileSize(doc.fileSize) && `• ${formatFileSize(doc.fileSize)}`}
-                                  </Text>
-                                </View>
-                                <Icon name="download-outline" size={22} color={colors.textSecondary} />
-                              </TouchableOpacity>
-                            ))}
-                          </View>
-                        ) : (
-                          <View style={styles.emptyMedia}>
-                            <Icon name="document-outline" size={48} color={colors.textSecondary} />
-                            <Text style={styles.emptyText}>No shared documents</Text>
-                          </View>
-                        )
+                                <Text style={styles.docIconText}>
+                                  {doc.fileType.substring(0, 3)}
+                                </Text>
+                              </View>
+                              <View style={styles.docContent}>
+                                <Text style={styles.docName} numberOfLines={1}>
+                                  {doc.fileName}
+                                </Text>
+                                <Text style={styles.docMeta}>
+                                  {doc.fileType}{' '}
+                                  {formatFileSize(doc.fileSize) &&
+                                    `• ${formatFileSize(doc.fileSize)}`}
+                                </Text>
+                              </View>
+                              <Icon
+                                name="download-outline"
+                                size={22}
+                                color={colors.textSecondary}
+                              />
+                            </TouchableOpacity>
+                          ))}
+                        </View>
+                      ) : (
+                        <View style={styles.emptyMedia}>
+                          <Icon name="document-outline" size={48} color={colors.textSecondary} />
+                          <Text style={styles.emptyText}>No shared documents</Text>
+                        </View>
                       )}
                     </View>
                   </View>
@@ -1009,7 +1143,11 @@ export const ConversationInfoSheet: React.FC<ConversationInfoSheetProps> = ({
                 {/* Toggles */}
                 <View style={styles.toggleSection}>
                   <View style={styles.toggleItem}>
-                    <Icon name={isPinned ? 'pin' : 'pin-outline'} size={22} color={colors.textSecondary} />
+                    <Icon
+                      name={isPinned ? 'pin' : 'pin-outline'}
+                      size={22}
+                      color={colors.textSecondary}
+                    />
                     <Text style={styles.toggleText}>Pin Conversation</Text>
                     <Switch
                       value={isPinned}
@@ -1062,7 +1200,8 @@ export const ConversationInfoSheet: React.FC<ConversationInfoSheetProps> = ({
                           <Text
                             style={[
                               styles.disappearingOptionText,
-                              disappearingDuration === duration && styles.disappearingOptionTextActive,
+                              disappearingDuration === duration &&
+                                styles.disappearingOptionTextActive,
                             ]}
                           >
                             {getDisappearingLabel(duration)}
@@ -1078,9 +1217,13 @@ export const ConversationInfoSheet: React.FC<ConversationInfoSheetProps> = ({
 
                 {/* Danger Zone */}
                 <View style={styles.dangerSection}>
-                  <TouchableOpacity style={styles.dangerItem} onPress={handleBlockUser} disabled={isBlockingUser}>
+                  <TouchableOpacity
+                    style={styles.dangerItem}
+                    onPress={handleBlockUser}
+                    disabled={isBlockingUser}
+                  >
                     <Icon
-                      name={isOtherUserBlocked ? "lock-open-outline" : "ban-outline"}
+                      name={isOtherUserBlocked ? 'lock-open-outline' : 'ban-outline'}
                       size={22}
                       color={colors.warning}
                     />
@@ -1111,7 +1254,9 @@ export const ConversationInfoSheet: React.FC<ConversationInfoSheetProps> = ({
                       style={[styles.tab, activeTab === 'members' && styles.tabActive]}
                       onPress={() => setActiveTab('members')}
                     >
-                      <Text style={[styles.tabText, activeTab === 'members' && styles.tabTextActive]}>
+                      <Text
+                        style={[styles.tabText, activeTab === 'members' && styles.tabTextActive]}
+                      >
                         Members
                       </Text>
                     </TouchableOpacity>
@@ -1131,7 +1276,9 @@ export const ConversationInfoSheet: React.FC<ConversationInfoSheetProps> = ({
                     style={[styles.tab, activeTab === 'settings' && styles.tabActive]}
                     onPress={() => setActiveTab('settings')}
                   >
-                    <Text style={[styles.tabText, activeTab === 'settings' && styles.tabTextActive]}>
+                    <Text
+                      style={[styles.tabText, activeTab === 'settings' && styles.tabTextActive]}
+                    >
                       Settings
                     </Text>
                   </TouchableOpacity>
@@ -1157,16 +1304,18 @@ export const ConversationInfoSheet: React.FC<ConversationInfoSheetProps> = ({
                     )}
 
                     {isLoadingMembers ? (
-                      <ActivityIndicator size="large" color={colors.primary} style={styles.loader} />
+                      <ActivityIndicator
+                        size="large"
+                        color={colors.primary}
+                        style={styles.loader}
+                      />
                     ) : (
                       <FlatList
                         data={filteredMembers}
                         renderItem={renderMemberItem}
                         keyExtractor={(item) => item.userId}
                         scrollEnabled={false}
-                        ListEmptyComponent={
-                          <Text style={styles.emptyText}>No members found</Text>
-                        }
+                        ListEmptyComponent={<Text style={styles.emptyText}>No members found</Text>}
                       />
                     )}
                   </View>
@@ -1181,8 +1330,17 @@ export const ConversationInfoSheet: React.FC<ConversationInfoSheetProps> = ({
                         style={[styles.subTab, mediaSubTab === 'media' && styles.subTabActive]}
                         onPress={() => setMediaSubTab('media')}
                       >
-                        <Icon name="images-outline" size={18} color={mediaSubTab === 'media' ? colors.primary : colors.textSecondary} />
-                        <Text style={[styles.subTabText, mediaSubTab === 'media' && styles.subTabTextActive]}>
+                        <Icon
+                          name="images-outline"
+                          size={18}
+                          color={mediaSubTab === 'media' ? colors.primary : colors.textSecondary}
+                        />
+                        <Text
+                          style={[
+                            styles.subTabText,
+                            mediaSubTab === 'media' && styles.subTabTextActive,
+                          ]}
+                        >
                           Media ({sharedMedia.length})
                         </Text>
                       </TouchableOpacity>
@@ -1190,8 +1348,17 @@ export const ConversationInfoSheet: React.FC<ConversationInfoSheetProps> = ({
                         style={[styles.subTab, mediaSubTab === 'links' && styles.subTabActive]}
                         onPress={() => setMediaSubTab('links')}
                       >
-                        <Icon name="link-outline" size={18} color={mediaSubTab === 'links' ? colors.primary : colors.textSecondary} />
-                        <Text style={[styles.subTabText, mediaSubTab === 'links' && styles.subTabTextActive]}>
+                        <Icon
+                          name="link-outline"
+                          size={18}
+                          color={mediaSubTab === 'links' ? colors.primary : colors.textSecondary}
+                        />
+                        <Text
+                          style={[
+                            styles.subTabText,
+                            mediaSubTab === 'links' && styles.subTabTextActive,
+                          ]}
+                        >
                           Links ({sharedLinks.length})
                         </Text>
                       </TouchableOpacity>
@@ -1199,8 +1366,17 @@ export const ConversationInfoSheet: React.FC<ConversationInfoSheetProps> = ({
                         style={[styles.subTab, mediaSubTab === 'docs' && styles.subTabActive]}
                         onPress={() => setMediaSubTab('docs')}
                       >
-                        <Icon name="document-outline" size={18} color={mediaSubTab === 'docs' ? colors.primary : colors.textSecondary} />
-                        <Text style={[styles.subTabText, mediaSubTab === 'docs' && styles.subTabTextActive]}>
+                        <Icon
+                          name="document-outline"
+                          size={18}
+                          color={mediaSubTab === 'docs' ? colors.primary : colors.textSecondary}
+                        />
+                        <Text
+                          style={[
+                            styles.subTabText,
+                            mediaSubTab === 'docs' && styles.subTabTextActive,
+                          ]}
+                        >
                           Docs ({sharedDocs.length})
                         </Text>
                       </TouchableOpacity>
@@ -1209,7 +1385,11 @@ export const ConversationInfoSheet: React.FC<ConversationInfoSheetProps> = ({
                     {/* Sub-tab Content */}
                     <View style={styles.subTabContent}>
                       {isLoadingMedia ? (
-                        <ActivityIndicator size="large" color={colors.primary} style={styles.loader} />
+                        <ActivityIndicator
+                          size="large"
+                          color={colors.primary}
+                          style={styles.loader}
+                        />
                       ) : mediaSubTab === 'media' ? (
                         sharedMedia.length > 0 ? (
                           <FlatList
@@ -1238,8 +1418,12 @@ export const ConversationInfoSheet: React.FC<ConversationInfoSheetProps> = ({
                                   <Icon name="globe-outline" size={24} color={colors.primary} />
                                 </View>
                                 <View style={styles.linkContent}>
-                                  <Text style={styles.linkTitle} numberOfLines={1}>{link.title}</Text>
-                                  <Text style={styles.linkUrl} numberOfLines={1}>{link.url}</Text>
+                                  <Text style={styles.linkTitle} numberOfLines={1}>
+                                    {link.title}
+                                  </Text>
+                                  <Text style={styles.linkUrl} numberOfLines={1}>
+                                    {link.url}
+                                  </Text>
                                 </View>
                                 <Icon name="open-outline" size={20} color={colors.textSecondary} />
                               </TouchableOpacity>
@@ -1251,34 +1435,47 @@ export const ConversationInfoSheet: React.FC<ConversationInfoSheetProps> = ({
                             <Text style={styles.emptyText}>No shared links</Text>
                           </View>
                         )
-                      ) : (
-                        sharedDocs.length > 0 ? (
-                          <View style={styles.docsList}>
-                            {sharedDocs.map((doc) => (
-                              <TouchableOpacity
-                                key={doc.id}
-                                style={styles.docItem}
-                                onPress={() => Linking.openURL(doc.url)}
+                      ) : sharedDocs.length > 0 ? (
+                        <View style={styles.docsList}>
+                          {sharedDocs.map((doc) => (
+                            <TouchableOpacity
+                              key={doc.id}
+                              style={styles.docItem}
+                              onPress={() => Linking.openURL(doc.url)}
+                            >
+                              <View
+                                style={[
+                                  styles.docIcon,
+                                  { backgroundColor: getDocColor(doc.fileType) },
+                                ]}
                               >
-                                <View style={[styles.docIcon, { backgroundColor: getDocColor(doc.fileType) }]}>
-                                  <Text style={styles.docIconText}>{doc.fileType.substring(0, 3)}</Text>
-                                </View>
-                                <View style={styles.docContent}>
-                                  <Text style={styles.docName} numberOfLines={1}>{doc.fileName}</Text>
-                                  <Text style={styles.docMeta}>
-                                    {doc.fileType} {formatFileSize(doc.fileSize) && `• ${formatFileSize(doc.fileSize)}`}
-                                  </Text>
-                                </View>
-                                <Icon name="download-outline" size={22} color={colors.textSecondary} />
-                              </TouchableOpacity>
-                            ))}
-                          </View>
-                        ) : (
-                          <View style={styles.emptyMedia}>
-                            <Icon name="document-outline" size={48} color={colors.textSecondary} />
-                            <Text style={styles.emptyText}>No shared documents</Text>
-                          </View>
-                        )
+                                <Text style={styles.docIconText}>
+                                  {doc.fileType.substring(0, 3)}
+                                </Text>
+                              </View>
+                              <View style={styles.docContent}>
+                                <Text style={styles.docName} numberOfLines={1}>
+                                  {doc.fileName}
+                                </Text>
+                                <Text style={styles.docMeta}>
+                                  {doc.fileType}{' '}
+                                  {formatFileSize(doc.fileSize) &&
+                                    `• ${formatFileSize(doc.fileSize)}`}
+                                </Text>
+                              </View>
+                              <Icon
+                                name="download-outline"
+                                size={22}
+                                color={colors.textSecondary}
+                              />
+                            </TouchableOpacity>
+                          ))}
+                        </View>
+                      ) : (
+                        <View style={styles.emptyMedia}>
+                          <Icon name="document-outline" size={48} color={colors.textSecondary} />
+                          <Text style={styles.emptyText}>No shared documents</Text>
+                        </View>
                       )}
                     </View>
                   </View>
@@ -1303,7 +1500,11 @@ export const ConversationInfoSheet: React.FC<ConversationInfoSheetProps> = ({
                       {/* Hide Pin for platform channels */}
                       {!isPlatformChannel && (
                         <View style={styles.toggleItem}>
-                          <Icon name={isPinned ? 'pin' : 'pin-outline'} size={22} color={colors.textSecondary} />
+                          <Icon
+                            name={isPinned ? 'pin' : 'pin-outline'}
+                            size={22}
+                            color={colors.textSecondary}
+                          />
                           <Text style={styles.toggleText}>Pin Conversation</Text>
                           <Switch
                             value={isPinned}
@@ -1352,14 +1553,16 @@ export const ConversationInfoSheet: React.FC<ConversationInfoSheetProps> = ({
                                   key={duration}
                                   style={[
                                     styles.disappearingOption,
-                                    disappearingDuration === duration && styles.disappearingOptionActive,
+                                    disappearingDuration === duration &&
+                                      styles.disappearingOptionActive,
                                   ]}
                                   onPress={() => handleDisappearingChange(duration)}
                                 >
                                   <Text
                                     style={[
                                       styles.disappearingOptionText,
-                                      disappearingDuration === duration && styles.disappearingOptionTextActive,
+                                      disappearingDuration === duration &&
+                                        styles.disappearingOptionTextActive,
                                     ]}
                                   >
                                     {getDisappearingLabel(duration)}
@@ -1379,13 +1582,17 @@ export const ConversationInfoSheet: React.FC<ConversationInfoSheetProps> = ({
                       {!isBroadcast && (
                         <TouchableOpacity style={styles.dangerItem} onPress={handleLeaveGroup}>
                           <Icon name="exit-outline" size={22} color={colors.warning} />
-                          <Text style={[styles.dangerText, { color: colors.warning }]}>Leave Group</Text>
+                          <Text style={[styles.dangerText, { color: colors.warning }]}>
+                            Leave Group
+                          </Text>
                         </TouchableOpacity>
                       )}
                       {isOwner && (
                         <TouchableOpacity style={styles.dangerItem} onPress={handleDeleteChat}>
                           <Icon name="trash-outline" size={22} color={colors.error} />
-                          <Text style={[styles.dangerText, { color: colors.error }]}>Delete Group</Text>
+                          <Text style={[styles.dangerText, { color: colors.error }]}>
+                            Delete Group
+                          </Text>
                         </TouchableOpacity>
                       )}
                     </View>
@@ -1453,17 +1660,29 @@ export const ConversationInfoSheet: React.FC<ConversationInfoSheetProps> = ({
               onPress={() => setSelectedMediaIndex(Math.max(0, selectedMediaIndex - 1))}
               disabled={selectedMediaIndex === 0}
             >
-              <Icon name="chevron-back" size={32} color={selectedMediaIndex === 0 ? colors.gray[600] : colors.white} />
+              <Icon
+                name="chevron-back"
+                size={32}
+                color={selectedMediaIndex === 0 ? colors.gray[600] : colors.white}
+              />
             </TouchableOpacity>
             <Text style={styles.galleryCounter}>
               {selectedMediaIndex + 1} / {sharedMedia.length}
             </Text>
             <TouchableOpacity
               style={styles.galleryNavButton}
-              onPress={() => setSelectedMediaIndex(Math.min(sharedMedia.length - 1, selectedMediaIndex + 1))}
+              onPress={() =>
+                setSelectedMediaIndex(Math.min(sharedMedia.length - 1, selectedMediaIndex + 1))
+              }
               disabled={selectedMediaIndex === sharedMedia.length - 1}
             >
-              <Icon name="chevron-forward" size={32} color={selectedMediaIndex === sharedMedia.length - 1 ? colors.gray[600] : colors.white} />
+              <Icon
+                name="chevron-forward"
+                size={32}
+                color={
+                  selectedMediaIndex === sharedMedia.length - 1 ? colors.gray[600] : colors.white
+                }
+              />
             </TouchableOpacity>
           </View>
         </View>
@@ -1474,8 +1693,8 @@ export const ConversationInfoSheet: React.FC<ConversationInfoSheetProps> = ({
 
 const styles = StyleSheet.create({
   overlay: {
-    flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
+    flex: 1,
     justifyContent: 'flex-end',
   },
   dismissArea: {
@@ -1489,282 +1708,282 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
     borderBottomColor: colors.border,
+    borderBottomWidth: 1,
+    paddingVertical: 12,
   },
   handleBar: {
-    width: 40,
-    height: 4,
     backgroundColor: colors.gray[300],
     borderRadius: 2,
+    height: 4,
+    width: 40,
   },
   closeButton: {
+    padding: 4,
     position: 'absolute',
     right: 16,
     top: 12,
-    padding: 4,
   },
   content: {
     flex: 1,
   },
   profileSection: {
     alignItems: 'center',
-    paddingVertical: 24,
-    borderBottomWidth: 1,
     borderBottomColor: colors.border,
+    borderBottomWidth: 1,
+    paddingVertical: 24,
   },
   displayName: {
+    color: colors.text,
     fontSize: 22,
     fontWeight: '600',
-    color: colors.text,
     marginTop: 12,
   },
   username: {
-    fontSize: 14,
     color: colors.textSecondary,
+    fontSize: 14,
     marginTop: 4,
   },
   memberCount: {
-    fontSize: 14,
     color: colors.textSecondary,
+    fontSize: 14,
     marginTop: 4,
   },
   statusText: {
-    fontSize: 14,
     color: colors.textSecondary,
+    fontSize: 14,
     marginTop: 8,
   },
   statusOnline: {
     color: colors.online,
   },
   description: {
-    fontSize: 14,
     color: colors.textSecondary,
-    textAlign: 'center',
+    fontSize: 14,
     marginTop: 8,
     paddingHorizontal: 24,
+    textAlign: 'center',
   },
   quickActions: {
     flexDirection: 'row',
-    marginTop: 20,
     gap: 20,
+    marginTop: 20,
   },
   quickActionButton: {
     alignItems: 'center',
   },
   quickActionIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: colors.gray[100],
-    justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: colors.gray[100],
+    borderRadius: 24,
+    height: 48,
+    justifyContent: 'center',
+    width: 48,
   },
   quickActionLabel: {
-    fontSize: 12,
     color: colors.text,
+    fontSize: 12,
     marginTop: 6,
   },
   dmContent: {
     paddingTop: 8,
   },
   menuItem: {
-    flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
     borderBottomColor: colors.border,
+    borderBottomWidth: 1,
+    flexDirection: 'row',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
   },
   menuItemText: {
+    color: colors.text,
     flex: 1,
     fontSize: 16,
-    color: colors.text,
     marginLeft: 12,
   },
   menuItemCount: {
-    fontSize: 14,
     color: colors.textSecondary,
+    fontSize: 14,
     marginRight: 8,
   },
   mediaGridSection: {
-    padding: 16,
-    borderBottomWidth: 1,
     borderBottomColor: colors.border,
+    borderBottomWidth: 1,
+    padding: 16,
   },
   mediaSection: {
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
     backgroundColor: colors.gray[50],
+    borderBottomColor: colors.border,
+    borderBottomWidth: 1,
   },
   subTabs: {
+    backgroundColor: colors.white,
+    borderBottomColor: colors.border,
+    borderBottomWidth: 1,
     flexDirection: 'row',
+    paddingBottom: 8,
     paddingHorizontal: 16,
     paddingTop: 12,
-    paddingBottom: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-    backgroundColor: colors.white,
   },
   subTab: {
-    flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    marginRight: 8,
-    borderRadius: 20,
     backgroundColor: colors.gray[100],
+    borderRadius: 20,
+    flexDirection: 'row',
+    marginRight: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
   },
   subTabActive: {
     backgroundColor: colors.primary + '15',
   },
   subTabText: {
-    fontSize: 13,
     color: colors.textSecondary,
-    marginLeft: 6,
+    fontSize: 13,
     fontWeight: '500',
+    marginLeft: 6,
   },
   subTabTextActive: {
     color: colors.primary,
   },
   subTabContent: {
-    padding: 12,
     minHeight: 150,
+    padding: 12,
   },
   linksList: {
     gap: 8,
   },
   linkItem: {
-    flexDirection: 'row',
     alignItems: 'center',
-    padding: 12,
     backgroundColor: colors.white,
     borderRadius: 10,
+    flexDirection: 'row',
     marginBottom: 8,
+    padding: 12,
   },
   linkIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 10,
-    backgroundColor: colors.primary + '15',
-    justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: colors.primary + '15',
+    borderRadius: 10,
+    height: 44,
+    justifyContent: 'center',
     marginRight: 12,
+    width: 44,
   },
   linkContent: {
     flex: 1,
     marginRight: 8,
   },
   linkTitle: {
+    color: colors.text,
     fontSize: 15,
     fontWeight: '500',
-    color: colors.text,
     marginBottom: 2,
   },
   linkUrl: {
-    fontSize: 13,
     color: colors.primary,
+    fontSize: 13,
   },
   docsList: {
     gap: 8,
   },
   docItem: {
-    flexDirection: 'row',
     alignItems: 'center',
-    padding: 12,
     backgroundColor: colors.white,
     borderRadius: 10,
+    flexDirection: 'row',
     marginBottom: 8,
+    padding: 12,
   },
   docIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 8,
-    justifyContent: 'center',
     alignItems: 'center',
+    borderRadius: 8,
+    height: 44,
+    justifyContent: 'center',
     marginRight: 12,
+    width: 44,
   },
   docIconText: {
+    color: colors.white,
     fontSize: 12,
     fontWeight: '700',
-    color: colors.white,
   },
   docContent: {
     flex: 1,
     marginRight: 8,
   },
   docName: {
+    color: colors.text,
     fontSize: 15,
     fontWeight: '500',
-    color: colors.text,
     marginBottom: 2,
   },
   docMeta: {
-    fontSize: 13,
     color: colors.textSecondary,
+    fontSize: 13,
   },
   toggleSection: {
-    borderBottomWidth: 1,
     borderBottomColor: colors.border,
+    borderBottomWidth: 1,
   },
   toggleItem: {
-    flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 14,
+    flexDirection: 'row',
     paddingHorizontal: 16,
+    paddingVertical: 14,
   },
   toggleText: {
+    color: colors.text,
     flex: 1,
     fontSize: 16,
-    color: colors.text,
     marginLeft: 12,
   },
   disappearingValue: {
-    flexDirection: 'row',
     alignItems: 'center',
+    flexDirection: 'row',
     gap: 4,
   },
   disappearingValueText: {
-    fontSize: 14,
     color: colors.textSecondary,
+    fontSize: 14,
   },
   disappearingPicker: {
     backgroundColor: colors.gray[50],
-    marginHorizontal: 16,
-    marginBottom: 12,
     borderRadius: 10,
+    marginBottom: 12,
+    marginHorizontal: 16,
     overflow: 'hidden',
   },
   disappearingOption: {
-    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
     borderBottomColor: colors.border,
+    borderBottomWidth: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
   },
   disappearingOptionActive: {
     backgroundColor: colors.primary + '10',
   },
   disappearingOptionText: {
-    fontSize: 15,
     color: colors.text,
+    fontSize: 15,
   },
   disappearingOptionTextActive: {
     color: colors.primary,
     fontWeight: '500',
   },
   dangerSection: {
-    paddingVertical: 8,
     paddingBottom: 32,
+    paddingVertical: 8,
   },
   dangerItem: {
-    flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 14,
+    flexDirection: 'row',
     paddingHorizontal: 16,
+    paddingVertical: 14,
   },
   dangerText: {
     fontSize: 16,
@@ -1774,23 +1993,23 @@ const styles = StyleSheet.create({
     paddingTop: 8,
   },
   tabs: {
-    flexDirection: 'row',
-    borderBottomWidth: 1,
     borderBottomColor: colors.border,
+    borderBottomWidth: 1,
+    flexDirection: 'row',
   },
   tab: {
+    alignItems: 'center',
     flex: 1,
     paddingVertical: 12,
-    alignItems: 'center',
   },
   tabActive: {
-    borderBottomWidth: 2,
     borderBottomColor: colors.primary,
+    borderBottomWidth: 2,
   },
   tabText: {
+    color: colors.textSecondary,
     fontSize: 14,
     fontWeight: '500',
-    color: colors.textSecondary,
   },
   tabTextActive: {
     color: colors.primary,
@@ -1802,30 +2021,30 @@ const styles = StyleSheet.create({
   searchInput: {
     backgroundColor: colors.gray[100],
     borderRadius: 10,
+    color: colors.text,
+    fontSize: 16,
+    marginBottom: 12,
     paddingHorizontal: 14,
     paddingVertical: 10,
-    fontSize: 16,
-    color: colors.text,
-    marginBottom: 12,
   },
   addMembersButton: {
-    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
     backgroundColor: colors.gray[100],
     borderRadius: 10,
+    flexDirection: 'row',
+    justifyContent: 'center',
     marginBottom: 12,
+    paddingVertical: 12,
   },
   addMembersText: {
-    fontSize: 16,
     color: colors.primary,
+    fontSize: 16,
     fontWeight: '500',
     marginLeft: 8,
   },
   memberItem: {
-    flexDirection: 'row',
     alignItems: 'center',
+    flexDirection: 'row',
     paddingVertical: 10,
     position: 'relative',
   },
@@ -1834,104 +2053,104 @@ const styles = StyleSheet.create({
     marginLeft: 12,
   },
   memberNameRow: {
-    flexDirection: 'row',
     alignItems: 'center',
+    flexDirection: 'row',
   },
   memberName: {
+    color: colors.text,
     fontSize: 16,
     fontWeight: '500',
-    color: colors.text,
   },
   memberUsername: {
-    fontSize: 13,
     color: colors.textSecondary,
+    fontSize: 13,
     marginTop: 2,
   },
   memberMenuButton: {
     padding: 8,
   },
   memberActionsMenu: {
-    position: 'absolute',
-    right: 40,
-    top: 0,
     backgroundColor: colors.white,
     borderRadius: 8,
+    elevation: 5,
+    minWidth: 180,
+    position: 'absolute',
+    right: 40,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 4,
-    elevation: 5,
+    top: 0,
     zIndex: 10,
-    minWidth: 180,
   },
   memberActionItem: {
-    flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
     borderBottomColor: colors.border,
+    borderBottomWidth: 1,
+    flexDirection: 'row',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
   },
   memberActionCancel: {
-    justifyContent: 'center',
     borderBottomWidth: 0,
+    justifyContent: 'center',
   },
   memberActionText: {
-    fontSize: 14,
     color: colors.text,
+    fontSize: 14,
     marginLeft: 10,
   },
   roleBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
     borderRadius: 4,
     marginLeft: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
   },
   roleBadgeText: {
+    color: colors.white,
     fontSize: 11,
     fontWeight: '600',
-    color: colors.white,
   },
   loader: {
     marginTop: 20,
   },
   emptyText: {
-    textAlign: 'center',
     color: colors.textSecondary,
-    marginTop: 20,
     fontSize: 14,
+    marginTop: 20,
+    textAlign: 'center',
   },
   mediaItem: {
-    flex: 1 / 3,
     aspectRatio: 1,
+    flex: 1 / 3,
     margin: 2,
   },
   mediaImage: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 4,
     backgroundColor: colors.gray[200],
+    borderRadius: 4,
+    height: '100%',
+    width: '100%',
   },
   mediaVideo: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 4,
-    backgroundColor: colors.gray[800],
-    justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: colors.gray[800],
+    borderRadius: 4,
+    height: '100%',
+    justifyContent: 'center',
+    width: '100%',
   },
   mediaFile: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 4,
-    backgroundColor: colors.gray[100],
-    justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: colors.gray[100],
+    borderRadius: 4,
+    height: '100%',
+    justifyContent: 'center',
     padding: 4,
+    width: '100%',
   },
   mediaFileName: {
-    fontSize: 10,
     color: colors.textSecondary,
+    fontSize: 10,
     marginTop: 4,
     textAlign: 'center',
   },
@@ -1941,58 +2160,58 @@ const styles = StyleSheet.create({
   },
   // Edit Group Modal
   editModalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    flex: 1,
+    justifyContent: 'center',
   },
   editModalContainer: {
     backgroundColor: colors.white,
     borderRadius: 16,
-    width: screenWidth - 40,
     maxHeight: screenHeight * 0.6,
+    width: screenWidth - 40,
   },
   editModalHeader: {
+    alignItems: 'center',
+    borderBottomColor: colors.border,
+    borderBottomWidth: 1,
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
     padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
   },
   editModalTitle: {
+    color: colors.text,
     fontSize: 18,
     fontWeight: '600',
-    color: colors.text,
   },
   editModalContent: {
     padding: 16,
   },
   editLabel: {
+    color: colors.textSecondary,
     fontSize: 14,
     fontWeight: '500',
-    color: colors.textSecondary,
     marginBottom: 8,
     marginTop: 12,
   },
   editInput: {
     backgroundColor: colors.gray[100],
     borderRadius: 10,
+    color: colors.text,
+    fontSize: 16,
     paddingHorizontal: 14,
     paddingVertical: 12,
-    fontSize: 16,
-    color: colors.text,
   },
   editInputMultiline: {
     height: 80,
     textAlignVertical: 'top',
   },
   saveButton: {
+    alignItems: 'center',
     backgroundColor: colors.primary,
     borderRadius: 10,
-    paddingVertical: 14,
-    alignItems: 'center',
     marginTop: 24,
+    paddingVertical: 14,
   },
   saveButtonText: {
     color: colors.white,
@@ -2001,28 +2220,28 @@ const styles = StyleSheet.create({
   },
   // Gallery Modal
   galleryOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.95)',
-    justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.95)',
+    flex: 1,
+    justifyContent: 'center',
   },
   galleryClose: {
-    position: 'absolute',
-    top: 50,
-    right: 20,
-    zIndex: 10,
     padding: 8,
+    position: 'absolute',
+    right: 20,
+    top: 50,
+    zIndex: 10,
   },
   galleryImage: {
-    width: screenWidth,
     height: screenHeight * 0.7,
+    width: screenWidth,
   },
   galleryNav: {
-    position: 'absolute',
+    alignItems: 'center',
     bottom: 50,
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'center',
+    position: 'absolute',
     width: '100%',
   },
   galleryNavButton: {

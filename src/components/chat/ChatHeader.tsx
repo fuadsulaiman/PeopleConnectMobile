@@ -60,70 +60,79 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
               {displayName}
             </Text>
             {isDM && userStatus && (
-              <Text style={[
-                styles.statusText,
-                { color: userStatus === 'online' ? colors.online : colors.textSecondary }
-              ]}>
+              <Text
+                style={[
+                  styles.statusText,
+                  { color: userStatus === 'online' ? colors.online : colors.textSecondary },
+                ]}
+              >
                 {userStatus.charAt(0).toUpperCase() + userStatus.slice(1)}
               </Text>
             )}
             {isBroadcast && (
               <Text style={[styles.statusText, { color: colors.textSecondary }]}>
-                {(conversation as any)?.isPlatformChannel ? 'Official Channel' : 'Broadcast Channel'}
+                {(conversation as any)?.isPlatformChannel
+                  ? 'Official Channel'
+                  : 'Broadcast Channel'}
               </Text>
             )}
           </View>
         </TouchableOpacity>
       ),
-      headerRight: () => (
+      headerRight: () =>
         !isBroadcast ? (
           <View style={styles.headerRightContainer}>
-            <TouchableOpacity
-              onPress={onVoiceCallPress}
-              style={styles.callButton}
-            >
+            <TouchableOpacity onPress={onVoiceCallPress} style={styles.callButton}>
               <Icon name="call-outline" size={24} color={colors.primary} />
             </TouchableOpacity>
-            <TouchableOpacity
-              onPress={onVideoCallPress}
-              style={styles.videoCallButton}
-            >
+            <TouchableOpacity onPress={onVideoCallPress} style={styles.videoCallButton}>
               <Icon name="videocam-outline" size={24} color={colors.primary} />
             </TouchableOpacity>
           </View>
-        ) : null
-      ),
+        ) : null,
     });
-  }, [navigation, conversation, isBroadcast, isDM, userStatus, displayName, avatarUrl, onInfoPress, onVoiceCallPress, onVideoCallPress, colors]);
+  }, [
+    navigation,
+    conversation,
+    isBroadcast,
+    isDM,
+    userStatus,
+    displayName,
+    avatarUrl,
+    onInfoPress,
+    onVoiceCallPress,
+    onVideoCallPress,
+    colors,
+  ]);
 
   return null;
 };
 
 const styles = StyleSheet.create({
-  headerContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
   avatar: {
     marginRight: 10,
   },
-  titleContainer: {
-    flex: 1,
+  callButton: {
+    marginRight: 4,
+    padding: 8,
   },
   displayName: {
     fontSize: 17,
     fontWeight: '600',
   },
-  statusText: {
-    fontSize: 12,
+  headerContainer: {
+    alignItems: 'center',
+    flexDirection: 'row',
   },
   headerRightContainer: {
     flexDirection: 'row',
     marginRight: 8,
   },
-  callButton: {
-    padding: 8,
-    marginRight: 4,
+  statusText: {
+    fontSize: 12,
+  },
+  titleContainer: {
+    flex: 1,
   },
   videoCallButton: {
     padding: 8,

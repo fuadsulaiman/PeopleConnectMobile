@@ -14,7 +14,12 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { RootStackParamList } from '../../navigation/types';
 import { useTheme } from '../../hooks';
-import { notifications as notificationsApi } from '../../services/sdk';
+// CRITICAL: Do NOT import SDK at top level - it causes module initialization failures on Windows
+const getNotifications = () => {
+  const sdkModule = require('../../services/sdk');
+  return sdkModule.notifications;
+};
+const notificationsApi = { list: (params: any) => getNotifications().list(params), markAsRead: (id: string) => getNotifications().markAsRead(id), markAllAsRead: () => getNotifications().markAllAsRead(), delete: (id: string) => getNotifications().delete(id), clearAll: () => getNotifications().clearAll() };
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Notifications'>;
 
@@ -124,9 +129,7 @@ const NotificationsScreen: React.FC<Props> = ({ navigation }) => {
   const handleMarkAsRead = useCallback(async (id: string) => {
     try {
       await notificationsApi.markAsRead(id);
-      setNotifications((prev) =>
-        prev.map((n) => (n.id === id ? { ...n, isRead: true } : n))
-      );
+      setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, isRead: true } : n)));
     } catch (error) {
       console.error('Failed to mark as read:', error);
     }
@@ -153,26 +156,22 @@ const NotificationsScreen: React.FC<Props> = ({ navigation }) => {
   }, []);
 
   const handleClearAll = useCallback(async () => {
-    Alert.alert(
-      'Clear All Notifications',
-      'Are you sure you want to delete all notifications?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Clear All',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await Promise.all(notifications.map((n) => notificationsApi.delete(n.id)));
-              setNotifications([]);
-            } catch (error) {
-              console.error('Failed to clear notifications:', error);
-              Alert.alert('Error', 'Failed to clear all notifications.');
-            }
-          },
+    Alert.alert('Clear All Notifications', 'Are you sure you want to delete all notifications?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Clear All',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await Promise.all(notifications.map((n) => notificationsApi.delete(n.id)));
+            setNotifications([]);
+          } catch (error) {
+            console.error('Failed to clear notifications:', error);
+            Alert.alert('Error', 'Failed to clear all notifications.');
+          }
         },
-      ]
-    );
+      },
+    ]);
   }, [notifications]);
 
   const getIcon = (type: Notification['type']): string => {
@@ -221,11 +220,21 @@ const NotificationsScreen: React.FC<Props> = ({ navigation }) => {
     const diffHours = Math.floor(diffMs / 3600000);
     const diffDays = Math.floor(diffMs / 86400000);
 
-    if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffDays === 1) return 'Yesterday';
-    if (diffDays < 7) return `${diffDays} days ago`;
+    if (diffMins < 1) {
+      return 'Just now';
+    }
+    if (diffMins < 60) {
+      return `${diffMins}m ago`;
+    }
+    if (diffHours < 24) {
+      return `${diffHours}h ago`;
+    }
+    if (diffDays === 1) {
+      return 'Yesterday';
+    }
+    if (diffDays < 7) {
+      return `${diffDays} days ago`;
+    }
     return date.toLocaleDateString();
   };
 
@@ -322,7 +331,9 @@ const NotificationsScreen: React.FC<Props> = ({ navigation }) => {
   );
 
   const renderFooter = () => {
-    if (!hasMore || filteredNotifications.length === 0) return null;
+    if (!hasMore || filteredNotifications.length === 0) {
+      return null;
+    }
 
     return (
       <TouchableOpacity style={styles.loadMoreButton} onPress={loadMore} disabled={isLoadingMore}>
@@ -343,9 +354,7 @@ const NotificationsScreen: React.FC<Props> = ({ navigation }) => {
         </TouchableOpacity>
         <View style={styles.headerCenter}>
           <Text style={styles.headerTitle}>Notifications</Text>
-          {unreadCount > 0 && (
-            <Text style={styles.unreadCountText}>{unreadCount} unread</Text>
-          )}
+          {unreadCount > 0 && <Text style={styles.unreadCountText}>{unreadCount} unread</Text>}
         </View>
         <View style={styles.headerActions}>
           {unreadCount > 0 && (
@@ -370,7 +379,9 @@ const NotificationsScreen: React.FC<Props> = ({ navigation }) => {
           data={filteredNotifications}
           renderItem={renderNotification}
           keyExtractor={(item) => item.id}
-          contentContainerStyle={filteredNotifications.length === 0 ? styles.emptyListContent : undefined}
+          contentContainerStyle={
+            filteredNotifications.length === 0 ? styles.emptyListContent : undefined
+          }
           ListHeaderComponent={renderHeader}
           ListEmptyComponent={renderEmpty}
           ListFooterComponent={renderFooter}
@@ -390,19 +401,87 @@ const NotificationsScreen: React.FC<Props> = ({ navigation }) => {
 
 const createStyles = (colors: ReturnType<typeof import('../../hooks').useTheme>['colors']) =>
   StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: colors.background,
+    backButton: {
+      padding: 8,
     },
-    header: {
-      flexDirection: 'row',
+    body: {
+      color: colors.textSecondary,
+      fontSize: 14,
+      lineHeight: 20,
+      marginTop: 2,
+    },
+    container: {
+      backgroundColor: colors.background,
+      flex: 1,
+    },
+    contentContainer: {
+      flex: 1,
+      marginLeft: 12,
+      marginRight: 8,
+    },
+    deleteButton: {
+      padding: 4,
+    },
+    emptyContainer: {
       alignItems: 'center',
+      flex: 1,
+      justifyContent: 'center',
+      paddingVertical: 64,
+    },
+    emptyListContent: {
+      flex: 1,
+    },
+    emptyText: {
+      color: colors.textSecondary,
+      fontSize: 14,
+      marginTop: 4,
+    },
+    emptyTitle: {
+      color: colors.text,
+      fontSize: 18,
+      fontWeight: '600',
+      marginTop: 16,
+    },
+    filterContainer: {
+      alignItems: 'center',
+      borderBottomColor: colors.border,
+      borderBottomWidth: 1,
+      flexDirection: 'row',
+      gap: 8,
       paddingHorizontal: 16,
       paddingVertical: 12,
-      borderBottomWidth: 1,
-      borderBottomColor: colors.border,
     },
-    backButton: {
+    filterTab: {
+      backgroundColor: colors.surface,
+      borderRadius: 16,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+    },
+    filterTabActive: {
+      backgroundColor: colors.primary,
+    },
+    filterTabText: {
+      color: colors.textSecondary,
+      fontSize: 13,
+      fontWeight: '500',
+    },
+    filterTabTextActive: {
+      color: colors.white,
+    },
+    header: {
+      alignItems: 'center',
+      borderBottomColor: colors.border,
+      borderBottomWidth: 1,
+      flexDirection: 'row',
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+    },
+    headerActions: {
+      alignItems: 'center',
+      flexDirection: 'row',
+      gap: 4,
+    },
+    headerButton: {
       padding: 8,
     },
     headerCenter: {
@@ -410,135 +489,67 @@ const createStyles = (colors: ReturnType<typeof import('../../hooks').useTheme>[
       marginLeft: 8,
     },
     headerTitle: {
+      color: colors.text,
       fontSize: 18,
       fontWeight: '600',
-      color: colors.text,
-    },
-    unreadCountText: {
-      fontSize: 12,
-      color: colors.textSecondary,
-    },
-    headerActions: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 4,
-    },
-    headerButton: {
-      padding: 8,
-    },
-    loadingContainer: {
-      flex: 1,
-      justifyContent: 'center',
-      alignItems: 'center',
-    },
-    filterContainer: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingHorizontal: 16,
-      paddingVertical: 12,
-      gap: 8,
-      borderBottomWidth: 1,
-      borderBottomColor: colors.border,
-    },
-    filterTab: {
-      paddingHorizontal: 12,
-      paddingVertical: 6,
-      borderRadius: 16,
-      backgroundColor: colors.surface,
-    },
-    filterTabActive: {
-      backgroundColor: colors.primary,
-    },
-    filterTabText: {
-      fontSize: 13,
-      fontWeight: '500',
-      color: colors.textSecondary,
-    },
-    filterTabTextActive: {
-      color: colors.white,
-    },
-    notificationItem: {
-      flexDirection: 'row',
-      alignItems: 'flex-start',
-      paddingHorizontal: 16,
-      paddingVertical: 14,
-      borderBottomWidth: 1,
-      borderBottomColor: colors.border,
-    },
-    unreadItem: {
-      backgroundColor: colors.surface,
     },
     iconContainer: {
-      width: 44,
-      height: 44,
+      alignItems: 'center',
       borderRadius: 22,
+      height: 44,
       justifyContent: 'center',
-      alignItems: 'center',
-    },
-    contentContainer: {
-      flex: 1,
-      marginLeft: 12,
-      marginRight: 8,
-    },
-    titleRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 6,
-    },
-    title: {
-      flex: 1,
-      fontSize: 15,
-      fontWeight: '600',
-      color: colors.text,
-    },
-    unreadDot: {
-      width: 8,
-      height: 8,
-      borderRadius: 4,
-      backgroundColor: colors.primary,
-    },
-    body: {
-      fontSize: 14,
-      color: colors.textSecondary,
-      marginTop: 2,
-      lineHeight: 20,
-    },
-    time: {
-      fontSize: 12,
-      color: colors.textTertiary,
-      marginTop: 4,
-    },
-    deleteButton: {
-      padding: 4,
-    },
-    emptyListContent: {
-      flex: 1,
-    },
-    emptyContainer: {
-      flex: 1,
-      justifyContent: 'center',
-      alignItems: 'center',
-      paddingVertical: 64,
-    },
-    emptyTitle: {
-      fontSize: 18,
-      fontWeight: '600',
-      color: colors.text,
-      marginTop: 16,
-    },
-    emptyText: {
-      fontSize: 14,
-      color: colors.textSecondary,
-      marginTop: 4,
+      width: 44,
     },
     loadMoreButton: {
       alignItems: 'center',
       paddingVertical: 16,
     },
     loadMoreText: {
+      color: colors.primary,
       fontSize: 14,
       fontWeight: '500',
-      color: colors.primary,
+    },
+    loadingContainer: {
+      alignItems: 'center',
+      flex: 1,
+      justifyContent: 'center',
+    },
+    notificationItem: {
+      alignItems: 'flex-start',
+      borderBottomColor: colors.border,
+      borderBottomWidth: 1,
+      flexDirection: 'row',
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+    },
+    time: {
+      color: colors.textTertiary,
+      fontSize: 12,
+      marginTop: 4,
+    },
+    title: {
+      color: colors.text,
+      flex: 1,
+      fontSize: 15,
+      fontWeight: '600',
+    },
+    titleRow: {
+      alignItems: 'center',
+      flexDirection: 'row',
+      gap: 6,
+    },
+    unreadCountText: {
+      color: colors.textSecondary,
+      fontSize: 12,
+    },
+    unreadDot: {
+      backgroundColor: colors.primary,
+      borderRadius: 4,
+      height: 8,
+      width: 8,
+    },
+    unreadItem: {
+      backgroundColor: colors.surface,
     },
   });
 

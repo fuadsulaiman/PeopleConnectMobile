@@ -38,10 +38,19 @@ export const AttachmentPicker: React.FC<AttachmentPickerProps> = ({
             <Text style={[styles.title, { color: colors.text }]}>Share</Text>
             <View style={styles.headerRight}>
               <TouchableOpacity
-                style={[styles.viewOnceToggle, isViewOnce ? { backgroundColor: colors.primary } : { backgroundColor: 'transparent' }]}
+                style={[
+                  styles.viewOnceToggle,
+                  isViewOnce
+                    ? { backgroundColor: colors.primary }
+                    : { backgroundColor: 'transparent' },
+                ]}
                 onPress={onToggleViewOnce}
               >
-                <Icon name={isViewOnce ? "eye-off" : "eye-outline"} size={18} color={isViewOnce ? colors.white : colors.textSecondary} />
+                <Icon
+                  name={isViewOnce ? 'eye-off' : 'eye-outline'}
+                  size={18}
+                  color={isViewOnce ? colors.white : colors.textSecondary}
+                />
               </TouchableOpacity>
               <TouchableOpacity onPress={onClose}>
                 <Icon name="close" size={24} color={colors.text} />
@@ -100,17 +109,37 @@ export const AttachmentPicker: React.FC<AttachmentPickerProps> = ({
 };
 
 const styles = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   container: { borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingBottom: 34 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1 },
-  title: { fontSize: 18, fontWeight: '600' },
-  headerRight: { flexDirection: 'row', alignItems: 'center' },
-  viewOnceToggle: { width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center', marginRight: 8 },
-  viewOnceWarning: { paddingHorizontal: 16, paddingVertical: 8 },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', padding: 16, justifyContent: 'flex-start' },
-  item: { width: '25%', alignItems: 'center', marginBottom: 20 },
-  icon: { width: 56, height: 56, borderRadius: 28, justifyContent: 'center', alignItems: 'center', marginBottom: 8 },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-start', padding: 16 },
+  header: {
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    padding: 16,
+  },
+  headerRight: { alignItems: 'center', flexDirection: 'row' },
+  icon: {
+    alignItems: 'center',
+    borderRadius: 28,
+    height: 56,
+    justifyContent: 'center',
+    marginBottom: 8,
+    width: 56,
+  },
+  item: { alignItems: 'center', marginBottom: 20, width: '25%' },
   label: { fontSize: 12, textAlign: 'center' },
+  overlay: { backgroundColor: 'rgba(0,0,0,0.5)', flex: 1, justifyContent: 'flex-end' },
+  title: { fontSize: 18, fontWeight: '600' },
+  viewOnceToggle: {
+    alignItems: 'center',
+    borderRadius: 18,
+    height: 36,
+    justifyContent: 'center',
+    marginRight: 8,
+    width: 36,
+  },
+  viewOnceWarning: { paddingHorizontal: 16, paddingVertical: 8 },
 });
 
 export default AttachmentPicker;

@@ -45,7 +45,9 @@ export const MediaViewer: React.FC<MediaViewerProps> = ({
   const videoRef = useRef<any>(null);
 
   const getFileName = (url: string): string => {
-    if (fileName) return fileName;
+    if (fileName) {
+      return fileName;
+    }
     const pathPart = url.split('?')[0];
     return pathPart.split('/').pop() || 'file';
   };
@@ -57,16 +59,19 @@ export const MediaViewer: React.FC<MediaViewerProps> = ({
   };
 
   const handleDownload = async () => {
-    if (!mediaUrl) return;
+    if (!mediaUrl) {
+      return;
+    }
 
     try {
       setDownloading(true);
       setDownloadProgress(0);
 
       const name = getFileName(mediaUrl);
-      const downloadPath = Platform.OS === 'ios'
-        ? `${RNFS.DocumentDirectoryPath}/${name}`
-        : `${RNFS.DownloadDirectoryPath}/${name}`;
+      const downloadPath =
+        Platform.OS === 'ios'
+          ? `${RNFS.DocumentDirectoryPath}/${name}`
+          : `${RNFS.DownloadDirectoryPath}/${name}`;
 
       const downloadResult = RNFS.downloadFile({
         fromUrl: mediaUrl,
@@ -87,11 +92,9 @@ export const MediaViewer: React.FC<MediaViewerProps> = ({
             url: `file://${downloadPath}`,
           });
         } else {
-          Alert.alert(
-            'Downloaded',
-            `File saved to Downloads folder as "${name}"`,
-            [{ text: 'OK' }]
-          );
+          Alert.alert('Downloaded', `File saved to Downloads folder as "${name}"`, [
+            { text: 'OK' },
+          ]);
         }
       } else {
         throw new Error('Download failed');
@@ -104,7 +107,9 @@ export const MediaViewer: React.FC<MediaViewerProps> = ({
   };
 
   const handleShare = async () => {
-    if (!mediaUrl) return;
+    if (!mediaUrl) {
+      return;
+    }
 
     try {
       await Share.share({
@@ -136,7 +141,6 @@ export const MediaViewer: React.FC<MediaViewerProps> = ({
     setPaused(!paused);
   };
 
-
   // Reset state when modal closes
   const handleClose = () => {
     setPaused(true);
@@ -147,15 +151,12 @@ export const MediaViewer: React.FC<MediaViewerProps> = ({
     onClose();
   };
 
-  if (!visible || !mediaUrl) return null;
+  if (!visible || !mediaUrl) {
+    return null;
+  }
 
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="fade"
-      onRequestClose={handleClose}
-    >
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={handleClose}>
       <SafeAreaView style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
@@ -223,11 +224,7 @@ export const MediaViewer: React.FC<MediaViewerProps> = ({
                   >
                     {!loading && (
                       <View style={styles.playPauseButton}>
-                        <Icon
-                          name={paused ? 'play' : 'pause'}
-                          size={50}
-                          color={colors.white}
-                        />
+                        <Icon name={paused ? 'play' : 'pause'} size={50} color={colors.white} />
                       </View>
                     )}
                   </TouchableOpacity>
@@ -305,9 +302,7 @@ export const MediaViewer: React.FC<MediaViewerProps> = ({
               {downloading ? (
                 <View style={styles.progressContainer}>
                   <View style={[styles.progressBar, { width: `${downloadProgress * 100}%` }]} />
-                  <Text style={styles.progressText}>
-                    {Math.round(downloadProgress * 100)}%
-                  </Text>
+                  <Text style={styles.progressText}>{Math.round(downloadProgress * 100)}%</Text>
                 </View>
               ) : (
                 <TouchableOpacity style={styles.downloadButton} onPress={handleDownload}>
@@ -325,13 +320,13 @@ export const MediaViewer: React.FC<MediaViewerProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.95)',
+    flex: 1,
   },
   header: {
+    alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
     paddingHorizontal: 8,
     paddingVertical: 8,
   },
@@ -342,62 +337,62 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
   },
   content: {
+    alignItems: 'center',
     flex: 1,
     justifyContent: 'center',
-    alignItems: 'center',
   },
   loader: {
     position: 'absolute',
     zIndex: 1,
   },
   image: {
-    width: screenWidth,
     height: screenHeight * 0.8,
+    width: screenWidth,
   },
   // Video styles
   videoContainer: {
-    flex: 1,
-    width: '100%',
-    justifyContent: 'center',
     alignItems: 'center',
+    flex: 1,
+    justifyContent: 'center',
+    width: '100%',
   },
   video: {
-    width: screenWidth,
     height: screenHeight * 0.6,
+    width: screenWidth,
   },
   videoControlsOverlay: {
     ...StyleSheet.absoluteFillObject,
-    justifyContent: 'center',
     alignItems: 'center',
+    justifyContent: 'center',
   },
   playPauseButton: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    borderRadius: 40,
+    height: 80,
+    justifyContent: 'center',
+    width: 80,
   },
   videoProgressContainer: {
-    flexDirection: 'row',
     alignItems: 'center',
+    bottom: 40,
+    flexDirection: 'row',
+    left: 0,
     paddingHorizontal: 16,
     position: 'absolute',
-    bottom: 40,
-    left: 0,
     right: 0,
   },
   videoProgressBar: {
-    flex: 1,
-    height: 4,
     backgroundColor: 'rgba(255, 255, 255, 0.3)',
     borderRadius: 2,
+    flex: 1,
+    height: 4,
     marginHorizontal: 8,
   },
   videoProgressFill: {
-    height: '100%',
     backgroundColor: colors.primary,
     borderRadius: 2,
+    height: '100%',
   },
   videoTime: {
     color: colors.white,
@@ -410,8 +405,8 @@ const styles = StyleSheet.create({
   videoErrorText: {
     color: colors.white,
     fontSize: 16,
-    marginTop: 16,
     marginBottom: 16,
+    marginTop: 16,
   },
   // Audio styles
   audioContainer: {
@@ -419,13 +414,13 @@ const styles = StyleSheet.create({
     padding: 32,
   },
   audioPlayButton: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: colors.primary,
-    justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: colors.primary,
+    borderRadius: 32,
+    height: 64,
+    justifyContent: 'center',
     marginTop: 24,
+    width: 64,
   },
   // File styles
   filePreview: {
@@ -446,16 +441,16 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   progressContainer: {
-    width: 200,
-    height: 8,
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     borderRadius: 4,
+    height: 8,
     marginTop: 24,
     overflow: 'hidden',
+    width: 200,
   },
   progressBar: {
-    height: '100%',
     backgroundColor: colors.primary,
+    height: '100%',
   },
   progressText: {
     color: colors.white,
@@ -464,13 +459,13 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   downloadButton: {
-    flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.primary,
+    borderRadius: 24,
+    flexDirection: 'row',
+    marginTop: 24,
     paddingHorizontal: 24,
     paddingVertical: 12,
-    borderRadius: 24,
-    marginTop: 24,
   },
   downloadButtonText: {
     color: colors.white,

@@ -1,7 +1,46 @@
 import { create } from 'zustand';
-import { auth, initializeSDK, storeTokens, clearTokens, setOnUnauthorizedCallback } from '../services/sdk';
-import { signalRService } from '../services/signalr';
 import { Alert } from 'react-native';
+
+// CRITICAL: Do NOT import SDK at top level - it causes module initialization failures on Windows
+// Use lazy loading pattern instead - SDK is loaded only when needed
+type AuthService = {
+  login: (params: { username: string; password: string }) => Promise<any>;
+  register: (params: any) => Promise<any>;
+  verifyTwoFactor: (params: { userId: string; code: string }) => Promise<any>;
+  logout: () => Promise<void>;
+  getCurrentUser: () => Promise<any>;
+};
+
+// Lazy loaders for SDK functions
+const getAuthService = (): AuthService => {
+  const sdk = require('../services/sdk');
+  return sdk.auth;
+};
+
+const getInitializeSDK = (): (() => Promise<boolean>) => {
+  const sdk = require('../services/sdk');
+  return sdk.initializeSDK;
+};
+
+const getStoreTokens = (): ((accessToken: string, refreshToken: string) => Promise<void>) => {
+  const sdk = require('../services/sdk');
+  return sdk.storeTokens;
+};
+
+const getClearTokens = (): (() => Promise<void>) => {
+  const sdk = require('../services/sdk');
+  return sdk.clearTokens;
+};
+
+const getSetOnUnauthorizedCallback = (): ((callback: () => void) => void) => {
+  const sdk = require('../services/sdk');
+  return sdk.setOnUnauthorizedCallback;
+};
+
+const getSignalRService = () => {
+  const signalr = require('../services/signalr');
+  return signalr.signalRService;
+};
 
 interface User {
   id: string;
@@ -13,6 +52,7 @@ interface User {
   bio?: string;
   statusMessage?: string;
   isOnline?: boolean;
+  twoFactorEnabled?: boolean;
 }
 
 interface AuthState {
@@ -54,6 +94,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   login: async (username, password) => {
     set({ isLoading: true, error: null });
     try {
+      const auth = getAuthService();
+      const storeTokens = getStoreTokens();
+      const signalRService = getSignalRService();
       const response = await auth.login({ username, password });
 
       // Check if 2FA is required
@@ -106,6 +149,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   register: async (displayName, username, email, password, invitationCode) => {
     set({ isLoading: true, error: null });
     try {
+      const auth = getAuthService();
+      const storeTokens = getStoreTokens();
+      const signalRService = getSignalRService();
       const registerData: any = {
         name: displayName,
         username,
@@ -155,6 +201,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   verify2FA: async (userId: string, code: string) => {
     set({ isLoading: true, error: null });
     try {
+      const auth = getAuthService();
+      const storeTokens = getStoreTokens();
+      const signalRService = getSignalRService();
       const response = await auth.verifyTwoFactor({ userId, code });
 
       if (response.user && response.accessToken && response.refreshToken) {
@@ -193,6 +242,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   logout: async () => {
+    const auth = getAuthService();
+    const clearTokens = getClearTokens();
+    const signalRService = getSignalRService();
     try {
       await auth.logout();
     } catch (error) {
@@ -211,6 +263,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   handleSessionExpired: async () => {
+    const clearTokens = getClearTokens();
+    const signalRService = getSignalRService();
     console.log('Session expired - clearing auth state');
     await clearTokens();
     await signalRService.disconnect();
@@ -222,16 +276,17 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       sessionExpired: true,
     });
     // Show alert to user
-    Alert.alert(
-      'Session Expired',
-      'Your session has expired. Please log in again.',
-      [{ text: 'OK' }]
-    );
+    Alert.alert('Session Expired', 'Your session has expired. Please log in again.', [
+      { text: 'OK' },
+    ]);
   },
 
   checkAuth: async () => {
     set({ isLoading: true });
     try {
+      const initializeSDK = getInitializeSDK();
+      const auth = getAuthService();
+      const signalRService = getSignalRService();
       const hasTokens = await initializeSDK();
       if (!hasTokens) {
         set({ isLoading: false, isAuthenticated: false });
@@ -274,6 +329,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         return get().isAuthenticated;
       }
       console.error('Auth check failed:', error);
+      const clearTokens = getClearTokens();
       await clearTokens();
       set({ isLoading: false, isAuthenticated: false });
       return false;
@@ -306,8 +362,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 }));
 
 // Register the session expired callback after store is created
-setOnUnauthorizedCallback(() => {
-  useAuthStore.getState().handleSessionExpired();
-});
+// Use setTimeout to ensure this runs after all modules are loaded
+setTimeout(() => {
+  const setOnUnauthorizedCallback = getSetOnUnauthorizedCallback();
+  setOnUnauthorizedCallback(() => {
+    useAuthStore.getState().handleSessionExpired();
+  });
+}, 0);
 
 export default useAuthStore;

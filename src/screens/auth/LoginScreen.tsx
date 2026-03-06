@@ -13,7 +13,8 @@ import {
   Image,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { useAuthStore, useSettingsStore } from '../../stores';
+import { useAuthStore } from '../../stores/authStore';
+import { useSettingsStore } from '../../stores/settingsStore';
 import { useTheme } from '../../hooks';
 import { LoginScreenProps } from '../../navigation/types';
 import { biometricService } from '../../services/biometricService';
@@ -117,7 +118,10 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
       }
     } catch (err: any) {
       console.error('Biometric login error:', err);
-      Alert.alert('Error', 'Biometric authentication failed. Please try again or use your password.');
+      Alert.alert(
+        'Error',
+        'Biometric authentication failed. Please try again or use your password.'
+      );
     } finally {
       setIsAuthenticatingBiometric(false);
     }
@@ -140,17 +144,10 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled"
-      >
+      <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
         <View style={styles.header}>
           {siteLogo ? (
-            <Image
-              source={{ uri: siteLogo }}
-              style={styles.logo}
-              resizeMode="contain"
-            />
+            <Image source={{ uri: siteLogo }} style={styles.logo} resizeMode="contain" />
           ) : (
             <Icon name="chatbubbles" size={80} color={colors.primary} />
           )}
@@ -196,10 +193,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
               secureTextEntry={!showPassword}
               editable={!isLoading && !isAuthenticatingBiometric}
             />
-            <TouchableOpacity
-              onPress={() => setShowPassword(!showPassword)}
-              style={styles.eyeIcon}
-            >
+            <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eyeIcon}>
               <Icon
                 name={showPassword ? 'eye-off-outline' : 'eye-outline'}
                 size={20}
@@ -218,7 +212,10 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
 
           {/* Login Button */}
           <TouchableOpacity
-            style={[styles.loginButton, (isLoading || isAuthenticatingBiometric) && styles.loginButtonDisabled]}
+            style={[
+              styles.loginButton,
+              (isLoading || isAuthenticatingBiometric) && styles.loginButtonDisabled,
+            ]}
             onPress={handleLogin}
             disabled={isLoading || isAuthenticatingBiometric}
           >
@@ -264,47 +261,16 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
 
 const createStyles = (colors: any) =>
   StyleSheet.create({
-    container: { flex: 1, backgroundColor: colors.background },
-    scrollContent: { flexGrow: 1, justifyContent: 'center', padding: 24 },
-    header: { alignItems: 'center', marginBottom: 48 },
-    logo: { width: 200, height: 80, marginBottom: 8 },
-    title: { fontSize: 32, fontWeight: 'bold', color: colors.text, marginTop: 16 },
-    subtitle: { fontSize: 16, color: colors.textSecondary, marginTop: 8 },
-    form: { marginBottom: 32 },
-    inputContainer: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      backgroundColor: colors.surface,
-      borderRadius: 12,
-      marginBottom: 16,
-      paddingHorizontal: 16,
-      borderWidth: 1,
-      borderColor: colors.border,
-    },
-    inputIcon: { marginRight: 12 },
-    input: { flex: 1, height: 52, fontSize: 16, color: colors.text },
-    eyeIcon: { padding: 4 },
-    forgotPassword: { alignSelf: 'flex-end', marginBottom: 24 },
-    forgotPasswordText: { color: colors.primary, fontSize: 14, fontWeight: '500' },
-    loginButton: {
-      backgroundColor: colors.primary,
-      borderRadius: 12,
-      height: 52,
-      justifyContent: 'center',
-      alignItems: 'center',
-    },
-    loginButtonDisabled: { opacity: 0.7 },
-    loginButtonText: { color: colors.white, fontSize: 18, fontWeight: '600' },
     biometricButton: {
-      flexDirection: 'row',
       alignItems: 'center',
-      justifyContent: 'center',
       backgroundColor: colors.surface,
-      borderRadius: 12,
-      height: 52,
-      marginTop: 16,
-      borderWidth: 1,
       borderColor: colors.primary,
+      borderRadius: 12,
+      borderWidth: 1,
+      flexDirection: 'row',
+      height: 52,
+      justifyContent: 'center',
+      marginTop: 16,
     },
     biometricButtonDisabled: { opacity: 0.7 },
     biometricButtonText: {
@@ -313,9 +279,40 @@ const createStyles = (colors: any) =>
       fontWeight: '600',
       marginLeft: 8,
     },
-    footer: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },
+    container: { backgroundColor: colors.background, flex: 1 },
+    eyeIcon: { padding: 4 },
+    footer: { alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
     footerText: { color: colors.textSecondary, fontSize: 14 },
+    forgotPassword: { alignSelf: 'flex-end', marginBottom: 24 },
+    forgotPasswordText: { color: colors.primary, fontSize: 14, fontWeight: '500' },
+    form: { marginBottom: 32 },
+    header: { alignItems: 'center', marginBottom: 48 },
+    input: { color: colors.text, flex: 1, fontSize: 16, height: 52 },
+    inputContainer: {
+      alignItems: 'center',
+      backgroundColor: colors.surface,
+      borderColor: colors.border,
+      borderRadius: 12,
+      borderWidth: 1,
+      flexDirection: 'row',
+      marginBottom: 16,
+      paddingHorizontal: 16,
+    },
+    inputIcon: { marginRight: 12 },
+    loginButton: {
+      alignItems: 'center',
+      backgroundColor: colors.primary,
+      borderRadius: 12,
+      height: 52,
+      justifyContent: 'center',
+    },
+    loginButtonDisabled: { opacity: 0.7 },
+    loginButtonText: { color: colors.white, fontSize: 18, fontWeight: '600' },
+    logo: { height: 80, marginBottom: 8, width: 200 },
     registerLink: { color: colors.primary, fontSize: 14, fontWeight: '600', marginLeft: 4 },
+    scrollContent: { flexGrow: 1, justifyContent: 'center', padding: 24 },
+    subtitle: { color: colors.textSecondary, fontSize: 16, marginTop: 8 },
+    title: { color: colors.text, fontSize: 32, fontWeight: 'bold', marginTop: 16 },
   });
 
 export default LoginScreen;

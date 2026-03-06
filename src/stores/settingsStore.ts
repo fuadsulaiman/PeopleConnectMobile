@@ -147,9 +147,13 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   getSiteLogo: () => {
     const state = get();
     const logo = state.publicSettings?.general?.siteLogo;
-    if (!logo) return undefined;
+    if (!logo) {
+      return undefined;
+    }
     // Convert relative URL to absolute if needed
-    if (logo.startsWith('http')) return logo;
+    if (logo.startsWith('http')) {
+      return logo;
+    }
     const baseUrl = config.API_BASE_URL.replace(/\/api$/, '');
     return `${baseUrl}${logo.startsWith('/') ? '' : '/'}${logo}`;
   },
@@ -191,12 +195,14 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
 
   getPrivacySettings: () => {
     const state = get();
-    return state.publicSettings?.privacy ?? {
-      showOnlineStatus: true,
-      showLastSeen: true,
-      showReadReceipts: true,
-      showTypingIndicator: true,
-    };
+    return (
+      state.publicSettings?.privacy ?? {
+        showOnlineStatus: true,
+        showLastSeen: true,
+        showReadReceipts: true,
+        showTypingIndicator: true,
+      }
+    );
   },
 }));
 

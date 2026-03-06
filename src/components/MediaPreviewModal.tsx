@@ -67,24 +67,44 @@ export const MediaPreviewModal: React.FC<MediaPreviewModalProps> = ({
   };
 
   const formatFileSize = (bytes?: number): string => {
-    if (!bytes) return '';
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    if (!bytes) {
+      return '';
+    }
+    if (bytes < 1024) {
+      return `${bytes} B`;
+    }
+    if (bytes < 1024 * 1024) {
+      return `${(bytes / 1024).toFixed(1)} KB`;
+    }
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
   const getFileIcon = (mimeType?: string): string => {
-    if (!mimeType) return 'document-outline';
-    if (mimeType.includes('pdf')) return 'document-text-outline';
-    if (mimeType.includes('word') || mimeType.includes('doc')) return 'document-outline';
-    if (mimeType.includes('excel') || mimeType.includes('sheet')) return 'grid-outline';
-    if (mimeType.includes('powerpoint') || mimeType.includes('presentation')) return 'easel-outline';
-    if (mimeType.includes('zip') || mimeType.includes('rar')) return 'file-tray-outline';
+    if (!mimeType) {
+      return 'document-outline';
+    }
+    if (mimeType.includes('pdf')) {
+      return 'document-text-outline';
+    }
+    if (mimeType.includes('word') || mimeType.includes('doc')) {
+      return 'document-outline';
+    }
+    if (mimeType.includes('excel') || mimeType.includes('sheet')) {
+      return 'grid-outline';
+    }
+    if (mimeType.includes('powerpoint') || mimeType.includes('presentation')) {
+      return 'easel-outline';
+    }
+    if (mimeType.includes('zip') || mimeType.includes('rar')) {
+      return 'file-tray-outline';
+    }
     return 'document-outline';
   };
 
   const renderMediaPreview = () => {
-    if (!media) return null;
+    if (!media) {
+      return null;
+    }
 
     if (media.type === 'image') {
       return (
@@ -146,15 +166,12 @@ export const MediaPreviewModal: React.FC<MediaPreviewModalProps> = ({
     );
   };
 
-  if (!visible || !media) return null;
+  if (!visible || !media) {
+    return null;
+  }
 
   return (
-    <Modal
-      visible={visible}
-      transparent={false}
-      animationType="slide"
-      onRequestClose={onClose}
-    >
+    <Modal visible={visible} transparent={false} animationType="slide" onRequestClose={onClose}>
       <SafeAreaView style={styles.container}>
         <KeyboardAvoidingView
           style={styles.keyboardView}
@@ -162,16 +179,15 @@ export const MediaPreviewModal: React.FC<MediaPreviewModalProps> = ({
         >
           {/* Header */}
           <View style={styles.header}>
-            <TouchableOpacity
-              style={styles.closeButton}
-              onPress={onClose}
-              disabled={sending}
-            >
+            <TouchableOpacity style={styles.closeButton} onPress={onClose} disabled={sending}>
               <Icon name="close" size={28} color={colors.text} />
             </TouchableOpacity>
             <Text style={styles.headerTitle}>
-              {media.type === 'image' ? 'Send Photo' :
-               media.type === 'video' ? 'Send Video' : 'Send Document'}
+              {media.type === 'image'
+                ? 'Send Photo'
+                : media.type === 'video'
+                  ? 'Send Video'
+                  : 'Send Document'}
             </Text>
             <View style={styles.headerSpacer} />
           </View>
@@ -194,12 +210,14 @@ export const MediaPreviewModal: React.FC<MediaPreviewModalProps> = ({
                 activeOpacity={0.7}
               >
                 <View style={styles.viewOnceLeft}>
-                  <View style={[
-                    styles.viewOnceIconContainer,
-                    isViewOnce && styles.viewOnceIconContainerActive
-                  ]}>
+                  <View
+                    style={[
+                      styles.viewOnceIconContainer,
+                      isViewOnce && styles.viewOnceIconContainerActive,
+                    ]}
+                  >
                     <Icon
-                      name={isViewOnce ? "eye-off" : "eye-outline"}
+                      name={isViewOnce ? 'eye-off' : 'eye-outline'}
                       size={22}
                       color={isViewOnce ? colors.white : colors.textSecondary}
                     />
@@ -207,20 +225,17 @@ export const MediaPreviewModal: React.FC<MediaPreviewModalProps> = ({
                   <View style={styles.viewOnceTextContainer}>
                     <Text style={styles.viewOnceLabel}>View Once</Text>
                     <Text style={styles.viewOnceDescription}>
-                      {isViewOnce
-                        ? 'Recipient can only view once'
-                        : 'Tap to enable view once'}
+                      {isViewOnce ? 'Recipient can only view once' : 'Tap to enable view once'}
                     </Text>
                   </View>
                 </View>
-                <View style={[
-                  styles.viewOnceToggle,
-                  isViewOnce && styles.viewOnceToggleActive
-                ]}>
-                  <View style={[
-                    styles.viewOnceToggleCircle,
-                    isViewOnce && styles.viewOnceToggleCircleActive
-                  ]} />
+                <View style={[styles.viewOnceToggle, isViewOnce && styles.viewOnceToggleActive]}>
+                  <View
+                    style={[
+                      styles.viewOnceToggleCircle,
+                      isViewOnce && styles.viewOnceToggleCircleActive,
+                    ]}
+                  />
                 </View>
               </TouchableOpacity>
             )}
@@ -238,10 +253,7 @@ export const MediaPreviewModal: React.FC<MediaPreviewModalProps> = ({
                 editable={!sending}
               />
               <TouchableOpacity
-                style={[
-                  styles.sendButton,
-                  sending && styles.sendButtonDisabled
-                ]}
+                style={[styles.sendButton, sending && styles.sendButtonDisabled]}
                 onPress={handleSend}
                 disabled={sending}
               >
@@ -260,203 +272,203 @@ export const MediaPreviewModal: React.FC<MediaPreviewModalProps> = ({
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
+  bottomControls: {
     backgroundColor: colors.background,
+    borderTopColor: colors.border,
+    borderTopWidth: 1,
   },
-  keyboardView: {
-    flex: 1,
-  },
-  header: {
+  captionContainer: {
+    alignItems: 'flex-end',
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: 8,
+    padding: 12,
+  },
+  captionInput: {
+    backgroundColor: colors.surface,
+    borderRadius: 22,
+    color: colors.text,
+    flex: 1,
+    fontSize: 16,
+    maxHeight: 100,
+    minHeight: 44,
     paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    paddingVertical: 10,
   },
   closeButton: {
     padding: 4,
   },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '600',
+  container: {
+    backgroundColor: colors.background,
+    flex: 1,
+  },
+  documentContainer: {
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderRadius: 12,
+    padding: 32,
+    width: '100%',
+  },
+  documentIconContainer: {
+    alignItems: 'center',
+    backgroundColor: colors.primary + '20',
+    borderRadius: 20,
+    height: 100,
+    justifyContent: 'center',
+    marginBottom: 16,
+    width: 100,
+  },
+  documentName: {
     color: colors.text,
+    fontSize: 16,
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+  documentSize: {
+    color: colors.textSecondary,
+    fontSize: 14,
+    marginTop: 4,
+  },
+  header: {
+    alignItems: 'center',
+    borderBottomColor: colors.border,
+    borderBottomWidth: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
   },
   headerSpacer: {
     width: 36,
+  },
+  headerTitle: {
+    color: colors.text,
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  imagePreview: {
+    height: '100%',
+    width: '100%',
+  },
+  keyboardView: {
+    flex: 1,
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    bottom: 0,
+    justifyContent: 'center',
+    left: 0,
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    zIndex: 1,
+  },
+  mediaContainer: {
+    alignItems: 'center',
+    aspectRatio: 1,
+    backgroundColor: colors.surface,
+    borderRadius: 12,
+    justifyContent: 'center',
+    maxHeight: screenHeight * 0.5,
+    overflow: 'hidden',
+    width: '100%',
   },
   previewScroll: {
     flex: 1,
   },
   previewScrollContent: {
+    alignItems: 'center',
     flexGrow: 1,
     justifyContent: 'center',
-    alignItems: 'center',
     padding: 16,
   },
-  mediaContainer: {
-    width: '100%',
-    aspectRatio: 1,
-    maxHeight: screenHeight * 0.5,
-    justifyContent: 'center',
+  sendButton: {
     alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderRadius: 12,
-    overflow: 'hidden',
-  },
-  loadingContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+    backgroundColor: colors.primary,
+    borderRadius: 22,
+    height: 44,
     justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: colors.surface,
-    zIndex: 1,
+    width: 44,
   },
-  imagePreview: {
-    width: '100%',
-    height: '100%',
-  },
-  videoPreview: {
-    width: '100%',
-    height: '100%',
+  sendButtonDisabled: {
+    backgroundColor: colors.primary + '80',
   },
   videoErrorContainer: {
     alignItems: 'center',
     padding: 24,
   },
   videoErrorText: {
-    fontSize: 16,
     color: colors.textSecondary,
+    fontSize: 16,
     marginTop: 12,
   },
   videoFileName: {
-    fontSize: 14,
     color: colors.textSecondary,
+    fontSize: 14,
     marginTop: 4,
   },
-  documentContainer: {
-    alignItems: 'center',
-    padding: 32,
-    backgroundColor: colors.surface,
-    borderRadius: 12,
+  videoPreview: {
+    height: '100%',
     width: '100%',
   },
-  documentIconContainer: {
-    width: 100,
-    height: 100,
-    borderRadius: 20,
-    backgroundColor: colors.primary + '20',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  documentName: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: colors.text,
-    textAlign: 'center',
-  },
-  documentSize: {
-    fontSize: 14,
+  viewOnceDescription: {
     color: colors.textSecondary,
-    marginTop: 4,
-  },
-  bottomControls: {
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-    backgroundColor: colors.background,
-  },
-  viewOnceRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  viewOnceLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
+    fontSize: 13,
+    marginTop: 2,
   },
   viewOnceIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.surface,
-    justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderRadius: 20,
+    height: 40,
+    justifyContent: 'center',
     marginRight: 12,
+    width: 40,
   },
   viewOnceIconContainerActive: {
     backgroundColor: colors.primary,
   },
+  viewOnceLabel: {
+    color: colors.text,
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  viewOnceLeft: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flex: 1,
+  },
+  viewOnceRow: {
+    alignItems: 'center',
+    borderBottomColor: colors.border,
+    borderBottomWidth: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
   viewOnceTextContainer: {
     flex: 1,
   },
-  viewOnceLabel: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: colors.text,
-  },
-  viewOnceDescription: {
-    fontSize: 13,
-    color: colors.textSecondary,
-    marginTop: 2,
-  },
   viewOnceToggle: {
-    width: 50,
-    height: 30,
-    borderRadius: 15,
     backgroundColor: colors.border,
-    padding: 2,
+    borderRadius: 15,
+    height: 30,
     justifyContent: 'center',
+    padding: 2,
+    width: 50,
   },
   viewOnceToggleActive: {
     backgroundColor: colors.primary,
   },
   viewOnceToggleCircle: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
     backgroundColor: colors.white,
+    borderRadius: 13,
+    height: 26,
+    width: 26,
   },
   viewOnceToggleCircleActive: {
     alignSelf: 'flex-end',
-  },
-  captionContainer: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    padding: 12,
-    gap: 8,
-  },
-  captionInput: {
-    flex: 1,
-    minHeight: 44,
-    maxHeight: 100,
-    backgroundColor: colors.surface,
-    borderRadius: 22,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    fontSize: 16,
-    color: colors.text,
-  },
-  sendButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: colors.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  sendButtonDisabled: {
-    backgroundColor: colors.primary + '80',
   },
 });
 

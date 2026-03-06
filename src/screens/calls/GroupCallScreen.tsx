@@ -11,7 +11,12 @@ import {
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useTheme } from '../../hooks';
-import { calls } from '../../services/sdk';
+// CRITICAL: Do NOT import SDK at top level - it causes module initialization failures on Windows
+const getCalls = () => {
+  const sdkModule = require('../../services/sdk');
+  return sdkModule.calls;
+};
+const calls = { getLiveKitToken: (id: string) => getCalls().getLiveKitToken(id) };
 import { GroupCallScreenProps } from '../../navigation/types';
 
 // LiveKit imports - will fail gracefully if not available
@@ -27,7 +32,7 @@ try {
   LiveKitRoom = livekit.LiveKitRoom;
   VideoView = livekit.VideoView;
   useParticipants = livekit.useParticipants;
-  
+
   useTracks = livekit.useTracks;
   Track = livekit.Track;
   isTrackReference = livekit.isTrackReference;
@@ -36,7 +41,6 @@ try {
 }
 
 const { width, height } = Dimensions.get('window');
-
 
 const GroupCallScreen: React.FC<GroupCallScreenProps> = ({ route, navigation }) => {
   const { conversationId, conversationName } = route.params;
@@ -84,15 +88,15 @@ const GroupCallScreen: React.FC<GroupCallScreenProps> = ({ route, navigation }) 
   }, [navigation]);
 
   const handleToggleMute = useCallback(() => {
-    setIsMuted(prev => !prev);
+    setIsMuted((prev) => !prev);
   }, []);
 
   const handleToggleVideo = useCallback(() => {
-    setIsVideoEnabled(prev => !prev);
+    setIsVideoEnabled((prev) => !prev);
   }, []);
 
   const handleToggleSpeaker = useCallback(() => {
-    setIsSpeakerOn(prev => !prev);
+    setIsSpeakerOn((prev) => !prev);
   }, []);
 
   if (!LiveKitRoom) {
@@ -154,7 +158,7 @@ const GroupCallScreen: React.FC<GroupCallScreenProps> = ({ route, navigation }) 
       video={isVideoEnabled}
     >
       <RoomContent
-        roomName={roomName || conversationName || ""}
+        roomName={roomName || conversationName || ''}
         isMuted={isMuted}
         isVideoEnabled={isVideoEnabled}
         isSpeakerOn={isSpeakerOn}
@@ -211,17 +215,15 @@ const RoomContent: React.FC<RoomContentProps> = ({
       <View style={styles.videoGrid}>
         {tracks.length > 0 ? (
           tracks.map((track: any, index: number) => {
-            if (!isTrackReference || !isTrackReference(track)) return null;
+            if (!isTrackReference || !isTrackReference(track)) {
+              return null;
+            }
             return (
               <View
                 key={track.participant.identity + '-' + index}
                 style={[styles.videoTile, { width: tileWidth, height: tileHeight }]}
               >
-                <VideoView
-                  style={styles.videoView}
-                  trackRef={track}
-                  objectFit="cover"
-                />
+                <VideoView style={styles.videoView} trackRef={track} objectFit="cover" />
                 <View style={styles.participantInfo}>
                   <Text style={styles.participantName} numberOfLines={1}>
                     {track.participant.name || track.participant.identity}
@@ -253,7 +255,11 @@ const RoomContent: React.FC<RoomContentProps> = ({
           style={[styles.controlButton, !isVideoEnabled && styles.controlButtonActive]}
           onPress={onToggleVideo}
         >
-          <Icon name={isVideoEnabled ? 'videocam' : 'videocam-off'} size={28} color={colors.white} />
+          <Icon
+            name={isVideoEnabled ? 'videocam' : 'videocam-off'}
+            size={28}
+            color={colors.white}
+          />
         </TouchableOpacity>
 
         <TouchableOpacity style={[styles.controlButton, styles.endCallButton]} onPress={onEndCall}>
@@ -277,88 +283,94 @@ const RoomContent: React.FC<RoomContentProps> = ({
 
 const createStyles = (colors: any) =>
   StyleSheet.create({
-    container: { flex: 1, backgroundColor: colors.gray?.[900] || '#1a1a1a' },
-    loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-    loadingText: { color: colors.white, fontSize: 16, marginTop: 16 },
-    errorContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
-    errorTitle: { fontSize: 20, fontWeight: 'bold', color: colors.text, marginTop: 16 },
-    errorMessage: { fontSize: 14, color: colors.textSecondary, textAlign: 'center', marginTop: 8, marginBottom: 24 },
-    retryButton: {
-      backgroundColor: colors.primary,
-      paddingHorizontal: 32,
-      paddingVertical: 12,
-      borderRadius: 8,
-      marginBottom: 12,
-    },
-    retryButtonText: { color: colors.white, fontSize: 16, fontWeight: '600' },
     backButton: {
       paddingHorizontal: 32,
       paddingVertical: 12,
     },
     backButtonText: { color: colors.primary, fontSize: 16, fontWeight: '600' },
+    container: { backgroundColor: colors.gray?.[900] || '#1a1a1a', flex: 1 },
+    controlButton: {
+      alignItems: 'center',
+      backgroundColor: colors.gray?.[700] || '#444',
+      borderRadius: 28,
+      height: 56,
+      justifyContent: 'center',
+      marginHorizontal: 8,
+      width: 56,
+    },
+    controlButtonActive: { backgroundColor: colors.primary },
+    controls: {
+      alignItems: 'center',
+      flexDirection: 'row',
+      justifyContent: 'center',
+      paddingHorizontal: 16,
+      paddingVertical: 24,
+    },
+    endCallButton: {
+      backgroundColor: colors.error,
+      borderRadius: 32,
+      height: 64,
+      width: 64,
+    },
+    endCallIcon: { transform: [{ rotate: '135deg' }] },
+    errorContainer: { alignItems: 'center', flex: 1, justifyContent: 'center', padding: 24 },
+    errorMessage: {
+      color: colors.textSecondary,
+      fontSize: 14,
+      marginBottom: 24,
+      marginTop: 8,
+      textAlign: 'center',
+    },
+    errorTitle: { color: colors.text, fontSize: 20, fontWeight: 'bold', marginTop: 16 },
     header: {
+      alignItems: 'center',
       paddingHorizontal: 16,
       paddingVertical: 12,
-      alignItems: 'center',
     },
-    roomName: { fontSize: 18, fontWeight: '600', color: colors.white },
-    participantCount: { fontSize: 14, color: colors.gray?.[400] || '#888', marginTop: 4 },
+    loadingContainer: { alignItems: 'center', flex: 1, justifyContent: 'center' },
+    loadingText: { color: colors.white, fontSize: 16, marginTop: 16 },
+    noVideoContainer: {
+      alignItems: 'center',
+      flex: 1,
+      justifyContent: 'center',
+    },
+    noVideoText: { color: colors.textSecondary, fontSize: 16, marginTop: 12 },
+    participantCount: { color: colors.gray?.[400] || '#888', fontSize: 14, marginTop: 4 },
+    participantInfo: {
+      alignItems: 'center',
+      backgroundColor: 'rgba(0,0,0,0.5)',
+      bottom: 0,
+      flexDirection: 'row',
+      left: 0,
+      padding: 8,
+      position: 'absolute',
+      right: 0,
+    },
+    participantName: { color: colors.white, flex: 1, fontSize: 12 },
+    retryButton: {
+      backgroundColor: colors.primary,
+      borderRadius: 8,
+      marginBottom: 12,
+      paddingHorizontal: 32,
+      paddingVertical: 12,
+    },
+    retryButtonText: { color: colors.white, fontSize: 16, fontWeight: '600' },
+    roomName: { color: colors.white, fontSize: 18, fontWeight: '600' },
     videoGrid: {
+      alignItems: 'center',
       flex: 1,
       flexDirection: 'row',
       flexWrap: 'wrap',
       justifyContent: 'center',
-      alignItems: 'center',
       padding: 4,
     },
     videoTile: {
-      margin: 4,
-      borderRadius: 12,
-      overflow: 'hidden',
       backgroundColor: colors.gray?.[800] || '#2a2a2a',
+      borderRadius: 12,
+      margin: 4,
+      overflow: 'hidden',
     },
     videoView: { flex: 1 },
-    participantInfo: {
-      position: 'absolute',
-      bottom: 0,
-      left: 0,
-      right: 0,
-      flexDirection: 'row',
-      alignItems: 'center',
-      padding: 8,
-      backgroundColor: 'rgba(0,0,0,0.5)',
-    },
-    participantName: { flex: 1, color: colors.white, fontSize: 12 },
-    noVideoContainer: {
-      flex: 1,
-      justifyContent: 'center',
-      alignItems: 'center',
-    },
-    noVideoText: { color: colors.textSecondary, fontSize: 16, marginTop: 12 },
-    controls: {
-      flexDirection: 'row',
-      justifyContent: 'center',
-      alignItems: 'center',
-      paddingVertical: 24,
-      paddingHorizontal: 16,
-    },
-    controlButton: {
-      width: 56,
-      height: 56,
-      borderRadius: 28,
-      backgroundColor: colors.gray?.[700] || '#444',
-      justifyContent: 'center',
-      alignItems: 'center',
-      marginHorizontal: 8,
-    },
-    controlButtonActive: { backgroundColor: colors.primary },
-    endCallButton: {
-      backgroundColor: colors.error,
-      width: 64,
-      height: 64,
-      borderRadius: 32,
-    },
-    endCallIcon: { transform: [{ rotate: '135deg' }] },
   });
 
 export default GroupCallScreen;

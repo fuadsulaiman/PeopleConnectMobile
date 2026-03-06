@@ -9,9 +9,7 @@ import {
   TextInput,
   Image,
   Dimensions,
-
   ScrollView,
-
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useTheme } from '../../hooks';
@@ -149,19 +147,22 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
   }, []);
 
   // Debounced search
-  const handleSearchChange = useCallback((text: string) => {
-    setSearchQuery(text);
+  const handleSearchChange = useCallback(
+    (text: string) => {
+      setSearchQuery(text);
 
-    // Clear previous timeout
-    if (searchTimeoutRef.current) {
-      clearTimeout(searchTimeoutRef.current);
-    }
+      // Clear previous timeout
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
 
-    // Set new timeout for debounce
-    searchTimeoutRef.current = setTimeout(() => {
-      searchLocation(text);
-    }, 500);
-  }, [searchLocation]);
+      // Set new timeout for debounce
+      searchTimeoutRef.current = setTimeout(() => {
+        searchLocation(text);
+      }, 500);
+    },
+    [searchLocation]
+  );
 
   // Select search result
   const selectSearchResult = useCallback(async (result: SearchResult) => {
@@ -180,7 +181,9 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
 
   // Handle send location
   const handleSendLocation = useCallback(() => {
-    if (!location) return;
+    if (!location) {
+      return;
+    }
 
     const locationData: LocationData = {
       latitude: location.latitude,
@@ -195,7 +198,9 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
 
   // Get static map URL
   const getMapUrl = useCallback(() => {
-    if (!location) return null;
+    if (!location) {
+      return null;
+    }
     return locationService.getStaticMapUrl(location.latitude, location.longitude, {
       width: Math.round(screenWidth),
       height: Math.round(MAP_HEIGHT),
@@ -219,10 +224,7 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
             <Icon name="close" size={24} color={colors.text} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Share Location</Text>
-          <TouchableOpacity
-            onPress={() => setShowSearch(!showSearch)}
-            style={styles.headerButton}
-          >
+          <TouchableOpacity onPress={() => setShowSearch(!showSearch)} style={styles.headerButton}>
             <Icon name={showSearch ? 'map' : 'search'} size={24} color={colors.primary} />
           </TouchableOpacity>
         </View>
@@ -241,10 +243,12 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
                 autoFocus
               />
               {searchQuery.length > 0 && (
-                <TouchableOpacity onPress={() => {
-                  setSearchQuery('');
-                  setSearchResults([]);
-                }}>
+                <TouchableOpacity
+                  onPress={() => {
+                    setSearchQuery('');
+                    setSearchResults([]);
+                  }}
+                >
                   <Icon name="close-circle" size={20} color={colors.textSecondary} />
                 </TouchableOpacity>
               )}
@@ -294,11 +298,7 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
             </View>
           ) : mapUrl ? (
             <View style={styles.mapWrapper}>
-              <Image
-                source={{ uri: mapUrl }}
-                style={styles.mapImage}
-                resizeMode="cover"
-              />
+              <Image source={{ uri: mapUrl }} style={styles.mapImage} resizeMode="cover" />
               {/* Pin overlay */}
               <View style={styles.pinOverlay}>
                 <Icon name="location" size={40} color={colors.error} />
@@ -334,10 +334,7 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
             </View>
 
             {/* Current Location Button */}
-            <TouchableOpacity
-              style={styles.currentLocationButton}
-              onPress={getCurrentLocation}
-            >
+            <TouchableOpacity style={styles.currentLocationButton} onPress={getCurrentLocation}>
               <Icon name="locate" size={20} color={colors.primary} />
             </TouchableOpacity>
           </View>
@@ -368,189 +365,189 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
 
 const createStyles = (colors: any) =>
   StyleSheet.create({
+    actionButtons: {
+      padding: 16,
+    },
     container: {
       flex: 1,
     },
-    header: {
-      flexDirection: 'row',
+    coordinatesText: {
+      color: colors.textSecondary,
+      fontSize: 11,
+      paddingBottom: 8,
+      textAlign: 'center',
+    },
+    currentLocationButton: {
       alignItems: 'center',
+      backgroundColor: colors.background,
+      borderColor: colors.border,
+      borderRadius: 20,
+      borderWidth: 1,
+      height: 40,
+      justifyContent: 'center',
+      width: 40,
+    },
+    errorContainer: {
+      alignItems: 'center',
+      flex: 1,
+      gap: 12,
+      justifyContent: 'center',
+      padding: 20,
+    },
+    errorText: {
+      color: colors.error,
+      fontSize: 14,
+      textAlign: 'center',
+    },
+    header: {
+      alignItems: 'center',
+      borderBottomColor: colors.border,
+      borderBottomWidth: 1,
+      flexDirection: 'row',
       justifyContent: 'space-between',
       paddingHorizontal: 16,
       paddingVertical: 12,
-      borderBottomWidth: 1,
-      borderBottomColor: colors.border,
     },
     headerButton: {
       padding: 8,
     },
     headerTitle: {
+      color: colors.text,
       fontSize: 17,
       fontWeight: '600',
-      color: colors.text,
     },
-    searchContainer: {
-      padding: 12,
-      borderBottomWidth: 1,
-      borderBottomColor: colors.border,
+    loadingContainer: {
+      alignItems: 'center',
+      flex: 1,
+      gap: 12,
+      justifyContent: 'center',
     },
-    searchInputContainer: {
-      flexDirection: 'row',
+    loadingText: {
+      color: colors.textSecondary,
+      fontSize: 14,
+    },
+    locationAddress: {
+      color: colors.textSecondary,
+      fontSize: 13,
+      lineHeight: 18,
+    },
+    locationInfo: {
       alignItems: 'center',
       backgroundColor: colors.cardBackground,
-      borderRadius: 10,
-      paddingHorizontal: 12,
-      gap: 8,
-    },
-    searchInput: {
-      flex: 1,
-      height: 44,
-      fontSize: 16,
-      color: colors.text,
-    },
-    searchResults: {
-      maxHeight: 200,
-      marginTop: 8,
-    },
-    searchingContainer: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      padding: 12,
-      gap: 8,
-    },
-    searchingText: {
-      fontSize: 14,
-      color: colors.textSecondary,
-    },
-    searchResultItem: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      padding: 12,
-      borderBottomWidth: 1,
       borderBottomColor: colors.border,
+      borderBottomWidth: 1,
+      flexDirection: 'row',
+      padding: 16,
+    },
+    locationInfoContent: {
+      alignItems: 'center',
+      flex: 1,
+      flexDirection: 'row',
       gap: 12,
     },
-    searchResultText: {
-      flex: 1,
-      fontSize: 14,
+    locationName: {
       color: colors.text,
-      lineHeight: 20,
+      fontSize: 16,
+      fontWeight: '600',
+      marginBottom: 2,
+    },
+    locationTextContainer: {
+      flex: 1,
     },
     mapContainer: {
-      height: MAP_HEIGHT,
       backgroundColor: colors.cardBackground,
+      height: MAP_HEIGHT,
+    },
+    mapImage: {
+      height: '100%',
+      width: '100%',
     },
     mapWrapper: {
       flex: 1,
       position: 'relative',
     },
-    mapImage: {
-      width: '100%',
-      height: '100%',
-    },
     pinOverlay: {
+      left: '50%',
       position: 'absolute',
       top: '50%',
-      left: '50%',
       transform: [{ translateX: -20 }, { translateY: -40 }],
     },
-    loadingContainer: {
-      flex: 1,
-      justifyContent: 'center',
-      alignItems: 'center',
-      gap: 12,
-    },
-    loadingText: {
-      fontSize: 14,
-      color: colors.textSecondary,
-    },
-    errorContainer: {
-      flex: 1,
-      justifyContent: 'center',
-      alignItems: 'center',
-      padding: 20,
-      gap: 12,
-    },
-    errorText: {
-      fontSize: 14,
-      color: colors.error,
-      textAlign: 'center',
-    },
     retryButton: {
-      paddingHorizontal: 20,
-      paddingVertical: 10,
       backgroundColor: colors.primary,
       borderRadius: 8,
       marginTop: 8,
+      paddingHorizontal: 20,
+      paddingVertical: 10,
     },
     retryButtonText: {
+      color: colors.white,
       fontSize: 14,
       fontWeight: '600',
-      color: colors.white,
     },
-    locationInfo: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      padding: 16,
-      backgroundColor: colors.cardBackground,
-      borderBottomWidth: 1,
+    searchContainer: {
       borderBottomColor: colors.border,
+      borderBottomWidth: 1,
+      padding: 12,
     },
-    locationInfoContent: {
-      flex: 1,
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 12,
-    },
-    locationTextContainer: {
-      flex: 1,
-    },
-    locationName: {
-      fontSize: 16,
-      fontWeight: '600',
+    searchInput: {
       color: colors.text,
-      marginBottom: 2,
+      flex: 1,
+      fontSize: 16,
+      height: 44,
     },
-    locationAddress: {
-      fontSize: 13,
-      color: colors.textSecondary,
-      lineHeight: 18,
-    },
-    currentLocationButton: {
-      width: 40,
-      height: 40,
-      borderRadius: 20,
-      backgroundColor: colors.background,
-      justifyContent: 'center',
+    searchInputContainer: {
       alignItems: 'center',
-      borderWidth: 1,
-      borderColor: colors.border,
+      backgroundColor: colors.cardBackground,
+      borderRadius: 10,
+      flexDirection: 'row',
+      gap: 8,
+      paddingHorizontal: 12,
     },
-    actionButtons: {
-      padding: 16,
+    searchResultItem: {
+      alignItems: 'center',
+      borderBottomColor: colors.border,
+      borderBottomWidth: 1,
+      flexDirection: 'row',
+      gap: 12,
+      padding: 12,
+    },
+    searchResultText: {
+      color: colors.text,
+      flex: 1,
+      fontSize: 14,
+      lineHeight: 20,
+    },
+    searchResults: {
+      marginTop: 8,
+      maxHeight: 200,
+    },
+    searchingContainer: {
+      alignItems: 'center',
+      flexDirection: 'row',
+      gap: 8,
+      padding: 12,
+    },
+    searchingText: {
+      color: colors.textSecondary,
+      fontSize: 14,
     },
     sendButton: {
-      flexDirection: 'row',
       alignItems: 'center',
-      justifyContent: 'center',
       backgroundColor: colors.primary,
       borderRadius: 12,
-      paddingVertical: 14,
+      flexDirection: 'row',
       gap: 8,
+      justifyContent: 'center',
+      paddingVertical: 14,
     },
     sendButtonDisabled: {
       backgroundColor: colors.textSecondary,
       opacity: 0.5,
     },
     sendButtonText: {
+      color: colors.white,
       fontSize: 16,
       fontWeight: '600',
-      color: colors.white,
-    },
-    coordinatesText: {
-      fontSize: 11,
-      color: colors.textSecondary,
-      textAlign: 'center',
-      paddingBottom: 8,
     },
   });
 

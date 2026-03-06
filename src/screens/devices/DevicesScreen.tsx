@@ -15,7 +15,12 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { ProfileStackParamList } from '../../navigation/types';
 import { useTheme } from '../../hooks';
-import { devices as devicesApi } from '../../services/sdk';
+// CRITICAL: Do NOT import SDK at top level - it causes module initialization failures on Windows
+const getDevices = () => {
+  const sdkModule = require('../../services/sdk');
+  return sdkModule.devices;
+};
+const devicesApi = { list: () => getDevices().list(), remove: (id: string) => getDevices().remove(id), removeAllOthers: () => getDevices().removeAllOthers() };
 
 type Props = NativeStackScreenProps<ProfileStackParamList, 'Devices'>;
 
@@ -61,7 +66,12 @@ const DevicesScreen: React.FC<Props> = ({ navigation }) => {
       setDevices([
         {
           id: 'current',
-          name: Platform.OS === 'ios' ? 'iPhone' : Platform.OS === 'android' ? 'Android Device' : 'Mobile Device',
+          name:
+            Platform.OS === 'ios'
+              ? 'iPhone'
+              : Platform.OS === 'android'
+                ? 'Android Device'
+                : 'Mobile Device',
           platform: Platform.OS,
           lastActive: new Date().toISOString(),
           isCurrent: true,
@@ -92,30 +102,26 @@ const DevicesScreen: React.FC<Props> = ({ navigation }) => {
       return;
     }
 
-    Alert.alert(
-      'Remove Device',
-      `Are you sure you want to sign out from "${device.name}"?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Remove',
-          style: 'destructive',
-          onPress: async () => {
-            setRemovingId(device.id);
-            try {
-              await devicesApi.remove(device.id);
-              setDevices((prev) => prev.filter((d) => d.id !== device.id));
-              Alert.alert('Success', 'Device has been signed out.');
-            } catch (error) {
-              console.error('Failed to remove device:', error);
-              Alert.alert('Error', 'Failed to remove device. Please try again.');
-            } finally {
-              setRemovingId(null);
-            }
-          },
+    Alert.alert('Remove Device', `Are you sure you want to sign out from "${device.name}"?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Remove',
+        style: 'destructive',
+        onPress: async () => {
+          setRemovingId(device.id);
+          try {
+            await devicesApi.remove(device.id);
+            setDevices((prev) => prev.filter((d) => d.id !== device.id));
+            Alert.alert('Success', 'Device has been signed out.');
+          } catch (error) {
+            console.error('Failed to remove device:', error);
+            Alert.alert('Error', 'Failed to remove device. Please try again.');
+          } finally {
+            setRemovingId(null);
+          }
         },
-      ]
-    );
+      },
+    ]);
   }, []);
 
   const handleRemoveAllOtherDevices = useCallback(() => {
@@ -136,7 +142,7 @@ const DevicesScreen: React.FC<Props> = ({ navigation }) => {
           onPress: async () => {
             setIsRemovingAll(true);
             try {
-              await devicesApi.removeAll();
+              await devicesApi.removeAllOthers();
               setDevices((prev) => prev.filter((d) => d.isCurrent));
               Alert.alert('Success', 'All other devices have been signed out.');
             } catch (error) {
@@ -172,11 +178,21 @@ const DevicesScreen: React.FC<Props> = ({ navigation }) => {
     const diffHours = Math.floor(diffMs / 3600000);
     const diffDays = Math.floor(diffMs / 86400000);
 
-    if (diffMins < 1) return 'Active now';
-    if (diffMins < 60) return `Active ${diffMins}m ago`;
-    if (diffHours < 24) return `Active ${diffHours}h ago`;
-    if (diffDays === 1) return 'Active yesterday';
-    if (diffDays < 7) return `Active ${diffDays} days ago`;
+    if (diffMins < 1) {
+      return 'Active now';
+    }
+    if (diffMins < 60) {
+      return `Active ${diffMins}m ago`;
+    }
+    if (diffHours < 24) {
+      return `Active ${diffHours}h ago`;
+    }
+    if (diffDays === 1) {
+      return 'Active yesterday';
+    }
+    if (diffDays < 7) {
+      return `Active ${diffDays} days ago`;
+    }
     return `Active on ${date.toLocaleDateString()}`;
   };
 
@@ -262,7 +278,8 @@ const DevicesScreen: React.FC<Props> = ({ navigation }) => {
               <View style={styles.infoBox}>
                 <Icon name="information-circle-outline" size={20} color={colors.textSecondary} />
                 <Text style={styles.infoText}>
-                  These are the devices currently signed in to your account. You can sign out from any device you don't recognize.
+                  These are the devices currently signed in to your account. You can sign out from
+                  any device you don't recognize.
                 </Text>
               </View>
             }
@@ -287,7 +304,8 @@ const DevicesScreen: React.FC<Props> = ({ navigation }) => {
                   <>
                     <Icon name="log-out-outline" size={20} color={colors.error} />
                     <Text style={styles.signOutAllText}>
-                      Sign out from {otherDevicesCount} other device{otherDevicesCount > 1 ? 's' : ''}
+                      Sign out from {otherDevicesCount} other device
+                      {otherDevicesCount > 1 ? 's' : ''}
                     </Text>
                   </>
                 )}
@@ -302,150 +320,150 @@ const DevicesScreen: React.FC<Props> = ({ navigation }) => {
 
 const createStyles = (colors: ReturnType<typeof import('../../hooks').useTheme>['colors']) =>
   StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: colors.background,
-    },
-    header: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      paddingHorizontal: 16,
-      paddingVertical: 12,
-      borderBottomWidth: 1,
-      borderBottomColor: colors.border,
-    },
     backButton: {
       padding: 8,
     },
-    headerTitle: {
-      fontSize: 18,
+    container: {
+      backgroundColor: colors.background,
+      flex: 1,
+    },
+    currentBadge: {
+      backgroundColor: colors.success,
+      borderRadius: 4,
+      paddingHorizontal: 8,
+      paddingVertical: 2,
+    },
+    currentBadgeText: {
+      color: colors.white,
+      fontSize: 10,
       fontWeight: '600',
-      color: colors.text,
-    },
-    placeholder: {
-      width: 40,
-    },
-    loadingContainer: {
-      flex: 1,
-      justifyContent: 'center',
-      alignItems: 'center',
-    },
-    loadingText: {
-      marginTop: 12,
-      fontSize: 14,
-      color: colors.textSecondary,
-    },
-    listContent: {
-      paddingBottom: 100,
-    },
-    infoBox: {
-      flexDirection: 'row',
-      alignItems: 'flex-start',
-      backgroundColor: colors.surface,
-      margin: 16,
-      padding: 12,
-      borderRadius: 8,
-      gap: 8,
-    },
-    infoText: {
-      flex: 1,
-      fontSize: 13,
-      color: colors.textSecondary,
-      lineHeight: 18,
-    },
-    deviceItem: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingHorizontal: 16,
-      paddingVertical: 12,
-      borderBottomWidth: 1,
-      borderBottomColor: colors.border,
-    },
-    deviceIcon: {
-      width: 48,
-      height: 48,
-      borderRadius: 24,
-      backgroundColor: colors.surface,
-      justifyContent: 'center',
-      alignItems: 'center',
     },
     currentDeviceIcon: {
       backgroundColor: colors.primary,
+    },
+    deviceDetails: {
+      color: colors.textSecondary,
+      fontSize: 13,
+      marginTop: 2,
+    },
+    deviceHeader: {
+      alignItems: 'center',
+      flexDirection: 'row',
+      gap: 8,
+    },
+    deviceIcon: {
+      alignItems: 'center',
+      backgroundColor: colors.surface,
+      borderRadius: 24,
+      height: 48,
+      justifyContent: 'center',
+      width: 48,
     },
     deviceInfo: {
       flex: 1,
       marginLeft: 12,
     },
-    deviceHeader: {
-      flexDirection: 'row',
+    deviceItem: {
       alignItems: 'center',
-      gap: 8,
+      borderBottomColor: colors.border,
+      borderBottomWidth: 1,
+      flexDirection: 'row',
+      paddingHorizontal: 16,
+      paddingVertical: 12,
     },
     deviceName: {
-      fontSize: 16,
-      fontWeight: '600',
       color: colors.text,
       flex: 1,
-    },
-    currentBadge: {
-      backgroundColor: colors.success,
-      paddingHorizontal: 8,
-      paddingVertical: 2,
-      borderRadius: 4,
-    },
-    currentBadgeText: {
-      fontSize: 10,
+      fontSize: 16,
       fontWeight: '600',
-      color: colors.white,
     },
-    deviceDetails: {
-      fontSize: 13,
+    emptyContainer: {
+      alignItems: 'center',
+      flex: 1,
+      justifyContent: 'center',
+      paddingVertical: 64,
+    },
+    emptyText: {
       color: colors.textSecondary,
-      marginTop: 2,
+      fontSize: 16,
+      marginTop: 16,
+    },
+    footer: {
+      backgroundColor: colors.background,
+      borderTopColor: colors.border,
+      borderTopWidth: 1,
+      bottom: 0,
+      left: 0,
+      padding: 16,
+      position: 'absolute',
+      right: 0,
+    },
+    header: {
+      alignItems: 'center',
+      borderBottomColor: colors.border,
+      borderBottomWidth: 1,
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+    },
+    headerTitle: {
+      color: colors.text,
+      fontSize: 18,
+      fontWeight: '600',
+    },
+    infoBox: {
+      alignItems: 'flex-start',
+      backgroundColor: colors.surface,
+      borderRadius: 8,
+      flexDirection: 'row',
+      gap: 8,
+      margin: 16,
+      padding: 12,
+    },
+    infoText: {
+      color: colors.textSecondary,
+      flex: 1,
+      fontSize: 13,
+      lineHeight: 18,
     },
     lastActive: {
-      fontSize: 12,
       color: colors.textTertiary,
+      fontSize: 12,
       marginTop: 2,
+    },
+    listContent: {
+      paddingBottom: 100,
+    },
+    loadingContainer: {
+      alignItems: 'center',
+      flex: 1,
+      justifyContent: 'center',
+    },
+    loadingText: {
+      color: colors.textSecondary,
+      fontSize: 14,
+      marginTop: 12,
+    },
+    placeholder: {
+      width: 40,
     },
     removeButton: {
       padding: 8,
     },
-    emptyContainer: {
-      flex: 1,
-      justifyContent: 'center',
-      alignItems: 'center',
-      paddingVertical: 64,
-    },
-    emptyText: {
-      fontSize: 16,
-      color: colors.textSecondary,
-      marginTop: 16,
-    },
-    footer: {
-      position: 'absolute',
-      bottom: 0,
-      left: 0,
-      right: 0,
-      backgroundColor: colors.background,
-      borderTopWidth: 1,
-      borderTopColor: colors.border,
-      padding: 16,
-    },
     signOutAllButton: {
-      flexDirection: 'row',
       alignItems: 'center',
-      justifyContent: 'center',
       backgroundColor: colors.surface,
-      padding: 14,
       borderRadius: 8,
+      flexDirection: 'row',
       gap: 8,
+      justifyContent: 'center',
+      padding: 14,
     },
     signOutAllText: {
+      color: colors.error,
       fontSize: 15,
       fontWeight: '600',
-      color: colors.error,
     },
   });
 

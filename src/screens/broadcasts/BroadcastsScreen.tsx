@@ -11,7 +11,12 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { broadcasts } from '../../services/sdk';
+// CRITICAL: Do NOT import SDK at top level - it causes module initialization failures on Windows
+const getBroadcasts = () => {
+  const sdkModule = require('../../services/sdk');
+  return sdkModule.broadcasts;
+};
+const broadcasts = { getChannels: () => getBroadcasts().getChannels(), getFeed: () => getBroadcasts().getFeed(), subscribe: (id: string) => getBroadcasts().subscribe(id), unsubscribe: (id: string) => getBroadcasts().unsubscribe(id), getMessages: (id: string) => getBroadcasts().getMessages(id) };
 import { useTheme } from '../../hooks';
 import { Avatar } from '../../components/common/Avatar';
 import { EmptyState } from '../../components/common/EmptyState';
@@ -39,8 +44,12 @@ interface BroadcastMessage {
 }
 
 const toAbsoluteUrl = (url: string | null | undefined): string | undefined => {
-  if (!url) return undefined;
-  if (url.startsWith('http')) return url;
+  if (!url) {
+    return undefined;
+  }
+  if (url.startsWith('http')) {
+    return url;
+  }
   const baseUrl = config.API_BASE_URL.replace(/\/api$/, '');
   return baseUrl + (url.startsWith('/') ? '' : '/') + url;
 };
@@ -61,7 +70,7 @@ const BroadcastsScreen: React.FC = () => {
     try {
       const [channelsData, feedData] = await Promise.all([
         broadcasts.getChannels(),
-        broadcasts.getFeed(),  // Fixed: was getMessageFeed
+        broadcasts.getFeed(), // Fixed: was getMessageFeed
       ]);
       setChannels(Array.isArray(channelsData) ? channelsData : (channelsData as any).items || []);
       const feedItems = (feedData as any)?.items || [];
@@ -90,10 +99,14 @@ const BroadcastsScreen: React.FC = () => {
       } else {
         await broadcasts.subscribe(channelId);
       }
-      setChannels(prev =>
-        prev.map(c =>
+      setChannels((prev) =>
+        prev.map((c) =>
           c.id === channelId
-            ? { ...c, isSubscribed: !isSubscribed, subscriberCount: c.subscriberCount + (isSubscribed ? -1 : 1) }
+            ? {
+                ...c,
+                isSubscribed: !isSubscribed,
+                subscriberCount: c.subscriberCount + (isSubscribed ? -1 : 1),
+              }
             : c
         )
       );
@@ -110,9 +123,9 @@ const BroadcastsScreen: React.FC = () => {
     setExpandedChannel(channelId);
     if (!channelMessages[channelId]) {
       try {
-        const msgsResponse = await broadcasts.getMessages(channelId);  // Fixed: was getChannelMessages
+        const msgsResponse = await broadcasts.getMessages(channelId); // Fixed: was getChannelMessages
         const msgs = (msgsResponse as any)?.items || [];
-        setChannelMessages(prev => ({
+        setChannelMessages((prev) => ({
           ...prev,
           [channelId]: Array.isArray(msgs) ? msgs : [],
         }));
@@ -130,10 +143,18 @@ const BroadcastsScreen: React.FC = () => {
     const diffHours = Math.floor(diffMs / 3600000);
     const diffDays = Math.floor(diffMs / 86400000);
 
-    if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return diffMins + 'm ago';
-    if (diffHours < 24) return diffHours + 'h ago';
-    if (diffDays < 7) return diffDays + 'd ago';
+    if (diffMins < 1) {
+      return 'Just now';
+    }
+    if (diffMins < 60) {
+      return diffMins + 'm ago';
+    }
+    if (diffHours < 24) {
+      return diffHours + 'h ago';
+    }
+    if (diffDays < 7) {
+      return diffDays + 'd ago';
+    }
     return date.toLocaleDateString();
   };
 
@@ -144,7 +165,9 @@ const BroadcastsScreen: React.FC = () => {
         <Text style={styles.feedTime}>{formatDate(item.createdAt)}</Text>
       </View>
       {item.title && <Text style={styles.feedTitle}>{item.title}</Text>}
-      <Text style={styles.feedContent} numberOfLines={4}>{item.content}</Text>
+      <Text style={styles.feedContent} numberOfLines={4}>
+        {item.content}
+      </Text>
       {item.imageUrl && (
         <Image source={{ uri: toAbsoluteUrl(item.imageUrl) }} style={styles.feedImage} />
       )}
@@ -154,16 +177,17 @@ const BroadcastsScreen: React.FC = () => {
   const renderChannelItem = ({ item }: { item: BroadcastChannel }) => (
     <View style={styles.channelItem}>
       <TouchableOpacity style={styles.channelHeader} onPress={() => handleExpandChannel(item.id)}>
-        <Avatar
-          uri={toAbsoluteUrl(item.imageUrl)}
-          name={item.name}
-          size={48}
-        />
+        <Avatar uri={toAbsoluteUrl(item.imageUrl)} name={item.name} size={48} />
         <View style={styles.channelInfo}>
           <View style={styles.channelNameRow}>
             <Text style={styles.channelName}>{item.name}</Text>
             {item.isPlatformChannel && (
-              <Icon name="checkmark-circle" size={16} color={colors.primary} style={styles.verifiedIcon} />
+              <Icon
+                name="checkmark-circle"
+                size={16}
+                color={colors.primary}
+                style={styles.verifiedIcon}
+              />
             )}
           </View>
           <Text style={styles.channelSubscribers}>
@@ -180,14 +204,18 @@ const BroadcastsScreen: React.FC = () => {
         </TouchableOpacity>
       </TouchableOpacity>
       {item.description && (
-        <Text style={styles.channelDescription} numberOfLines={2}>{item.description}</Text>
+        <Text style={styles.channelDescription} numberOfLines={2}>
+          {item.description}
+        </Text>
       )}
       {expandedChannel === item.id && (
         <View style={styles.channelMessages}>
           {channelMessages[item.id]?.length > 0 ? (
-            channelMessages[item.id].slice(0, 3).map(msg => (
+            channelMessages[item.id].slice(0, 3).map((msg) => (
               <View key={msg.id} style={styles.channelMessage}>
-                <Text style={styles.channelMessageContent} numberOfLines={2}>{msg.content}</Text>
+                <Text style={styles.channelMessageContent} numberOfLines={2}>
+                  {msg.content}
+                </Text>
                 <Text style={styles.channelMessageTime}>{formatDate(msg.createdAt)}</Text>
               </View>
             ))
@@ -225,17 +253,23 @@ const BroadcastsScreen: React.FC = () => {
           style={[styles.tab, activeTab === 'channels' && styles.activeTab]}
           onPress={() => setActiveTab('channels')}
         >
-          <Text style={[styles.tabText, activeTab === 'channels' && styles.activeTabText]}>Channels</Text>
+          <Text style={[styles.tabText, activeTab === 'channels' && styles.activeTabText]}>
+            Channels
+          </Text>
         </TouchableOpacity>
       </View>
       {activeTab === 'feed' ? (
         <FlatList
           data={messages}
           renderItem={renderFeedItem}
-          keyExtractor={item => item.id}
+          keyExtractor={(item) => item.id}
           contentContainerStyle={styles.listContent}
           refreshControl={
-            <RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} tintColor={colors.primary} />
+            <RefreshControl
+              refreshing={isRefreshing}
+              onRefresh={handleRefresh}
+              tintColor={colors.primary}
+            />
           }
           ListEmptyComponent={
             <EmptyState
@@ -249,10 +283,14 @@ const BroadcastsScreen: React.FC = () => {
         <FlatList
           data={channels}
           renderItem={renderChannelItem}
-          keyExtractor={item => item.id}
+          keyExtractor={(item) => item.id}
           contentContainerStyle={styles.listContent}
           refreshControl={
-            <RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} tintColor={colors.primary} />
+            <RefreshControl
+              refreshing={isRefreshing}
+              onRefresh={handleRefresh}
+              tintColor={colors.primary}
+            />
           }
           ListEmptyComponent={
             <EmptyState
@@ -269,76 +307,91 @@ const BroadcastsScreen: React.FC = () => {
 
 const createStyles = (colors: any) =>
   StyleSheet.create({
-    container: { flex: 1, backgroundColor: colors.background },
-    loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-    header: { paddingHorizontal: 16, paddingVertical: 12 },
-    headerTitle: { fontSize: 28, fontWeight: 'bold', color: colors.text },
-    tabs: {
-      flexDirection: 'row',
-      borderBottomWidth: 1,
-      borderBottomColor: colors.border,
-    },
-    tab: {
-      flex: 1,
-      paddingVertical: 12,
-      alignItems: 'center',
-    },
     activeTab: {
-      borderBottomWidth: 2,
       borderBottomColor: colors.primary,
+      borderBottomWidth: 2,
     },
-    tabText: { fontSize: 16, color: colors.textSecondary },
     activeTabText: { color: colors.primary, fontWeight: '600' },
-    listContent: { paddingVertical: 8 },
-    feedItem: {
+    channelDescription: { color: colors.textSecondary, fontSize: 13, lineHeight: 18, marginTop: 8 },
+    channelHeader: { alignItems: 'center', flexDirection: 'row' },
+    channelInfo: { flex: 1, marginLeft: 12 },
+    channelItem: {
       backgroundColor: colors.surface,
+      borderRadius: 12,
       marginHorizontal: 16,
       marginVertical: 8,
       padding: 16,
-      borderRadius: 12,
     },
+    channelMessage: {
+      borderBottomColor: colors.border,
+      borderBottomWidth: 1,
+      paddingVertical: 8,
+    },
+    channelMessageContent: { color: colors.text, fontSize: 14 },
+    channelMessageTime: { color: colors.textSecondary, fontSize: 12, marginTop: 4 },
+    channelMessages: {
+      borderTopColor: colors.border,
+      borderTopWidth: 1,
+      marginTop: 12,
+      paddingTop: 12,
+    },
+    channelName: { color: colors.text, fontSize: 16, fontWeight: '600' },
+    channelNameRow: { alignItems: 'center', flexDirection: 'row' },
+    channelSubscribers: { color: colors.textSecondary, fontSize: 13, marginTop: 2 },
+    container: { backgroundColor: colors.background, flex: 1 },
+    feedChannel: { color: colors.primary, fontSize: 14, fontWeight: '600' },
+    feedContent: { color: colors.text, fontSize: 14, lineHeight: 20 },
     feedHeader: {
       flexDirection: 'row',
       justifyContent: 'space-between',
       marginBottom: 8,
     },
-    feedChannel: { fontSize: 14, fontWeight: '600', color: colors.primary },
-    feedTime: { fontSize: 12, color: colors.textSecondary },
-    feedTitle: { fontSize: 16, fontWeight: '600', color: colors.text, marginBottom: 4 },
-    feedContent: { fontSize: 14, color: colors.text, lineHeight: 20 },
-    feedImage: { width: '100%', height: 180, borderRadius: 8, marginTop: 12 },
-    channelItem: {
+    feedImage: { borderRadius: 8, height: 180, marginTop: 12, width: '100%' },
+    feedItem: {
       backgroundColor: colors.surface,
+      borderRadius: 12,
       marginHorizontal: 16,
       marginVertical: 8,
       padding: 16,
-      borderRadius: 12,
     },
-    channelHeader: { flexDirection: 'row', alignItems: 'center' },
-    channelInfo: { flex: 1, marginLeft: 12 },
-    channelNameRow: { flexDirection: 'row', alignItems: 'center' },
-    channelName: { fontSize: 16, fontWeight: '600', color: colors.text },
-    verifiedIcon: { marginLeft: 4 },
-    channelSubscribers: { fontSize: 13, color: colors.textSecondary, marginTop: 2 },
-    channelDescription: { fontSize: 13, color: colors.textSecondary, marginTop: 8, lineHeight: 18 },
+    feedTime: { color: colors.textSecondary, fontSize: 12 },
+    feedTitle: { color: colors.text, fontSize: 16, fontWeight: '600', marginBottom: 4 },
+    header: { paddingHorizontal: 16, paddingVertical: 12 },
+    headerTitle: { color: colors.text, fontSize: 28, fontWeight: 'bold' },
+    listContent: { paddingVertical: 8 },
+    loadingContainer: { alignItems: 'center', flex: 1, justifyContent: 'center' },
+    noMessages: {
+      color: colors.textSecondary,
+      fontSize: 14,
+      fontStyle: 'italic',
+      paddingVertical: 16,
+      textAlign: 'center',
+    },
     subscribeButton: {
+      backgroundColor: colors.primary,
+      borderRadius: 20,
       paddingHorizontal: 16,
       paddingVertical: 8,
-      borderRadius: 20,
-      backgroundColor: colors.primary,
     },
-    subscribedButton: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
-    subscribeText: { fontSize: 14, fontWeight: '600', color: colors.white },
+    subscribeText: { color: colors.white, fontSize: 14, fontWeight: '600' },
+    subscribedButton: {
+      backgroundColor: colors.surface,
+      borderColor: colors.border,
+      borderWidth: 1,
+    },
     subscribedText: { color: colors.text },
-    channelMessages: { marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: colors.border },
-    channelMessage: {
-      paddingVertical: 8,
-      borderBottomWidth: 1,
-      borderBottomColor: colors.border,
+    tab: {
+      alignItems: 'center',
+      flex: 1,
+      paddingVertical: 12,
     },
-    channelMessageContent: { fontSize: 14, color: colors.text },
-    channelMessageTime: { fontSize: 12, color: colors.textSecondary, marginTop: 4 },
-    noMessages: { fontSize: 14, color: colors.textSecondary, fontStyle: 'italic', textAlign: 'center', paddingVertical: 16 },
+    tabText: { color: colors.textSecondary, fontSize: 16 },
+    tabs: {
+      borderBottomColor: colors.border,
+      borderBottomWidth: 1,
+      flexDirection: 'row',
+    },
+    verifiedIcon: { marginLeft: 4 },
   });
 
 export default BroadcastsScreen;

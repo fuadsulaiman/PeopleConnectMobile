@@ -229,7 +229,11 @@ class LocationService {
       if (data && data.address) {
         const result: GeocodingResult = {
           address: this.formatAddress(data.address),
-          city: data.address.city || data.address.town || data.address.village || data.address.municipality,
+          city:
+            data.address.city ||
+            data.address.town ||
+            data.address.village ||
+            data.address.municipality,
           country: data.address.country,
           formattedAddress: data.display_name || this.formatAddress(data.address),
         };
@@ -253,9 +257,15 @@ class LocationService {
   private formatAddress(address: any): string {
     const parts: string[] = [];
 
-    if (address.house_number) parts.push(address.house_number);
-    if (address.road || address.street) parts.push(address.road || address.street);
-    if (address.suburb || address.neighbourhood) parts.push(address.suburb || address.neighbourhood);
+    if (address.house_number) {
+      parts.push(address.house_number);
+    }
+    if (address.road || address.street) {
+      parts.push(address.road || address.street);
+    }
+    if (address.suburb || address.neighbourhood) {
+      parts.push(address.suburb || address.neighbourhood);
+    }
     if (address.city || address.town || address.village) {
       parts.push(address.city || address.town || address.village);
     }
@@ -273,7 +283,9 @@ class LocationService {
       latitude: coordinates.latitude,
       longitude: coordinates.longitude,
       address: geocodeResult?.address,
-      name: geocodeResult?.formattedAddress || `${coordinates.latitude.toFixed(6)}, ${coordinates.longitude.toFixed(6)}`,
+      name:
+        geocodeResult?.formattedAddress ||
+        `${coordinates.latitude.toFixed(6)}, ${coordinates.longitude.toFixed(6)}`,
       city: geocodeResult?.city,
       country: geocodeResult?.country,
     };
@@ -343,11 +355,15 @@ class LocationService {
    * Generate static map image URL
    * Uses OpenStreetMap static map service
    */
-  getStaticMapUrl(latitude: number, longitude: number, options?: {
-    width?: number;
-    height?: number;
-    zoom?: number;
-  }): string {
+  getStaticMapUrl(
+    latitude: number,
+    longitude: number,
+    options?: {
+      width?: number;
+      height?: number;
+      zoom?: number;
+    }
+  ): string {
     const { width = 300, height = 200, zoom = 15 } = options || {};
 
     // Use OpenStreetMap static map tile

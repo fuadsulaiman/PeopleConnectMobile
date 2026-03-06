@@ -8,10 +8,16 @@ import {
   MediaStreamTrack,
   RTCSessionDescriptionType,
   RTCIceCandidateType,
-} from 'react-native-webrtc';
+} from '@livekit/react-native-webrtc';
 import { signalRService } from './signalr';
-import { calls } from './sdk';
 import InCallManager from 'react-native-incall-manager';
+
+// CRITICAL: Do NOT import SDK at top level - it causes module initialization failures on Windows
+// Use lazy loading pattern instead
+const getCallsService = () => {
+  const sdk = require('./sdk');
+  return sdk.calls;
+};
 
 export interface IceServer {
   urls: string | string[];
@@ -72,6 +78,7 @@ class WebRTCService {
   // Fetch ICE servers from backend
   async fetchIceServers(): Promise<void> {
     try {
+      const calls = getCallsService();
       const response = await calls.getIceServers();
       if (response && Array.isArray(response)) {
         this.iceServers = response.length > 0 ? response : DEFAULT_ICE_SERVERS;
@@ -117,7 +124,7 @@ class WebRTCService {
     this.pendingIceCandidates = [];
 
     // Clean up SignalR handlers
-    this.callEventUnsubscribers.forEach(unsub => unsub());
+    this.callEventUnsubscribers.forEach((unsub) => unsub());
     this.callEventUnsubscribers = [];
 
     // Reset state
@@ -167,8 +174,13 @@ class WebRTCService {
     try {
       console.log('[WebRTC] Requesting media devices...');
       this.localStream = await this.getMediaStream(type);
-      console.log('[WebRTC] Got local stream with tracks:',
-        this.localStream.getTracks().map((t: MediaStreamTrack) => t.kind).join(', '));
+      console.log(
+        '[WebRTC] Got local stream with tracks:',
+        this.localStream
+          .getTracks()
+          .map((t: MediaStreamTrack) => t.kind)
+          .join(', ')
+      );
 
       this.callState.localStream = this.localStream;
       this.callbacks.onLocalStream?.(this.localStream);
@@ -210,23 +222,26 @@ class WebRTCService {
   private async getMediaStream(type: 'voice' | 'video'): Promise<MediaStream> {
     const constraints = {
       audio: true,
-      video: type === 'video' ? {
-        width: { ideal: 1280 },
-        height: { ideal: 720 },
-        facingMode: this.isFrontCamera ? 'user' : 'environment',
-        frameRate: { ideal: 30 },
-      } : false,
+      video:
+        type === 'video'
+          ? {
+              width: { ideal: 1280 },
+              height: { ideal: 720 },
+              facingMode: this.isFrontCamera ? 'user' : 'environment',
+              frameRate: { ideal: 30 },
+            }
+          : false,
     };
 
     try {
       const stream = await mediaDevices.getUserMedia(constraints);
-      return stream as MediaStream;
+      return stream;
     } catch (error) {
       // If video fails, try audio only for video calls
       if (type === 'video' && error instanceof Error && error.name !== 'NotAllowedError') {
         console.warn('[WebRTC] Video failed, trying audio only:', error);
         const audioOnlyStream = await mediaDevices.getUserMedia({ audio: true, video: false });
-        return audioOnlyStream as MediaStream;
+        return audioOnlyStream;
       }
       throw error;
     }
@@ -255,7 +270,8 @@ class WebRTCService {
               sdpMid: event.candidate.sdpMid,
             };
             console.log('[WebRTC] Sending ICE candidate via SignalR...');
-            signalRService.sendIceCandidate(this.callState.callId, candidateJson)
+            signalRService
+              .sendIceCandidate(this.callState.callId, candidateJson)
               .then(() => console.log('[WebRTC] ICE candidate sent'))
               .catch((err) => console.error('[WebRTC] Failed to send ICE candidate:', err));
           }
@@ -301,7 +317,12 @@ class WebRTCService {
     // Handle remote tracks
     this.peerConnection.ontrack = (event: any) => {
       console.log('[WebRTC] Remote track received:', event.track.kind);
-      console.log('[WebRTC] Track state - enabled:', event.track.enabled, 'readyState:', event.track.readyState);
+      console.log(
+        '[WebRTC] Track state - enabled:',
+        event.track.enabled,
+        'readyState:',
+        event.track.readyState
+      );
 
       // Track unmute event
       const track = event.track;
@@ -322,7 +343,9 @@ class WebRTCService {
         if (!this.remoteStream) {
           this.remoteStream = new MediaStream();
         }
-        const existingTrack = this.remoteStream.getTracks().find((t: MediaStreamTrack) => t.id === event.track.id);
+        const existingTrack = this.remoteStream
+          .getTracks()
+          .find((t: MediaStreamTrack) => t.id === event.track.id);
         if (!existingTrack) {
           this.remoteStream.addTrack(event.track);
         }
@@ -345,7 +368,7 @@ class WebRTCService {
 
   private setupSignalRHandlers(): void {
     // Clean up any existing handlers
-    this.callEventUnsubscribers.forEach(unsub => unsub());
+    this.callEventUnsubscribers.forEach((unsub) => unsub());
     this.callEventUnsubscribers = [];
 
     // Handle call accepted - initiator should send offer now
@@ -409,7 +432,9 @@ class WebRTCService {
   }
 
   private async createAndSendOffer(): Promise<void> {
-    if (!this.peerConnection || !this.callState) return;
+    if (!this.peerConnection || !this.callState) {
+      return;
+    }
 
     try {
       console.log('[WebRTC] Creating SDP offer...');
@@ -421,7 +446,7 @@ class WebRTCService {
       const offer = await this.peerConnection.createOffer(offerOptions);
       console.log('[WebRTC] SDP offer created, setting local description...');
 
-      await this.peerConnection.setLocalDescription(offer as RTCSessionDescription);
+      await this.peerConnection.setLocalDescription(offer);
       console.log('[WebRTC] Local description set');
 
       console.log('[WebRTC] Sending SDP offer via SignalR...');
@@ -440,7 +465,9 @@ class WebRTCService {
   }
 
   private async handleRemoteOffer(sdp: RTCSessionDescriptionType): Promise<void> {
-    if (!this.peerConnection) return;
+    if (!this.peerConnection) {
+      return;
+    }
 
     const signalingState = (this.peerConnection as any)?.signalingState;
     console.log('[WebRTC] Handling remote offer, current signaling state:', signalingState);
@@ -456,7 +483,11 @@ class WebRTCService {
       console.log('[WebRTC] Remote description set');
 
       // Process any pending ICE candidates
-      console.log('[WebRTC] Processing', this.pendingIceCandidates.length, 'pending ICE candidates');
+      console.log(
+        '[WebRTC] Processing',
+        this.pendingIceCandidates.length,
+        'pending ICE candidates'
+      );
       for (const candidate of this.pendingIceCandidates) {
         await this.peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
         console.log('[WebRTC] Added pending ICE candidate');
@@ -468,7 +499,7 @@ class WebRTCService {
       const answer = await this.peerConnection.createAnswer();
 
       console.log('[WebRTC] Setting local description (answer)...');
-      await this.peerConnection.setLocalDescription(answer as RTCSessionDescription);
+      await this.peerConnection.setLocalDescription(answer);
       console.log('[WebRTC] Local description set');
 
       if (this.callState) {
@@ -487,7 +518,9 @@ class WebRTCService {
   }
 
   private async handleRemoteAnswer(sdp: RTCSessionDescriptionType): Promise<void> {
-    if (!this.peerConnection) return;
+    if (!this.peerConnection) {
+      return;
+    }
 
     const signalingState = (this.peerConnection as any)?.signalingState;
     console.log('[WebRTC] Handling remote answer, current signaling state:', signalingState);
@@ -503,7 +536,11 @@ class WebRTCService {
       console.log('[WebRTC] Remote description set');
 
       // Process any pending ICE candidates
-      console.log('[WebRTC] Processing', this.pendingIceCandidates.length, 'pending ICE candidates');
+      console.log(
+        '[WebRTC] Processing',
+        this.pendingIceCandidates.length,
+        'pending ICE candidates'
+      );
       for (const candidate of this.pendingIceCandidates) {
         await this.peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
         console.log('[WebRTC] Added pending ICE candidate');
@@ -517,7 +554,9 @@ class WebRTCService {
   }
 
   private async handleRemoteIceCandidate(candidate: RTCIceCandidateType): Promise<void> {
-    if (!this.peerConnection) return;
+    if (!this.peerConnection) {
+      return;
+    }
 
     try {
       const remoteDesc = (this.peerConnection as any)?.remoteDescription;
@@ -542,7 +581,9 @@ class WebRTCService {
   }
 
   toggleMute(): boolean {
-    if (!this.localStream) return this.isMuted;
+    if (!this.localStream) {
+      return this.isMuted;
+    }
 
     const audioTracks = this.localStream.getAudioTracks();
     if (audioTracks.length > 0) {
@@ -556,7 +597,9 @@ class WebRTCService {
   }
 
   toggleVideo(): boolean {
-    if (!this.localStream) return !this.isVideoEnabled;
+    if (!this.localStream) {
+      return !this.isVideoEnabled;
+    }
 
     const videoTracks = this.localStream.getVideoTracks();
     if (videoTracks.length > 0) {
@@ -577,10 +620,14 @@ class WebRTCService {
   }
 
   async switchCamera(): Promise<void> {
-    if (!this.localStream) return;
+    if (!this.localStream) {
+      return;
+    }
 
     const videoTracks = this.localStream.getVideoTracks();
-    if (videoTracks.length === 0) return;
+    if (videoTracks.length === 0) {
+      return;
+    }
 
     try {
       this.isFrontCamera = !this.isFrontCamera;
@@ -596,7 +643,7 @@ class WebRTCService {
           width: { ideal: 1280 },
           height: { ideal: 720 },
         },
-      }) as MediaStream;
+      });
 
       const newVideoTrack = newStream.getVideoTracks()[0];
       if (newVideoTrack) {
@@ -605,11 +652,11 @@ class WebRTCService {
         this.localStream.addTrack(newVideoTrack);
 
         // Replace track in peer connection
-        const sender = this.peerConnection?.getSenders().find(
-          (s: any) => s.track?.kind === 'video'
-        );
+        const sender = this.peerConnection
+          ?.getSenders()
+          .find((s: any) => s.track?.kind === 'video');
         if (sender) {
-          await (sender as any).replaceTrack(newVideoTrack);
+          await sender.replaceTrack(newVideoTrack);
         }
 
         // Notify callback
@@ -627,9 +674,9 @@ class WebRTCService {
 
     if (this.callState && !reason) {
       // Notify other party via SignalR
-      signalRService.endCall(this.callState.callId).catch(err =>
-        console.error('[WebRTC] Failed to send end call signal:', err)
-      );
+      signalRService
+        .endCall(this.callState.callId)
+        .catch((err) => console.error('[WebRTC] Failed to send end call signal:', err));
     }
 
     this.updateCallState({ status: 'ended' });
@@ -644,7 +691,9 @@ class WebRTCService {
   }
 
   getCallDuration(): number {
-    if (!this.callState?.startTime) return 0;
+    if (!this.callState?.startTime) {
+      return 0;
+    }
     return Math.floor((Date.now() - this.callState.startTime.getTime()) / 1000);
   }
 

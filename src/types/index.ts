@@ -78,8 +78,33 @@ export interface Conversation {
 }
 
 // Message types
-export type MessageType = string | 'text' | 'image' | 'video' | 'audio' | 'file' | 'system' | 'Text' | 'Image' | 'Video' | 'Audio' | 'File' | 'System' | 'Location' | 'VoiceCall' | 'VideoCall';
-export type MessageStatus = 'sending' | 'sent' | 'delivered' | 'read' | 'failed' | 'Sent' | 'Delivered' | 'Read' | 'Deleted' | 'Flagged';
+export type MessageType =
+  | 'text'
+  | 'image'
+  | 'video'
+  | 'audio'
+  | 'file'
+  | 'system'
+  | 'Text'
+  | 'Image'
+  | 'Video'
+  | 'Audio'
+  | 'File'
+  | 'System'
+  | 'Location'
+  | 'VoiceCall'
+  | 'VideoCall';
+export type MessageStatus =
+  | 'sending'
+  | 'sent'
+  | 'delivered'
+  | 'read'
+  | 'failed'
+  | 'Sent'
+  | 'Delivered'
+  | 'Read'
+  | 'Deleted'
+  | 'Flagged';
 
 export interface Message {
   id: string;
@@ -139,7 +164,14 @@ export interface ContactRequest {
 
 // Call types
 export type CallType = 'voice' | 'video';
-export type CallStatus = 'ringing' | 'connected' | 'ended' | 'missed' | 'rejected' | 'failed' | 'completed';
+export type CallStatus =
+  | 'ringing'
+  | 'connected'
+  | 'ended'
+  | 'missed'
+  | 'rejected'
+  | 'failed'
+  | 'completed';
 
 export interface Call {
   id: string;
@@ -150,7 +182,7 @@ export interface Call {
   caller?: User;
   callee?: User;
   type: CallType;
-  status: CallStatus | string;
+  status: CallStatus;
   direction?: 'incoming' | 'outgoing';
   startedAt: string;
   endedAt?: string;

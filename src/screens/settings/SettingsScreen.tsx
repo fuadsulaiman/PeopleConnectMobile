@@ -1,13 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  Switch,
-  Alert,
-} from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -105,7 +97,8 @@ const SettingsScreen: React.FC<Props> = ({ navigation }) => {
           title: 'Blocked Users',
           type: 'navigation',
           iconColor: colors.error,
-          onPress: () => Alert.alert('Coming Soon', 'Blocked users management will be available soon.'),
+          onPress: () =>
+            Alert.alert('Coming Soon', 'Blocked users management will be available soon.'),
         },
       ],
     },
@@ -137,7 +130,8 @@ const SettingsScreen: React.FC<Props> = ({ navigation }) => {
           title: 'Auto-Download Media',
           type: 'navigation',
           iconColor: colors.success,
-          onPress: () => Alert.alert('Coming Soon', 'Auto-download settings will be available soon.'),
+          onPress: () =>
+            Alert.alert('Coming Soon', 'Auto-download settings will be available soon.'),
         },
         {
           icon: 'trash-outline',
@@ -202,10 +196,17 @@ const SettingsScreen: React.FC<Props> = ({ navigation }) => {
         disabled={item.type === 'toggle'}
         activeOpacity={item.type === 'toggle' ? 1 : 0.7}
       >
-        <View style={[styles.iconContainer, { backgroundColor: `${item.iconColor || colors.primary}15` }]}>
+        <View
+          style={[
+            styles.iconContainer,
+            { backgroundColor: `${item.iconColor || colors.primary}15` },
+          ]}
+        >
           <Icon name={item.icon} size={20} color={item.iconColor || colors.primary} />
         </View>
-        <Text style={[styles.settingTitle, item.title === 'Delete Account' && { color: colors.error }]}>
+        <Text
+          style={[styles.settingTitle, item.title === 'Delete Account' && { color: colors.error }]}
+        >
           {item.title}
         </Text>
         {item.type === 'toggle' && (
@@ -237,9 +238,7 @@ const SettingsScreen: React.FC<Props> = ({ navigation }) => {
         {sections.map((section) => (
           <View key={section.title} style={styles.section}>
             <Text style={styles.sectionTitle}>{section.title}</Text>
-            <View style={styles.sectionContent}>
-              {section.items.map(renderSettingItem)}
-            </View>
+            <View style={styles.sectionContent}>{section.items.map(renderSettingItem)}</View>
           </View>
         ))}
 
@@ -254,85 +253,85 @@ const SettingsScreen: React.FC<Props> = ({ navigation }) => {
 
 const createStyles = (colors: ReturnType<typeof import('../../hooks').useTheme>['colors']) =>
   StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: colors.background,
-    },
-    header: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      paddingHorizontal: 16,
-      paddingVertical: 12,
-      backgroundColor: colors.surface,
-      borderBottomWidth: 1,
-      borderBottomColor: colors.border,
-    },
     backButton: {
       padding: 8,
     },
-    headerTitle: {
-      fontSize: 18,
-      fontWeight: '600',
-      color: colors.text,
-    },
-    placeholder: {
-      width: 40,
+    container: {
+      backgroundColor: colors.background,
+      flex: 1,
     },
     content: {
       flex: 1,
-    },
-    section: {
-      marginTop: 24,
-    },
-    sectionTitle: {
-      fontSize: 13,
-      fontWeight: '600',
-      color: colors.textSecondary,
-      textTransform: 'uppercase',
-      paddingHorizontal: 16,
-      marginBottom: 8,
-      letterSpacing: 0.5,
-    },
-    sectionContent: {
-      backgroundColor: colors.surface,
-      borderTopWidth: 1,
-      borderBottomWidth: 1,
-      borderColor: colors.border,
-    },
-    settingItem: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingHorizontal: 16,
-      paddingVertical: 14,
-      borderBottomWidth: 1,
-      borderBottomColor: colors.border,
-    },
-    iconContainer: {
-      width: 36,
-      height: 36,
-      borderRadius: 8,
-      justifyContent: 'center',
-      alignItems: 'center',
-      marginRight: 12,
-    },
-    settingTitle: {
-      flex: 1,
-      fontSize: 16,
-      color: colors.text,
     },
     footer: {
       alignItems: 'center',
       paddingVertical: 32,
     },
     footerText: {
-      fontSize: 14,
       color: colors.textSecondary,
+      fontSize: 14,
       marginBottom: 4,
     },
-    versionText: {
-      fontSize: 12,
+    header: {
+      alignItems: 'center',
+      backgroundColor: colors.surface,
+      borderBottomColor: colors.border,
+      borderBottomWidth: 1,
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+    },
+    headerTitle: {
+      color: colors.text,
+      fontSize: 18,
+      fontWeight: '600',
+    },
+    iconContainer: {
+      alignItems: 'center',
+      borderRadius: 8,
+      height: 36,
+      justifyContent: 'center',
+      marginRight: 12,
+      width: 36,
+    },
+    placeholder: {
+      width: 40,
+    },
+    section: {
+      marginTop: 24,
+    },
+    sectionContent: {
+      backgroundColor: colors.surface,
+      borderBottomWidth: 1,
+      borderColor: colors.border,
+      borderTopWidth: 1,
+    },
+    sectionTitle: {
       color: colors.textSecondary,
+      fontSize: 13,
+      fontWeight: '600',
+      letterSpacing: 0.5,
+      marginBottom: 8,
+      paddingHorizontal: 16,
+      textTransform: 'uppercase',
+    },
+    settingItem: {
+      alignItems: 'center',
+      borderBottomColor: colors.border,
+      borderBottomWidth: 1,
+      flexDirection: 'row',
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+    },
+    settingTitle: {
+      color: colors.text,
+      flex: 1,
+      fontSize: 16,
+    },
+    versionText: {
+      color: colors.textSecondary,
+      fontSize: 12,
       opacity: 0.7,
     },
   });

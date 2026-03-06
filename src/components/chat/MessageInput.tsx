@@ -1,5 +1,13 @@
 import React from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Animated, ActivityIndicator } from 'react-native';
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  Animated,
+  ActivityIndicator,
+} from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useTheme } from '../../hooks';
 import { Message } from '../../types';
@@ -48,20 +56,37 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   const { colors } = useTheme();
   const recordingAnimValue = React.useRef(new Animated.Value(1)).current;
 
-  if (isBroadcast) return null;
+  if (isBroadcast) {
+    return null;
+  }
 
   if (isRecording) {
     return (
-      <View style={[styles.recordingContainer, { backgroundColor: colors.background, borderTopColor: colors.border }]}>
+      <View
+        style={[
+          styles.recordingContainer,
+          { backgroundColor: colors.background, borderTopColor: colors.border },
+        ]}
+      >
         <TouchableOpacity style={styles.cancelRecordButton} onPress={onCancelRecording}>
           <Icon name="trash-outline" size={24} color={colors.error} />
         </TouchableOpacity>
         <View style={styles.recordingInfo}>
-          <Animated.View style={[styles.recordingDot, { backgroundColor: colors.error, opacity: recordingAnimValue }]} />
-          <Text style={[styles.recordingDuration, { color: colors.text }]}>{formatRecordingDuration(recordingDuration)}</Text>
+          <Animated.View
+            style={[
+              styles.recordingDot,
+              { backgroundColor: colors.error, opacity: recordingAnimValue },
+            ]}
+          />
+          <Text style={[styles.recordingDuration, { color: colors.text }]}>
+            {formatRecordingDuration(recordingDuration)}
+          </Text>
           <Text style={[styles.recordingText, { color: colors.textSecondary }]}>Recording...</Text>
         </View>
-        <TouchableOpacity style={[styles.sendRecordButton, { backgroundColor: colors.primary }]} onPress={onStopRecording}>
+        <TouchableOpacity
+          style={[styles.sendRecordButton, { backgroundColor: colors.primary }]}
+          onPress={onStopRecording}
+        >
           <Icon name="send" size={24} color={colors.white} />
         </TouchableOpacity>
       </View>
@@ -72,7 +97,11 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     <>
       {replyToMessage && <ReplyPreview message={replyToMessage} onClear={onClearReply} />}
       <View style={[styles.inputContainer, { borderTopColor: colors.border }]}>
-        <TouchableOpacity style={styles.attachButton} onPress={onAttachPress} disabled={uploadingMedia || sending}>
+        <TouchableOpacity
+          style={styles.attachButton}
+          onPress={onAttachPress}
+          disabled={uploadingMedia || sending}
+        >
           {uploadingMedia ? (
             <ActivityIndicator size="small" color={colors.primary} />
           ) : (
@@ -95,21 +124,42 @@ export const MessageInput: React.FC<MessageInputProps> = ({
         {inputText.trim() ? (
           <View style={styles.sendContainer}>
             <TouchableOpacity
-              style={[styles.viewOnceToggle, isViewOnce ? { backgroundColor: colors.primary } : { backgroundColor: 'transparent' }]}
+              style={[
+                styles.viewOnceToggle,
+                isViewOnce
+                  ? { backgroundColor: colors.primary }
+                  : { backgroundColor: 'transparent' },
+              ]}
               onPress={onToggleViewOnce}
             >
-              <Icon name={isViewOnce ? "eye-off" : "eye-outline"} size={20} color={isViewOnce ? colors.white : colors.textSecondary} />
+              <Icon
+                name={isViewOnce ? 'eye-off' : 'eye-outline'}
+                size={20}
+                color={isViewOnce ? colors.white : colors.textSecondary}
+              />
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.sendButton, { backgroundColor: colors.primary }, (sending || uploadingMedia) && styles.sendButtonDisabled]}
+              style={[
+                styles.sendButton,
+                { backgroundColor: colors.primary },
+                (sending || uploadingMedia) && styles.sendButtonDisabled,
+              ]}
               onPress={onSend}
               disabled={sending || uploadingMedia}
             >
-              {sending ? <ActivityIndicator size="small" color={colors.white} /> : <Icon name="send" size={20} color={colors.white} />}
+              {sending ? (
+                <ActivityIndicator size="small" color={colors.white} />
+              ) : (
+                <Icon name="send" size={20} color={colors.white} />
+              )}
             </TouchableOpacity>
           </View>
         ) : (
-          <TouchableOpacity style={styles.micButton} onPress={onMicPress} disabled={uploadingMedia || sending}>
+          <TouchableOpacity
+            style={styles.micButton}
+            onPress={onMicPress}
+            disabled={uploadingMedia || sending}
+          >
             <Icon name="mic" size={24} color={colors.primary} />
           </TouchableOpacity>
         )}
@@ -119,23 +169,75 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 };
 
 const styles = StyleSheet.create({
-  inputContainer: { flexDirection: 'row', alignItems: 'flex-end', padding: 8, paddingBottom: 24, borderTopWidth: 1 },
   attachButton: { padding: 8 },
-  inputWrapper: { flex: 1, flexDirection: 'row', alignItems: 'center', borderRadius: 24, paddingHorizontal: 12, marginHorizontal: 8, minHeight: 44, maxHeight: 120 },
-  input: { flex: 1, fontSize: 16, paddingVertical: 10 },
+  cancelRecordButton: {
+    alignItems: 'center',
+    borderRadius: 22,
+    height: 44,
+    justifyContent: 'center',
+    width: 44,
+  },
   emojiButton: { padding: 4 },
-  micButton: { width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center' },
-  sendContainer: { flexDirection: 'row', alignItems: 'center' },
-  viewOnceToggle: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center', marginRight: 4 },
-  sendButton: { width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center' },
-  sendButtonDisabled: { opacity: 0.5 },
-  recordingContainer: { flexDirection: 'row', alignItems: 'center', padding: 12, paddingBottom: 28, borderTopWidth: 1 },
-  cancelRecordButton: { width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center' },
-  recordingInfo: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
-  recordingDot: { width: 12, height: 12, borderRadius: 6, marginRight: 8 },
+  input: { flex: 1, fontSize: 16, paddingVertical: 10 },
+  inputContainer: {
+    alignItems: 'flex-end',
+    borderTopWidth: 1,
+    flexDirection: 'row',
+    padding: 8,
+    paddingBottom: 24,
+  },
+  inputWrapper: {
+    alignItems: 'center',
+    borderRadius: 24,
+    flex: 1,
+    flexDirection: 'row',
+    marginHorizontal: 8,
+    maxHeight: 120,
+    minHeight: 44,
+    paddingHorizontal: 12,
+  },
+  micButton: {
+    alignItems: 'center',
+    borderRadius: 22,
+    height: 44,
+    justifyContent: 'center',
+    width: 44,
+  },
+  recordingContainer: {
+    alignItems: 'center',
+    borderTopWidth: 1,
+    flexDirection: 'row',
+    padding: 12,
+    paddingBottom: 28,
+  },
+  recordingDot: { borderRadius: 6, height: 12, marginRight: 8, width: 12 },
   recordingDuration: { fontSize: 18, fontWeight: '600', marginRight: 8 },
+  recordingInfo: { alignItems: 'center', flex: 1, flexDirection: 'row', justifyContent: 'center' },
   recordingText: { fontSize: 14 },
-  sendRecordButton: { width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center' },
+  sendButton: {
+    alignItems: 'center',
+    borderRadius: 22,
+    height: 44,
+    justifyContent: 'center',
+    width: 44,
+  },
+  sendButtonDisabled: { opacity: 0.5 },
+  sendContainer: { alignItems: 'center', flexDirection: 'row' },
+  sendRecordButton: {
+    alignItems: 'center',
+    borderRadius: 22,
+    height: 44,
+    justifyContent: 'center',
+    width: 44,
+  },
+  viewOnceToggle: {
+    alignItems: 'center',
+    borderRadius: 20,
+    height: 40,
+    justifyContent: 'center',
+    marginRight: 4,
+    width: 40,
+  },
 });
 
 export default MessageInput;

@@ -27,7 +27,9 @@ export const usePresenceStore = create<PresenceState>((set, get) => ({
   setUserOnline: (userId: string) => {
     set((state) => {
       // Skip if already online
-      if (state.onlineUsers[userId]) return state;
+      if (state.onlineUsers[userId]) {
+        return state;
+      }
 
       console.log(`[PresenceStore] User ${userId} is now ONLINE`);
       return {
@@ -40,7 +42,9 @@ export const usePresenceStore = create<PresenceState>((set, get) => ({
   setUserOffline: (userId: string) => {
     set((state) => {
       // Skip if not in the list
-      if (!state.onlineUsers[userId]) return state;
+      if (!state.onlineUsers[userId]) {
+        return state;
+      }
 
       console.log(`[PresenceStore] User ${userId} is now OFFLINE`);
       const { [userId]: _, ...rest } = state.onlineUsers;
@@ -54,7 +58,7 @@ export const usePresenceStore = create<PresenceState>((set, get) => ({
   setMultipleUsersOnline: (userIds: string[]) => {
     set((state) => {
       const newOnlineUsers: Record<string, boolean> = {};
-      userIds.forEach(userId => {
+      userIds.forEach((userId) => {
         if (userId) {
           newOnlineUsers[userId] = true;
         }

@@ -10,7 +10,7 @@ import {
   Alert,
   StatusBar,
 } from 'react-native';
-import { RTCView, MediaStream } from 'react-native-webrtc';
+import { RTCView, MediaStream } from '@livekit/react-native-webrtc';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useNavigation } from '@react-navigation/native';
 import { colors } from '../../constants/colors';
@@ -49,8 +49,14 @@ const CallScreen: React.FC<CallScreenProps> = ({ route }) => {
   const isConnected = callState?.status === 'connected';
 
   // Get display user info
-  const displayName = user?.name || user?.displayName || call?.participants?.[0]?.user?.name || callState?.remoteUserName || 'Unknown';
-  const displayAvatar = user?.avatarUrl || call?.participants?.[0]?.user?.avatarUrl || callState?.remoteUserAvatar;
+  const displayName =
+    user?.name ||
+    user?.displayName ||
+    call?.participants?.[0]?.user?.name ||
+    callState?.remoteUserName ||
+    'Unknown';
+  const displayAvatar =
+    user?.avatarUrl || call?.participants?.[0]?.user?.avatarUrl || callState?.remoteUserAvatar;
 
   // Setup WebRTC callbacks
   useEffect(() => {
@@ -138,23 +144,28 @@ const CallScreen: React.FC<CallScreenProps> = ({ route }) => {
     };
   }, []);
 
-  const handleCallEnded = useCallback((_reason?: string) => {
-    if (durationIntervalRef.current) {
-      clearInterval(durationIntervalRef.current);
-    }
+  const handleCallEnded = useCallback(
+    (_reason?: string) => {
+      if (durationIntervalRef.current) {
+        clearInterval(durationIntervalRef.current);
+      }
 
-    // Navigate back after a short delay
-    setTimeout(() => {
-      navigation.goBack();
-    }, 500);
-  }, [navigation]);
+      // Navigate back after a short delay
+      setTimeout(() => {
+        navigation.goBack();
+      }, 500);
+    },
+    [navigation]
+  );
 
   const handleEndCall = useCallback(() => {
     webRTCService.endCall();
   }, []);
 
   const handleAcceptCall = useCallback(async () => {
-    if (!call?.id) return;
+    if (!call?.id) {
+      return;
+    }
 
     try {
       await signalRService.answerCall(call.id);
@@ -165,7 +176,9 @@ const CallScreen: React.FC<CallScreenProps> = ({ route }) => {
   }, [call?.id]);
 
   const handleRejectCall = useCallback(async () => {
-    if (!call?.id) return;
+    if (!call?.id) {
+      return;
+    }
 
     try {
       await signalRService.rejectCall(call.id);
@@ -202,10 +215,18 @@ const CallScreen: React.FC<CallScreenProps> = ({ route }) => {
   };
 
   const getStatusText = () => {
-    if (error) return error;
-    if (isConnected) return formatDuration(callDuration);
-    if (callState?.status === 'ringing') return isIncoming ? 'Incoming call...' : 'Ringing...';
-    if (isConnecting) return 'Connecting...';
+    if (error) {
+      return error;
+    }
+    if (isConnected) {
+      return formatDuration(callDuration);
+    }
+    if (callState?.status === 'ringing') {
+      return isIncoming ? 'Incoming call...' : 'Ringing...';
+    }
+    if (isConnecting) {
+      return 'Connecting...';
+    }
     return 'Call ended';
   };
 
@@ -315,7 +336,11 @@ const CallScreen: React.FC<CallScreenProps> = ({ route }) => {
               style={[styles.controlButton, !isVideoEnabled && styles.controlButtonActive]}
               onPress={handleToggleVideo}
             >
-              <Icon name={isVideoEnabled ? 'videocam' : 'videocam-off'} size={28} color={colors.white} />
+              <Icon
+                name={isVideoEnabled ? 'videocam' : 'videocam-off'}
+                size={28}
+                color={colors.white}
+              />
               <Text style={styles.controlLabel}>{isVideoEnabled ? 'Stop' : 'Start'}</Text>
             </TouchableOpacity>
           )}
@@ -333,16 +358,17 @@ const CallScreen: React.FC<CallScreenProps> = ({ route }) => {
             style={[styles.controlButton, isSpeakerOn && styles.controlButtonActive]}
             onPress={handleToggleSpeaker}
           >
-            <Icon name={isSpeakerOn ? 'volume-high' : 'volume-medium'} size={28} color={colors.white} />
+            <Icon
+              name={isSpeakerOn ? 'volume-high' : 'volume-medium'}
+              size={28}
+              color={colors.white}
+            />
             <Text style={styles.controlLabel}>Speaker</Text>
           </TouchableOpacity>
 
           {/* Switch Camera (only for video calls) */}
           {isVideo && (
-            <TouchableOpacity
-              style={styles.controlButton}
-              onPress={handleSwitchCamera}
-            >
+            <TouchableOpacity style={styles.controlButton} onPress={handleSwitchCamera}>
               <Icon name="camera-reverse" size={28} color={colors.white} />
               <Text style={styles.controlLabel}>Flip</Text>
             </TouchableOpacity>
@@ -354,83 +380,99 @@ const CallScreen: React.FC<CallScreenProps> = ({ route }) => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.gray[900],
-  },
-  videoContainer: {
-    flex: 1,
-    position: 'relative',
-  },
-  remoteVideo: {
-    flex: 1,
-    backgroundColor: colors.gray[800],
-  },
-  remoteVideoPlaceholder: {
-    flex: 1,
-    backgroundColor: colors.gray[800],
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  placeholderAvatar: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    marginBottom: 16,
-  },
-  waitingText: {
-    color: colors.white,
-    fontSize: 18,
-  },
-  localVideoContainer: {
-    position: 'absolute',
-    top: 60,
-    right: 20,
-    width: 120,
-    height: 160,
-    borderRadius: 12,
-    overflow: 'hidden',
-    borderWidth: 2,
-    borderColor: colors.white,
-  },
-  localVideo: {
-    flex: 1,
-    backgroundColor: colors.gray[700],
+  acceptButton: {
+    backgroundColor: colors.success,
+    borderRadius: 35,
+    height: 70,
+    width: 70,
   },
   audioContainer: {
+    alignItems: 'center',
     flex: 1,
     justifyContent: 'center',
-    alignItems: 'center',
   },
   avatar: {
-    width: 140,
-    height: 140,
     borderRadius: 70,
+    height: 140,
+    width: 140,
   },
   avatarPlaceholder: {
+    alignItems: 'center',
     backgroundColor: colors.primary,
     justifyContent: 'center',
-    alignItems: 'center',
-  },
-  callerName: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: colors.white,
-    marginTop: 24,
   },
   callStatus: {
-    fontSize: 16,
     color: colors.gray[400],
+    fontSize: 16,
     marginTop: 8,
   },
-  statusOverlay: {
+  callerName: {
+    color: colors.white,
+    fontSize: 28,
+    fontWeight: 'bold',
+    marginTop: 24,
+  },
+  container: {
+    backgroundColor: colors.gray[900],
+    flex: 1,
+  },
+  controlButton: {
+    alignItems: 'center',
+    backgroundColor: colors.gray[700],
+    borderRadius: 30,
+    height: 60,
+    justifyContent: 'center',
+    marginHorizontal: 8,
+    width: 60,
+  },
+  controlButtonActive: {
+    backgroundColor: colors.primary,
+  },
+  controlLabel: {
+    bottom: -20,
+    color: colors.white,
+    fontSize: 10,
+    marginTop: 4,
     position: 'absolute',
-    top: 60,
-    left: 20,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  controls: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    flexDirection: 'row',
+    justifyContent: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
+    paddingVertical: 32,
+  },
+  endCallButton: {
+    backgroundColor: colors.error,
+    borderRadius: 35,
+    height: 70,
+    width: 70,
+  },
+  endCallIcon: {
+    transform: [{ rotate: '135deg' }],
+  },
+  incomingControls: {
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    paddingHorizontal: 48,
+    paddingVertical: 32,
+  },
+  localVideo: {
+    backgroundColor: colors.gray[700],
+    flex: 1,
+  },
+  localVideoContainer: {
+    borderColor: colors.white,
+    borderRadius: 12,
+    borderWidth: 2,
+    height: 160,
+    overflow: 'hidden',
+    position: 'absolute',
+    right: 20,
+    top: 60,
+    width: 120,
   },
   overlayName: {
     color: colors.white,
@@ -441,60 +483,44 @@ const styles = StyleSheet.create({
     color: colors.gray[300],
     fontSize: 14,
   },
-  controls: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 32,
-    paddingHorizontal: 16,
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
-  },
-  incomingControls: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingVertical: 32,
-    paddingHorizontal: 48,
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
-  },
-  controlButton: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: colors.gray[700],
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginHorizontal: 8,
-  },
-  controlButtonActive: {
-    backgroundColor: colors.primary,
-  },
-  controlLabel: {
-    color: colors.white,
-    fontSize: 10,
-    marginTop: 4,
-    position: 'absolute',
-    bottom: -20,
-  },
-  endCallButton: {
-    backgroundColor: colors.error,
-    width: 70,
-    height: 70,
-    borderRadius: 35,
-  },
-  endCallIcon: {
-    transform: [{ rotate: '135deg' }],
-  },
-  acceptButton: {
-    backgroundColor: colors.success,
-    width: 70,
-    height: 70,
-    borderRadius: 35,
+  placeholderAvatar: {
+    borderRadius: 60,
+    height: 120,
+    marginBottom: 16,
+    width: 120,
   },
   rejectButton: {
     backgroundColor: colors.error,
-    width: 70,
-    height: 70,
     borderRadius: 35,
+    height: 70,
+    width: 70,
+  },
+  remoteVideo: {
+    backgroundColor: colors.gray[800],
+    flex: 1,
+  },
+  remoteVideoPlaceholder: {
+    alignItems: 'center',
+    backgroundColor: colors.gray[800],
+    flex: 1,
+    justifyContent: 'center',
+  },
+  statusOverlay: {
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    borderRadius: 8,
+    left: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    position: 'absolute',
+    top: 60,
+  },
+  videoContainer: {
+    flex: 1,
+    position: 'relative',
+  },
+  waitingText: {
+    color: colors.white,
+    fontSize: 18,
   },
 });
 

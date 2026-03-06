@@ -48,6 +48,9 @@ export type ProfileStackParamList = {
   TwoFactorSettings: undefined;
   PrivacySettings: undefined;
   NotificationSettings: undefined;
+  Devices: undefined;
+  DataExport: undefined;
+  Notifications: undefined;
 };
 
 // Main Tab Navigator
@@ -65,12 +68,16 @@ export type RootStackParamList = {
   Main: NavigatorScreenParams<MainTabParamList>;
   ActiveCall: { call?: Call; user?: User; type?: CallType };
   GroupCall: { conversationId: string; conversationName?: string; type: CallType };
+  Notifications: undefined;
 };
 
 // Screen Props Types
 export type LoginScreenProps = NativeStackScreenProps<AuthStackParamList, 'Login'>;
 export type RegisterScreenProps = NativeStackScreenProps<AuthStackParamList, 'Register'>;
-export type ForgotPasswordScreenProps = NativeStackScreenProps<AuthStackParamList, 'ForgotPassword'>;
+export type ForgotPasswordScreenProps = NativeStackScreenProps<
+  AuthStackParamList,
+  'ForgotPassword'
+>;
 export type TwoFactorScreenProps = NativeStackScreenProps<AuthStackParamList, 'TwoFactor'>;
 export type ResetPasswordScreenProps = NativeStackScreenProps<AuthStackParamList, 'ResetPassword'>;
 export type VerifyEmailScreenProps = NativeStackScreenProps<AuthStackParamList, 'VerifyEmail'>;
@@ -102,9 +109,28 @@ export type ProfileScreenProps = CompositeScreenProps<
 >;
 export type EditProfileScreenProps = NativeStackScreenProps<ProfileStackParamList, 'EditProfile'>;
 export type SettingsScreenProps = NativeStackScreenProps<ProfileStackParamList, 'Settings'>;
-export type ChangePasswordScreenProps = NativeStackScreenProps<ProfileStackParamList, 'ChangePassword'>;
-export type TwoFactorSettingsScreenProps = NativeStackScreenProps<ProfileStackParamList, 'TwoFactorSettings'>;
-export type PrivacySettingsScreenProps = NativeStackScreenProps<ProfileStackParamList, 'PrivacySettings'>;
-export type NotificationSettingsScreenProps = NativeStackScreenProps<ProfileStackParamList, 'NotificationSettings'>;
+export type ChangePasswordScreenProps = NativeStackScreenProps<
+  ProfileStackParamList,
+  'ChangePassword'
+>;
+export type TwoFactorSettingsScreenProps = NativeStackScreenProps<
+  ProfileStackParamList,
+  'TwoFactorSettings'
+>;
+export type PrivacySettingsScreenProps = NativeStackScreenProps<
+  ProfileStackParamList,
+  'PrivacySettings'
+>;
+export type NotificationSettingsScreenProps = NativeStackScreenProps<
+  ProfileStackParamList,
+  'NotificationSettings'
+>;
 
 export type GroupCallScreenProps = NativeStackScreenProps<RootStackParamList, 'GroupCall'>;
+export type NotificationsScreenProps = NativeStackScreenProps<RootStackParamList, 'Notifications'>;
+
+// Global Search Screen (from Root or Main)
+export type GlobalSearchScreenProps = CompositeScreenProps<
+  NativeStackScreenProps<RootStackParamList, 'Notifications'>,
+  BottomTabScreenProps<MainTabParamList>
+>;

@@ -10,11 +10,122 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import RootNavigator from './src/navigation/RootNavigator';
 import { signalRService } from './src/services/signalr';
+import { pushNotificationService, NotificationData, NotificationMessage } from './src/services';
 import { useAuthStore } from './src/stores/authStore';
-import { useChatStore } from './src/stores/chatStore';
+// Import chatStore module - we'll access useChatStore from it
+import * as chatStoreModule from './src/stores/chatStore';
+import type { Message, MessageStatus, Conversation } from './src/stores/chatStore';
 import { useCallStore } from './src/stores/callStore';
 import { usePresenceStore } from './src/stores/presenceStore';
 import { useThemeStore } from './src/stores/themeStore';
+
+// ReplyTo message interface
+interface ReplyToMessage {
+  id?: string;
+  Id?: string;
+  content?: string;
+  Content?: string;
+  type?: string;
+  Type?: string;
+  senderId?: string;
+  SenderId?: string;
+  sender?: { name?: string };
+  Sender?: { name?: string };
+  attachments?: unknown[];
+  Attachments?: unknown[];
+}
+
+// SignalR message interface for type safety
+interface SignalRMessage {
+  id?: string;
+  messageId?: string;
+  conversationId: string;
+  senderId: string;
+  senderName?: string;
+  sender?: { name?: string };
+  content?: string;
+  type?: string;
+  sentAt?: string;
+  createdAt?: string;
+  isEdited?: boolean;
+  attachments?: unknown[];
+  reactions?: unknown[];
+  isViewOnce?: boolean;
+  IsViewOnce?: boolean;
+  viewOnceViewedAt?: string;
+  ViewOnceViewedAt?: string;
+  replyTo?: ReplyToMessage;
+  ReplyTo?: ReplyToMessage;
+  replyToMessage?: ReplyToMessage;
+  ReplyToMessage?: ReplyToMessage;
+  replyToId?: string;
+  ReplyToId?: string;
+  replyToMessageId?: string;
+  ReplyToMessageId?: string;
+}
+
+// Typing/Recording event data
+interface TypingRecordingData {
+  conversationId?: string;
+  ConversationId?: string;
+  userId?: string;
+  UserId?: string;
+  userName?: string;
+  UserName?: string;
+  user?: { name?: string };
+  stoppedTyping?: boolean;
+  stoppedRecording?: boolean;
+}
+
+// Online user data
+interface OnlineUserData {
+  userId?: string;
+  id?: string;
+}
+
+// SignalR event data interfaces
+interface ViewOnceViewedData {
+  messageId?: string;
+  MessageId?: string;
+  viewedAt?: string;
+  ViewedAt?: string;
+}
+
+interface ConversationMutedData {
+  conversationId?: string;
+  ConversationId?: string;
+  isMuted?: boolean;
+  IsMuted?: boolean;
+  mutedUntil?: string;
+  MutedUntil?: string;
+}
+
+interface ConversationDeletedData {
+  conversationId?: string;
+  ConversationId?: string;
+}
+
+interface ParticipantRoleChangedData {
+  conversationId?: string;
+  ConversationId?: string;
+  userId?: string;
+  UserId?: string;
+  newRole?: string;
+  NewRole?: string;
+  role?: string;
+  Role?: string;
+}
+
+interface DisappearingMessagesChangedData {
+  conversationId?: string;
+  ConversationId?: string;
+  duration?: string | null;
+  Duration?: string | null;
+}
+
+interface SessionRevokedData {
+  reason?: string;
+}
 
 // Track processed message IDs to prevent duplicates
 const processedMessageIds = new Set<string>();
@@ -54,8 +165,17 @@ function App(): React.JSX.Element {
   const unsubscribeCallAnsweredRef = useRef<(() => void) | null>(null);
   const unsubscribeCallEndedRef = useRef<(() => void) | null>(null);
   const unsubscribeCallRejectedRef = useRef<(() => void) | null>(null);
+  const unsubscribeSessionRevokedRef = useRef<(() => void) | null>(null);
+  const unsubscribeViewOnceViewedRef = useRef<(() => void) | null>(null);
+  const unsubscribeConversationMutedRef = useRef<(() => void) | null>(null);
+  const unsubscribeConversationDeletedRef = useRef<(() => void) | null>(null);
+  const unsubscribeParticipantRoleChangedRef = useRef<(() => void) | null>(null);
+  const unsubscribeDisappearingMessagesChangedRef = useRef<(() => void) | null>(null);
   const isConnectedRef = useRef<boolean>(false);
   const backgroundTimestampRef = useRef<number | null>(null);
+  const pushNotificationForegroundUnsubscribeRef = useRef<(() => void) | null>(null);
+  const pushNotificationOpenedUnsubscribeRef = useRef<(() => void) | null>(null);
+  const pendingNotificationRef = useRef<NotificationData | null>(null);
 
   // Initialize theme on app mount
   useEffect(() => {
@@ -66,10 +186,160 @@ function App(): React.JSX.Element {
   // Fetch admin color profile on app mount
   useEffect(() => {
     console.log('[App] Fetching admin color profile...');
-    fetchAdminColorProfile().catch(err => {
+    fetchAdminColorProfile().catch((err) => {
       console.log('[App] Failed to fetch admin color profile:', err);
     });
   }, [fetchAdminColorProfile]);
+
+  // Handle notification-based navigation
+  const handleNotificationNavigation = useCallback(
+    (data: NotificationData) => {
+      console.log('[App] Handling notification navigation:', data);
+
+      // If not authenticated, store for later
+      if (!isAuthenticated) {
+        console.log('[App] Not authenticated, storing notification for later');
+        pendingNotificationRef.current = data;
+        return;
+      }
+
+      // Navigate based on notification type
+      switch (data.type) {
+        case 'message':
+          if (data.conversationId) {
+            console.log('[App] Navigating to conversation:', data.conversationId);
+            // The navigation will be handled by RootNavigator through its ref
+            // We need to dispatch a navigation action
+            // For now, we'll set the active conversation in chat store
+            const chatStore = chatStoreModule.useChatStore.getState();
+            chatStore.setActiveConversation(data.conversationId);
+          }
+          break;
+
+        case 'call':
+          if (data.callId) {
+            console.log('[App] Handling call notification:', data.callId);
+            // Call notifications are handled by the call store and SignalR
+          }
+          break;
+
+        case 'contact_request':
+          console.log('[App] Contact request notification - navigate to contacts');
+          // Navigation to contacts will be handled by the navigator
+          break;
+
+        case 'broadcast':
+        case 'announcement':
+          console.log('[App] Broadcast/announcement notification');
+          // Navigation to broadcasts/announcements
+          break;
+
+        default:
+          console.log('[App] Unhandled notification type:', data.type);
+      }
+    },
+    [isAuthenticated]
+  );
+
+  // Handle foreground notifications (show in-app notification)
+  const handleForegroundNotification = useCallback((message: NotificationMessage) => {
+    console.log('[App] Foreground notification received:', message);
+
+    // Foreground notifications are typically handled by SignalR for real-time updates
+    // We can optionally show a toast/banner here for notifications not handled by SignalR
+
+    // For now, just log it - the SignalR handlers will update the UI
+    // If you want to show a custom in-app notification banner, implement it here
+  }, []);
+
+  // Initialize push notifications on app mount
+  useEffect(() => {
+    const initializePushNotifications = async () => {
+      console.log('[App] Initializing push notifications...');
+
+      try {
+        // Initialize the service
+        const initialized = await pushNotificationService.initialize();
+        if (!initialized) {
+          console.log('[App] Push notifications not available or initialization failed');
+          return;
+        }
+
+        // Set up foreground notification handler
+        pushNotificationForegroundUnsubscribeRef.current =
+          pushNotificationService.onForegroundNotification(handleForegroundNotification);
+
+        // Set up notification opened handler (when user taps notification)
+        pushNotificationOpenedUnsubscribeRef.current = pushNotificationService.onNotificationOpened(
+          handleNotificationNavigation
+        );
+
+        // Request permission (this will prompt the user on first launch)
+        const permission = await pushNotificationService.requestPermission();
+        console.log('[App] Push notification permission:', permission);
+
+        // Token registration is handled when user authenticates (see auth-dependent effect below)
+      } catch (error) {
+        console.error('[App] Failed to initialize push notifications:', error);
+      }
+    };
+
+    void initializePushNotifications();
+
+    return () => {
+      if (pushNotificationForegroundUnsubscribeRef.current) {
+        pushNotificationForegroundUnsubscribeRef.current();
+        pushNotificationForegroundUnsubscribeRef.current = null;
+      }
+      if (pushNotificationOpenedUnsubscribeRef.current) {
+        pushNotificationOpenedUnsubscribeRef.current();
+        pushNotificationOpenedUnsubscribeRef.current = null;
+      }
+    };
+  }, [handleForegroundNotification, handleNotificationNavigation]);
+
+  // Track whether auth check has completed (to avoid false "logged out" state on startup)
+  const authCheckCompleteRef = useRef(false);
+  const wasAuthenticatedRef = useRef(false);
+
+  // Register/unregister push notification token based on auth state
+  useEffect(() => {
+    const handlePushNotificationAuth = async () => {
+      if (isAuthenticated && user) {
+        // User is authenticated - register token
+        authCheckCompleteRef.current = true;
+        wasAuthenticatedRef.current = true;
+        console.log('[App] User authenticated, registering push notification token...');
+        try {
+          await pushNotificationService.registerTokenWithBackend();
+          console.log('[App] Push notification token registered');
+
+          // Handle any pending notification navigation
+          if (pendingNotificationRef.current) {
+            console.log('[App] Processing pending notification navigation');
+            handleNotificationNavigation(pendingNotificationRef.current);
+            pendingNotificationRef.current = null;
+          }
+        } catch (error) {
+          console.error('[App] Failed to register push notification token:', error);
+        }
+      } else if (!isAuthenticated && wasAuthenticatedRef.current) {
+        // User was previously authenticated and is now logged out - unregister token
+        // This prevents running on initial app start when isAuthenticated is false
+        // before checkAuth() has had a chance to run
+        console.log('[App] User logged out, unregistering push notification token...');
+        wasAuthenticatedRef.current = false;
+        try {
+          await pushNotificationService.unregisterToken();
+          console.log('[App] Push notification token unregistered');
+        } catch (error) {
+          console.error('[App] Failed to unregister push notification token:', error);
+        }
+      }
+    };
+
+    void handlePushNotificationAuth();
+  }, [isAuthenticated, user, handleNotificationNavigation]);
 
   // Cleanup function - only cleans up local refs, doesn't disconnect SignalR
   const cleanupLocalRefs = useCallback(() => {
@@ -113,10 +383,35 @@ function App(): React.JSX.Element {
       unsubscribeCallRejectedRef.current();
       unsubscribeCallRejectedRef.current = null;
     }
+    if (unsubscribeSessionRevokedRef.current) {
+      unsubscribeSessionRevokedRef.current();
+      unsubscribeSessionRevokedRef.current = null;
+    }
+    if (unsubscribeViewOnceViewedRef.current) {
+      unsubscribeViewOnceViewedRef.current();
+      unsubscribeViewOnceViewedRef.current = null;
+    }
+    if (unsubscribeConversationMutedRef.current) {
+      unsubscribeConversationMutedRef.current();
+      unsubscribeConversationMutedRef.current = null;
+    }
+    if (unsubscribeConversationDeletedRef.current) {
+      unsubscribeConversationDeletedRef.current();
+      unsubscribeConversationDeletedRef.current = null;
+    }
+    if (unsubscribeParticipantRoleChangedRef.current) {
+      unsubscribeParticipantRoleChangedRef.current();
+      unsubscribeParticipantRoleChangedRef.current = null;
+    }
+    if (unsubscribeDisappearingMessagesChangedRef.current) {
+      unsubscribeDisappearingMessagesChangedRef.current();
+      unsubscribeDisappearingMessagesChangedRef.current = null;
+    }
     if (platformChannelPollRef.current) {
       clearInterval(platformChannelPollRef.current);
       platformChannelPollRef.current = null;
     }
+    // Note: Push notification handlers are cleaned up in their own effect
   }, []);
 
   // Handle app state changes (foreground/background)
@@ -143,10 +438,10 @@ function App(): React.JSX.Element {
         // This handles stale connections that the server may have dropped
         if (backgroundTime > FORCE_RECONNECT_THRESHOLD_MS) {
           console.log('App was in background too long, forcing fresh SignalR reconnection...');
-          signalRService.forceReconnect();
+          void signalRService.forceReconnect();
         } else if (!signalRService.isConnected()) {
           console.log('App came to foreground, reconnecting SignalR...');
-          signalRService.connect();
+          void signalRService.connect();
         }
       }
     };
@@ -167,7 +462,7 @@ function App(): React.JSX.Element {
       if (isConnectedRef.current) {
         console.log('User logged out, disconnecting SignalR...');
         cleanupLocalRefs();
-        signalRService.disconnect();
+        void signalRService.disconnect();
         isConnectedRef.current = false;
       }
       return;
@@ -189,7 +484,7 @@ function App(): React.JSX.Element {
       }
 
       console.log('Initializing SignalR connection...');
-      signalRService.connect();
+      void signalRService.connect();
       isConnectedRef.current = true;
 
       // Start background polling for Platform Channel updates
@@ -197,9 +492,11 @@ function App(): React.JSX.Element {
         try {
           // Check if user is still authenticated
           const { isAuthenticated: stillAuthed } = useAuthStore.getState();
-          if (!stillAuthed) return;
+          if (!stillAuthed) {
+            return;
+          }
 
-          const chatStore = useChatStore.getState();
+          const chatStore = chatStoreModule.useChatStore.getState();
           const platformChannel = chatStore.conversations.find(
             (c) => (c as any).isPlatformChannel === true || (c as any).type === 'BroadcastChannel'
           );
@@ -212,13 +509,17 @@ function App(): React.JSX.Element {
         }
       };
 
-      platformChannelPollRef.current = setInterval(pollPlatformChannel, PLATFORM_CHANNEL_BACKGROUND_POLL_INTERVAL);
+      platformChannelPollRef.current = setInterval(
+        pollPlatformChannel,
+        PLATFORM_CHANNEL_BACKGROUND_POLL_INTERVAL
+      );
 
       // Register handler for incoming messages
-      unsubscribeMessageRef.current = signalRService.onMessage((message: any) => {
+      unsubscribeMessageRef.current = signalRService.onMessage((rawMessage: unknown) => {
+        const message = rawMessage as SignalRMessage;
         console.log('Received message via SignalR:', JSON.stringify(message, null, 2));
 
-        const chatStore = useChatStore.getState();
+        const chatStore = chatStoreModule.useChatStore.getState();
         const currentUser = useAuthStore.getState().user;
 
         // Check if this is a system message (always show system messages)
@@ -250,7 +551,7 @@ function App(): React.JSX.Element {
         // Prevent memory leak by clearing old message IDs (keep last 1000)
         if (processedMessageIds.size > 1000) {
           const idsArray = Array.from(processedMessageIds);
-          idsArray.slice(0, 500).forEach(id => processedMessageIds.delete(id));
+          idsArray.slice(0, 500).forEach((id) => processedMessageIds.delete(id));
         }
 
         // Check if viewing this conversation (don't increment unread if so)
@@ -272,8 +573,14 @@ function App(): React.JSX.Element {
           isViewOnce: message.isViewOnce || message.IsViewOnce || false,
           viewOnceViewedAt: message.viewOnceViewedAt || message.ViewOnceViewedAt || undefined,
           replyTo: (() => {
-            const rt = message.replyTo || message.ReplyTo || message.replyToMessage || message.ReplyToMessage;
-            if (!rt) return undefined;
+            const rt =
+              message.replyTo ||
+              message.ReplyTo ||
+              message.replyToMessage ||
+              message.ReplyToMessage;
+            if (!rt) {
+              return undefined;
+            }
             const rawAttachments = rt.attachments || rt.Attachments || [];
             const normalizedAttachments = rawAttachments.map((a: any) => ({
               id: a.id || a.Id,
@@ -297,13 +604,17 @@ function App(): React.JSX.Element {
               attachments: normalizedAttachments,
             };
           })(),
-          replyToId: message.replyToId || message.ReplyToId || message.replyToMessageId || message.ReplyToMessageId,
-        } as any);
+          replyToId:
+            message.replyToId ||
+            message.ReplyToId ||
+            message.replyToMessageId ||
+            message.ReplyToMessageId,
+        } as Message);
 
         // Acknowledge delivery to the sender (this triggers MessageDelivered on their end)
         // Don't acknowledge system messages
         if (!isSystemMessage) {
-          signalRService.acknowledgeDelivery(message.conversationId, messageId).catch(err => {
+          signalRService.acknowledgeDelivery(message.conversationId, messageId).catch((err) => {
             console.log('Failed to acknowledge delivery:', err);
           });
         }
@@ -311,8 +622,10 @@ function App(): React.JSX.Element {
         // Only update unread count if not viewing this conversation
         // Don't count system messages as unread
         if (!isViewingConversation && !isSystemMessage) {
-          const freshState = useChatStore.getState();
-          const currentConversation = freshState.conversations.find(c => c.id === message.conversationId);
+          const freshState = chatStoreModule.useChatStore.getState();
+          const currentConversation = freshState.conversations.find(
+            (c) => c.id === message.conversationId
+          );
           const currentUnread = currentConversation?.unreadCount || 0;
           freshState.updateConversation({
             id: message.conversationId,
@@ -322,67 +635,83 @@ function App(): React.JSX.Element {
       });
 
       // Register handler for message status changes (delivered, read, etc.)
-      unsubscribeStatusRef.current = signalRService.onStatusChange((messageId: string, status: string, conversationId?: string) => {
-        console.log(`Message status update: ${messageId} -> ${status} (conversation: ${conversationId})`);
-        const chatStore = useChatStore.getState();
+      unsubscribeStatusRef.current = signalRService.onStatusChange(
+        (messageId: string, status: string, conversationId?: string) => {
+          console.log(
+            `Message status update: ${messageId} -> ${status} (conversation: ${conversationId})`
+          );
+          const chatStore = chatStoreModule.useChatStore.getState();
 
-        // Normalize IDs for case-insensitive GUID comparison
-        const normalizedMessageId = messageId?.toLowerCase();
-        const normalizedConversationId = conversationId?.toLowerCase();
+          // Normalize IDs for case-insensitive GUID comparison
+          const normalizedMessageId = messageId?.toLowerCase();
+          const normalizedConversationId = conversationId?.toLowerCase();
 
-        // If we have the conversationId, try to update directly
-        if (conversationId) {
-          // Try exact match first, then normalized
-          const convMessages = chatStore.messages[conversationId] || (normalizedConversationId ? chatStore.messages[normalizedConversationId] : undefined);
-          if (convMessages) {
-            const message = convMessages.find((m: any) => m.id?.toLowerCase() === normalizedMessageId);
+          // If we have the conversationId, try to update directly
+          if (conversationId && normalizedConversationId) {
+            // Try exact match first, then normalized
+            const convMessages =
+              chatStore.messages[conversationId] || chatStore.messages[normalizedConversationId];
+            if (convMessages) {
+              const message = convMessages.find(
+                (m: Message) => m.id?.toLowerCase() === normalizedMessageId
+              );
+              if (message) {
+                chatStore.updateMessageStatus(conversationId, messageId, status as MessageStatus);
+                return;
+              }
+            }
+          }
+
+          // Fallback: Find the conversation containing this message
+          for (const [convId, msgs] of Object.entries(chatStore.messages)) {
+            const message = msgs.find((m: Message) => m.id?.toLowerCase() === normalizedMessageId);
             if (message) {
-              chatStore.updateMessageStatus(conversationId, messageId, status as any);
-              return;
+              chatStore.updateMessageStatus(convId, messageId, status as MessageStatus);
+              break;
             }
           }
         }
-
-        // Fallback: Find the conversation containing this message
-        for (const [convId, msgs] of Object.entries(chatStore.messages)) {
-          const message = msgs.find((m: any) => m.id?.toLowerCase() === normalizedMessageId);
-          if (message) {
-            chatStore.updateMessageStatus(convId, messageId, status as any);
-            break;
-          }
-        }
-      });
+      );
 
       // Register handler for presence changes (online/offline)
-      unsubscribePresenceRef.current = signalRService.onPresence((userId: string, isOnline: boolean) => {
-        console.log(`Presence update received: ${userId} -> ${isOnline ? 'online' : 'offline'}`);
-        const presenceStore = usePresenceStore.getState();
-        if (isOnline) {
-          presenceStore.setUserOnline(userId);
-        } else {
-          presenceStore.setUserOffline(userId);
+      unsubscribePresenceRef.current = signalRService.onPresence(
+        (userId: string, isOnline: boolean) => {
+          console.log(`Presence update received: ${userId} -> ${isOnline ? 'online' : 'offline'}`);
+          const presenceStore = usePresenceStore.getState();
+          if (isOnline) {
+            presenceStore.setUserOnline(userId);
+          } else {
+            presenceStore.setUserOffline(userId);
+          }
         }
-      });
+      );
 
       // Register handler for conversation updates (pin, archive, etc.)
-      unsubscribeConversationUpdateRef.current = signalRService.onConversationUpdate((conversationId: string, updates: any) => {
-        console.log(`Conversation update received: ${conversationId}`, updates);
-        const chatStore = useChatStore.getState();
-        chatStore.updateConversation({ id: conversationId, ...updates });
-      });
+      unsubscribeConversationUpdateRef.current = signalRService.onConversationUpdate(
+        (conversationId: string, updates: Partial<Conversation>) => {
+          console.log(`Conversation update received: ${conversationId}`, updates);
+          const chatStore = chatStoreModule.useChatStore.getState();
+          chatStore.updateConversation({ id: conversationId, ...updates });
+        }
+      );
 
       // Register handler for initial online users list
-      unsubscribeOnlineUsersRef.current = signalRService.onOnlineUsers((users: any[]) => {
-        console.log(`Online users list received: ${users?.length || 0} users`);
-        const presenceStore = usePresenceStore.getState();
-        // Extract user IDs from the users array (handle different formats)
-        const userIds = users.map(u => u.userId || u.id || u).filter(Boolean);
-        presenceStore.setMultipleUsersOnline(userIds);
-      });
+      unsubscribeOnlineUsersRef.current = signalRService.onOnlineUsers(
+        (users: OnlineUserData[]) => {
+          console.log(`Online users list received: ${users?.length || 0} users`);
+          const presenceStore = usePresenceStore.getState();
+          // Extract user IDs from the users array (handle different formats)
+          const userIds = users
+            .map((u) => u.userId || u.id || '')
+            .filter((id): id is string => Boolean(id));
+          presenceStore.setMultipleUsersOnline(userIds);
+        }
+      );
 
       // Register handler for typing indicators
-      signalRService.onTyping((data: any) => {
-        const chatStore = useChatStore.getState();
+      signalRService.onTyping((rawData: unknown) => {
+        const data = rawData as TypingRecordingData;
+        const chatStore = chatStoreModule.useChatStore.getState();
         const currentUser = useAuthStore.getState().user;
 
         const conversationId = data?.conversationId || data?.ConversationId;
@@ -391,7 +720,9 @@ function App(): React.JSX.Element {
         const stoppedTyping = data?.stoppedTyping === true;
 
         // Don't track our own typing
-        if (!conversationId || !userId || userId === currentUser?.id) return;
+        if (!conversationId || !userId || userId === currentUser?.id) {
+          return;
+        }
 
         if (stoppedTyping) {
           chatStore.removeTypingUser(conversationId, userId);
@@ -401,8 +732,9 @@ function App(): React.JSX.Element {
       });
 
       // Register handler for recording indicators
-      signalRService.onRecording((data: any) => {
-        const chatStore = useChatStore.getState();
+      signalRService.onRecording((rawData: unknown) => {
+        const data = rawData as TypingRecordingData;
+        const chatStore = chatStoreModule.useChatStore.getState();
         const currentUser = useAuthStore.getState().user;
 
         const conversationId = data?.conversationId || data?.ConversationId;
@@ -411,7 +743,9 @@ function App(): React.JSX.Element {
         const stoppedRecording = data?.stoppedRecording === true;
 
         // Don't track our own recording
-        if (!conversationId || !userId || userId === currentUser?.id) return;
+        if (!conversationId || !userId || userId === currentUser?.id) {
+          return;
+        }
 
         if (stoppedRecording) {
           chatStore.removeRecordingUser(conversationId, userId);
@@ -421,43 +755,51 @@ function App(): React.JSX.Element {
       });
 
       // Register handler for incoming calls (camelCase - SignalR converts from PascalCase)
-      unsubscribeIncomingCallRef.current = signalRService.onCallEvent('incomingCall', (data: any) => {
-        console.log('Incoming call received:', JSON.stringify(data, null, 2));
-        const callStore = useCallStore.getState();
-        const currentUser = useAuthStore.getState().user;
+      unsubscribeIncomingCallRef.current = signalRService.onCallEvent(
+        'incomingCall',
+        (data: any) => {
+          console.log('Incoming call received:', JSON.stringify(data, null, 2));
+          const callStore = useCallStore.getState();
+          const currentUser = useAuthStore.getState().user;
 
-        // Don't handle our own calls
-        if (data?.callerId === currentUser?.id) return;
+          // Don't handle our own calls
+          if (data?.callerId === currentUser?.id) {
+            return;
+          }
 
-        const call = {
-          id: data?.callId || data?.id || '',
-          callerId: data?.callerId || '',
-          calleeId: currentUser?.id || '',
-          caller: {
-            id: data?.callerId || '',
-            username: data?.callerName || 'Unknown',
-            displayName: data?.callerName || 'Unknown',
-            avatarUrl: data?.callerAvatarUrl,
-          },
-          type: (data?.type || 'voice').toLowerCase() as 'voice' | 'video',
-          status: 'Incoming',
-          startedAt: data?.startedAt || new Date().toISOString(),
-        };
+          const call = {
+            id: data?.callId || data?.id || '',
+            callerId: data?.callerId || '',
+            calleeId: currentUser?.id || '',
+            caller: {
+              id: data?.callerId || '',
+              username: data?.callerName || 'Unknown',
+              displayName: data?.callerName || 'Unknown',
+              avatarUrl: data?.callerAvatarUrl,
+            },
+            type: (data?.type || 'voice').toLowerCase() as 'voice' | 'video',
+            status: 'Incoming',
+            startedAt: data?.startedAt || new Date().toISOString(),
+          };
 
-        callStore.setIncomingCall(call);
-      });
+          callStore.setIncomingCall(call);
+        }
+      );
 
       // Register handler for call accepted
-      unsubscribeCallAnsweredRef.current = signalRService.onCallEvent('callAccepted', (data: any) => {
-        console.log('Call accepted:', JSON.stringify(data, null, 2));
-        const callStore = useCallStore.getState();
-        const currentCall = callStore.currentCall;
+      unsubscribeCallAnsweredRef.current = signalRService.onCallEvent(
+        'callAccepted',
+        (data: any) => {
+          console.log('Call accepted:', JSON.stringify(data, null, 2));
+          const callStore = useCallStore.getState();
+          const currentCall = callStore.currentCall;
 
-        if (currentCall && data?.callId === currentCall.id) {
-          // Update call state to connected
-          callStore.setCallConnected();
+          if (currentCall && data?.callId === currentCall.id) {
+            // Update call state to connected
+            callStore.setCallConnected();
+          }
         }
-      });
+      );
 
       // Register handler for call ended
       unsubscribeCallEndedRef.current = signalRService.onCallEvent('callEnded', (data: any) => {
@@ -467,26 +809,110 @@ function App(): React.JSX.Element {
       });
 
       // Register handler for call rejected
-      unsubscribeCallRejectedRef.current = signalRService.onCallEvent('callRejected', (data: any) => {
-        console.log('Call rejected:', JSON.stringify(data, null, 2));
-        const callStore = useCallStore.getState();
-        // Add to history as missed call if it was an incoming call we didn't answer
-        if (callStore.currentCall && callStore.callState === 'incoming') {
-          callStore.addMissedCall({
-            ...data,
-            ...callStore.currentCall,
-            status: 'missed',
-          });
+      unsubscribeCallRejectedRef.current = signalRService.onCallEvent(
+        'callRejected',
+        (data: unknown) => {
+          console.log('Call rejected:', JSON.stringify(data, null, 2));
+          const callStore = useCallStore.getState();
+          // Add to history as missed call if it was an incoming call we didn't answer
+          if (callStore.currentCall && callStore.callState === 'incoming') {
+            callStore.addMissedCall({
+              ...(data as Record<string, unknown>),
+              ...callStore.currentCall,
+              status: 'missed',
+            });
+          }
+          callStore.clearCall();
         }
-        callStore.clearCall();
-      });
+      );
 
       // Register handler for call missed (timeout, no answer)
-      signalRService.onCallEvent('callMissed', (data: any) => {
+      signalRService.onCallEvent('callMissed', (data: unknown) => {
         console.log('Call missed:', JSON.stringify(data, null, 2));
         const callStore = useCallStore.getState();
-        callStore.addMissedCall(data);
+        callStore.addMissedCall(data as Record<string, unknown>);
       });
+
+      // Register handler for session revoked (force logout by admin)
+      unsubscribeSessionRevokedRef.current = signalRService.onSessionRevoked((rawData: unknown) => {
+        const data = rawData as SessionRevokedData;
+        console.log('[App] Session revoked by admin:', data?.reason);
+        const authStore = useAuthStore.getState();
+        authStore.logout().catch((err) => console.error('Logout failed:', err));
+      });
+
+      // Register handler for view-once message viewed
+      unsubscribeViewOnceViewedRef.current = signalRService.onViewOnceViewed((rawData: unknown) => {
+        const data = rawData as ViewOnceViewedData;
+        console.log('[App] View-once viewed:', data);
+        const messageId = data?.messageId || data?.MessageId;
+        const viewedAt = data?.viewedAt || data?.ViewedAt || new Date().toISOString();
+
+        if (messageId) {
+          const chatStore = chatStoreModule.useChatStore.getState();
+          chatStore.updateMessageViewOnce(messageId, viewedAt);
+        }
+      });
+
+      // Register handler for conversation muted status
+      unsubscribeConversationMutedRef.current = signalRService.onConversationMuted(
+        (rawData: unknown) => {
+          const data = rawData as ConversationMutedData;
+          console.log('[App] Conversation muted:', data);
+          const conversationId = data?.conversationId || data?.ConversationId;
+          const isMuted = data?.isMuted ?? data?.IsMuted ?? true;
+          const mutedUntil = data?.mutedUntil || data?.MutedUntil;
+
+          if (conversationId) {
+            const chatStore = chatStoreModule.useChatStore.getState();
+            chatStore.updateConversationMuteStatus(conversationId, isMuted, mutedUntil);
+          }
+        }
+      );
+
+      // Register handler for conversation deleted
+      unsubscribeConversationDeletedRef.current = signalRService.onConversationDeleted(
+        (rawData: unknown) => {
+          const data = rawData as ConversationDeletedData;
+          console.log('[App] Conversation deleted:', data);
+          const conversationId = data?.conversationId || data?.ConversationId;
+
+          if (conversationId) {
+            const chatStore = chatStoreModule.useChatStore.getState();
+            chatStore.removeConversation(conversationId);
+          }
+        }
+      );
+
+      // Register handler for participant role changed
+      unsubscribeParticipantRoleChangedRef.current = signalRService.onParticipantRoleChanged(
+        (rawData: unknown) => {
+          const data = rawData as ParticipantRoleChangedData;
+          console.log('[App] Participant role changed:', data);
+          const conversationId = data?.conversationId || data?.ConversationId;
+          const userId = data?.userId || data?.UserId;
+          const newRole = data?.newRole || data?.NewRole || data?.role || data?.Role;
+
+          if (conversationId && userId && newRole) {
+            const chatStore = chatStoreModule.useChatStore.getState();
+            chatStore.updateParticipantRole(conversationId, userId, newRole);
+          }
+        }
+      );
+
+      // Register handler for disappearing messages setting changed
+      unsubscribeDisappearingMessagesChangedRef.current =
+        signalRService.onDisappearingMessagesChanged((rawData: unknown) => {
+          const data = rawData as DisappearingMessagesChangedData;
+          console.log('[App] Disappearing messages changed:', data);
+          const conversationId = data?.conversationId || data?.ConversationId;
+          const duration = data?.duration || data?.Duration;
+
+          if (conversationId) {
+            const chatStore = chatStoreModule.useChatStore.getState();
+            chatStore.updateDisappearingMessages(conversationId, duration as string | null);
+          }
+        });
     }, CONNECTION_DEBOUNCE_MS);
 
     return () => {

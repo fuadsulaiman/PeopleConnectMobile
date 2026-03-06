@@ -37,7 +37,9 @@ class BiometricService {
   async getBiometricType(): Promise<BiometricType> {
     try {
       const biometryType = await Keychain.getSupportedBiometryType();
-      if (!biometryType) return null;
+      if (!biometryType) {
+        return null;
+      }
 
       switch (biometryType) {
         case Keychain.BIOMETRY_TYPE.TOUCH_ID:

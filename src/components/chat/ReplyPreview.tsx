@@ -20,30 +20,42 @@ export const ReplyPreview: React.FC<ReplyPreviewProps> = ({
 }) => {
   const { colors } = useTheme();
 
-  if (!message) return null;
+  if (!message) {
+    return null;
+  }
 
   const mediaInfo = getReplyMediaInfo(message);
   const textColor = isInBubble
-    ? (isOwn ? 'rgba(255,255,255,0.7)' : colors.textSecondary)
+    ? isOwn
+      ? 'rgba(255,255,255,0.7)'
+      : colors.textSecondary
     : colors.textSecondary;
 
   // @ts-ignore
 
   const getMediaTypeLabel = () => {
     switch (mediaInfo.type) {
-      case 'image': return 'Photo';
-      case 'video': return 'Video';
-      case 'audio': return 'Voice message';
-      case 'file': return 'File';
-      default: return 'Media';
+      case 'image':
+        return 'Photo';
+      case 'video':
+        return 'Video';
+      case 'audio':
+        return 'Voice message';
+      case 'file':
+        return 'File';
+      default:
+        return 'Media';
     }
   };
 
-
-
   if (!isInBubble) {
     return (
-      <View style={[styles.container, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
+      <View
+        style={[
+          styles.container,
+          { backgroundColor: colors.surface, borderTopColor: colors.border },
+        ]}
+      >
         <View style={[styles.replyBar, { backgroundColor: colors.primary }]} />
         <View style={styles.content}>
           <Text style={[styles.replyName, { color: colors.primary }]} numberOfLines={1}>
@@ -61,10 +73,26 @@ export const ReplyPreview: React.FC<ReplyPreviewProps> = ({
   }
 
   return (
-    <View style={[styles.bubbleContainer, isOwn ? styles.bubbleContainerOwn : { backgroundColor: 'rgba(0,0,0,0.08)' }]}>
-      <View style={[styles.replyBar, { backgroundColor: isOwn ? 'rgba(255,255,255,0.5)' : colors.primary }]} />
+    <View
+      style={[
+        styles.bubbleContainer,
+        isOwn ? styles.bubbleContainerOwn : { backgroundColor: 'rgba(0,0,0,0.08)' },
+      ]}
+    >
+      <View
+        style={[
+          styles.replyBar,
+          { backgroundColor: isOwn ? 'rgba(255,255,255,0.5)' : colors.primary },
+        ]}
+      />
       <View style={styles.bubbleContent}>
-        <Text style={[styles.replyPreviewName, { color: isOwn ? 'rgba(255,255,255,0.9)' : colors.primary }]} numberOfLines={1}>
+        <Text
+          style={[
+            styles.replyPreviewName,
+            { color: isOwn ? 'rgba(255,255,255,0.9)' : colors.primary },
+          ]}
+          numberOfLines={1}
+        >
           {(message as any).senderName || (message as any).sender?.name || 'Unknown'}
         </Text>
         <Text style={[styles.replyPreviewText, { color: textColor }]} numberOfLines={1}>
@@ -76,17 +104,29 @@ export const ReplyPreview: React.FC<ReplyPreviewProps> = ({
 };
 
 const styles = StyleSheet.create({
-  container: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 10, borderTopWidth: 1 },
-  replyBar: { width: 3, minHeight: 36, borderRadius: 1.5, marginRight: 10 },
-  content: { flex: 1, justifyContent: 'center' },
-  replyName: { fontSize: 13, fontWeight: '600', marginBottom: 2 },
-  replyText: { fontSize: 13 },
-  replyPreviewText: { fontSize: 12 },
-  replyPreviewName: { fontSize: 12, fontWeight: '600', marginBottom: 2 },
-  cancelButton: { padding: 8, marginLeft: 8 },
-  bubbleContainer: { flexDirection: 'row', borderRadius: 8, padding: 10, marginBottom: 8, minWidth: 150 },
+  bubbleContainer: {
+    borderRadius: 8,
+    flexDirection: 'row',
+    marginBottom: 8,
+    minWidth: 150,
+    padding: 10,
+  },
   bubbleContainerOwn: { backgroundColor: 'rgba(255,255,255,0.15)' },
   bubbleContent: { flex: 1, minWidth: 0 },
+  cancelButton: { marginLeft: 8, padding: 8 },
+  container: {
+    alignItems: 'center',
+    borderTopWidth: 1,
+    flexDirection: 'row',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  content: { flex: 1, justifyContent: 'center' },
+  replyBar: { borderRadius: 1.5, marginRight: 10, minHeight: 36, width: 3 },
+  replyName: { fontSize: 13, fontWeight: '600', marginBottom: 2 },
+  replyPreviewName: { fontSize: 12, fontWeight: '600', marginBottom: 2 },
+  replyPreviewText: { fontSize: 12 },
+  replyText: { fontSize: 13 },
 });
 
 export default ReplyPreview;

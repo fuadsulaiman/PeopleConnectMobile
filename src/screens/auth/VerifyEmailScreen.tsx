@@ -1,16 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  Alert,
-} from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { AuthStackParamList } from '../../navigation/types';
-import { auth } from '../../services/sdk';
+// CRITICAL: Do NOT import SDK at top level - it causes module initialization failures on Windows
+const getAuth = () => {
+  const sdkModule = require('../../services/sdk');
+  return sdkModule.auth;
+};
+const auth = { verifyEmail: (token: string) => getAuth().verifyEmail(token), resendVerification: (email: string) => getAuth().resendVerification(email) };
 import { LoadingScreen } from '../../components/common/LoadingScreen';
 import { colors } from '../../constants';
 
@@ -43,7 +42,10 @@ export const VerifyEmailScreen: React.FC<Props> = ({ navigation, route }) => {
           navigation.navigate('Login');
         }, 3000);
       } catch (err: any) {
-        const message = err?.response?.data?.message || err.message || 'Email verification failed. The link may have expired.';
+        const message =
+          err?.response?.data?.message ||
+          err.message ||
+          'Email verification failed. The link may have expired.';
         setError(message);
         setStatus('error');
       }
@@ -66,7 +68,8 @@ export const VerifyEmailScreen: React.FC<Props> = ({ navigation, route }) => {
       setResendSuccess(true);
       Alert.alert('Success', 'Verification email sent successfully! Please check your inbox.');
     } catch (err: any) {
-      const message = err?.response?.data?.message || err.message || 'Failed to resend verification email.';
+      const message =
+        err?.response?.data?.message || err.message || 'Failed to resend verification email.';
       setError(message);
       Alert.alert('Error', message);
     } finally {
@@ -149,7 +152,10 @@ export const VerifyEmailScreen: React.FC<Props> = ({ navigation, route }) => {
             {/* Resend Button */}
             {email && (
               <TouchableOpacity
-                style={[styles.outlineButton, (isResending || resendSuccess) && styles.buttonDisabled]}
+                style={[
+                  styles.outlineButton,
+                  (isResending || resendSuccess) && styles.buttonDisabled,
+                ]}
                 onPress={handleResendVerification}
                 disabled={isResending || resendSuccess}
               >
@@ -192,7 +198,9 @@ export const VerifyEmailScreen: React.FC<Props> = ({ navigation, route }) => {
           {resendSuccess && (
             <View style={styles.successMessageContainer}>
               <Icon name="checkmark-circle" size={16} color="#22c55e" />
-              <Text style={styles.successMessage}>Verification email sent successfully! Please check your inbox.</Text>
+              <Text style={styles.successMessage}>
+                Verification email sent successfully! Please check your inbox.
+              </Text>
             </View>
           )}
 
@@ -223,49 +231,49 @@ export const VerifyEmailScreen: React.FC<Props> = ({ navigation, route }) => {
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
     backgroundColor: '#fff',
+    flex: 1,
   },
   content: {
     flex: 1,
   },
   centerContainer: {
+    alignItems: 'center',
     flex: 1,
     justifyContent: 'center',
-    alignItems: 'center',
     paddingHorizontal: 24,
   },
   // Mail icon container
   mailIconContainer: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: colors.primary + '15',
-    justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: colors.primary + '15',
+    borderRadius: 60,
+    height: 120,
+    justifyContent: 'center',
     marginBottom: 24,
+    width: 120,
   },
   // Success state
   successIconContainer: {
     marginBottom: 24,
   },
   successTitle: {
+    color: '#1a1a1a',
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#1a1a1a',
     marginBottom: 12,
   },
   successText: {
-    fontSize: 16,
     color: '#666',
-    textAlign: 'center',
+    fontSize: 16,
     lineHeight: 24,
     marginBottom: 16,
     paddingHorizontal: 16,
+    textAlign: 'center',
   },
   redirectText: {
-    fontSize: 14,
     color: '#999',
+    fontSize: 14,
     marginBottom: 24,
   },
   // Error state
@@ -273,90 +281,90 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   errorTitle: {
+    color: '#1a1a1a',
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#1a1a1a',
     marginBottom: 12,
   },
   errorText: {
-    fontSize: 16,
     color: '#666',
-    textAlign: 'center',
+    fontSize: 16,
     lineHeight: 24,
     marginBottom: 24,
     paddingHorizontal: 16,
+    textAlign: 'center',
   },
   // No token state
   title: {
+    color: '#1a1a1a',
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#1a1a1a',
     marginBottom: 12,
   },
   subtitle: {
-    fontSize: 16,
     color: '#666',
-    textAlign: 'center',
+    fontSize: 16,
     lineHeight: 24,
     marginBottom: 24,
     paddingHorizontal: 16,
+    textAlign: 'center',
   },
   // Tips container
   tipsContainer: {
     backgroundColor: '#eff6ff',
-    borderWidth: 1,
     borderColor: '#bfdbfe',
     borderRadius: 12,
-    padding: 16,
+    borderWidth: 1,
     marginBottom: 24,
+    padding: 16,
     width: '100%',
   },
   tipsTitle: {
+    color: '#1e40af',
     fontSize: 14,
     fontWeight: '600',
-    color: '#1e40af',
     marginBottom: 12,
   },
   tipRow: {
-    flexDirection: 'row',
     alignItems: 'center',
+    flexDirection: 'row',
     marginBottom: 8,
   },
   tipBullet: {
     marginRight: 8,
   },
   tipText: {
-    fontSize: 14,
     color: '#1e40af',
     flex: 1,
+    fontSize: 14,
   },
   // Success message
   successMessageContainer: {
-    flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#f0fdf4',
-    borderWidth: 1,
     borderColor: '#bbf7d0',
     borderRadius: 8,
-    padding: 12,
+    borderWidth: 1,
+    flexDirection: 'row',
     marginBottom: 16,
+    padding: 12,
     width: '100%',
   },
   successMessage: {
     color: '#166534',
+    flex: 1,
     fontSize: 14,
     marginLeft: 8,
-    flex: 1,
   },
   // Buttons
   primaryButton: {
+    alignItems: 'center',
     backgroundColor: colors.primary,
     borderRadius: 12,
-    paddingVertical: 16,
-    paddingHorizontal: 48,
     marginBottom: 16,
+    paddingHorizontal: 48,
+    paddingVertical: 16,
     width: '100%',
-    alignItems: 'center',
   },
   primaryButtonText: {
     color: '#fff',
@@ -364,14 +372,14 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   outlineButton: {
-    borderWidth: 1,
+    alignItems: 'center',
     borderColor: colors.primary,
     borderRadius: 12,
-    paddingVertical: 16,
-    paddingHorizontal: 48,
+    borderWidth: 1,
     marginBottom: 16,
+    paddingHorizontal: 48,
+    paddingVertical: 16,
     width: '100%',
-    alignItems: 'center',
   },
   outlineButtonText: {
     color: colors.primary,
@@ -379,10 +387,10 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   ghostButton: {
-    paddingVertical: 16,
-    paddingHorizontal: 48,
-    width: '100%',
     alignItems: 'center',
+    paddingHorizontal: 48,
+    paddingVertical: 16,
+    width: '100%',
   },
   ghostButtonText: {
     color: colors.primary,

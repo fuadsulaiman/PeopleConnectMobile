@@ -1,4 +1,4 @@
-import React from "react";
+import React from 'react';
 import {
   TouchableOpacity,
   Text,
@@ -6,14 +6,14 @@ import {
   ActivityIndicator,
   ViewStyle,
   TextStyle,
-} from "react-native";
-import { colors } from "../../constants";
+} from 'react-native';
+import { colors } from '../../constants';
 
 interface ButtonProps {
   title: string;
   onPress: () => void;
-  variant?: "primary" | "secondary" | "outline" | "ghost";
-  size?: "small" | "medium" | "large";
+  variant?: 'primary' | 'secondary' | 'outline' | 'ghost';
+  size?: 'small' | 'medium' | 'large';
   disabled?: boolean;
   loading?: boolean;
   style?: ViewStyle;
@@ -23,8 +23,8 @@ interface ButtonProps {
 export function Button({
   title,
   onPress,
-  variant = "primary",
-  size = "medium",
+  variant = 'primary',
+  size = 'medium',
   disabled = false,
   loading = false,
   style,
@@ -55,7 +55,7 @@ export function Button({
     >
       {loading ? (
         <ActivityIndicator
-          color={variant === "primary" ? colors.white : colors.primary}
+          color={variant === 'primary' ? colors.white : colors.primary}
           size="small"
         />
       ) : (
@@ -67,65 +67,65 @@ export function Button({
 
 const styles = StyleSheet.create({
   button: {
+    alignItems: 'center',
     borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  primary: {
-    backgroundColor: colors.primary,
-  },
-  secondary: {
-    backgroundColor: colors.gray[200],
-  },
-  outline: {
-    backgroundColor: "transparent",
-    borderWidth: 1,
-    borderColor: colors.primary,
-  },
-  ghost: {
-    backgroundColor: "transparent",
-  },
-  small: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-  },
-  medium: {
-    paddingVertical: 14,
-    paddingHorizontal: 24,
-  },
-  large: {
-    paddingVertical: 18,
-    paddingHorizontal: 32,
+    justifyContent: 'center',
   },
   disabled: {
     backgroundColor: colors.gray[300],
   },
-  text: {
-    fontWeight: "600",
+  disabledText: {
+    color: colors.gray[500],
   },
-  primaryText: {
-    color: colors.white,
-  },
-  secondaryText: {
-    color: colors.text,
-  },
-  outlineText: {
-    color: colors.primary,
+  ghost: {
+    backgroundColor: 'transparent',
   },
   ghostText: {
     color: colors.primary,
   },
-  smallText: {
-    fontSize: 14,
-  },
-  mediumText: {
-    fontSize: 16,
+  large: {
+    paddingHorizontal: 32,
+    paddingVertical: 18,
   },
   largeText: {
     fontSize: 18,
   },
-  disabledText: {
-    color: colors.gray[500],
+  medium: {
+    paddingHorizontal: 24,
+    paddingVertical: 14,
+  },
+  mediumText: {
+    fontSize: 16,
+  },
+  outline: {
+    backgroundColor: 'transparent',
+    borderColor: colors.primary,
+    borderWidth: 1,
+  },
+  outlineText: {
+    color: colors.primary,
+  },
+  primary: {
+    backgroundColor: colors.primary,
+  },
+  primaryText: {
+    color: colors.white,
+  },
+  secondary: {
+    backgroundColor: colors.gray[200],
+  },
+  secondaryText: {
+    color: colors.text,
+  },
+  small: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  smallText: {
+    fontSize: 14,
+  },
+  text: {
+    fontWeight: '600',
   },
 });
 

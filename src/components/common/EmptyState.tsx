@@ -1,7 +1,7 @@
-import React from "react";
-import { View, Text, StyleSheet, ViewStyle } from "react-native";
-import { colors } from "../../constants";
-import Button from "./Button";
+import React from 'react';
+import { View, Text, StyleSheet, ViewStyle } from 'react-native';
+import { colors } from '../../constants';
+import Button from './Button';
 
 interface EmptyStateProps {
   title: string;
@@ -39,29 +39,29 @@ export function EmptyState({
 }
 
 const styles = StyleSheet.create({
+  button: {
+    marginTop: 24,
+  },
   container: {
+    alignItems: 'center',
     flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
+    justifyContent: 'center',
     padding: 24,
   },
   icon: {
     marginBottom: 16,
   },
-  title: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: colors.text,
-    textAlign: "center",
-  },
   message: {
-    fontSize: 14,
     color: colors.textSecondary,
-    textAlign: "center",
+    fontSize: 14,
     marginTop: 8,
+    textAlign: 'center',
   },
-  button: {
-    marginTop: 24,
+  title: {
+    color: colors.text,
+    fontSize: 18,
+    fontWeight: '600',
+    textAlign: 'center',
   },
 });
 

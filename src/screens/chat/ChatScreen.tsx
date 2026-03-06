@@ -1,29 +1,72 @@
-import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, TextInput, KeyboardAvoidingView, Platform, Image, ActivityIndicator, Dimensions, Modal, Alert, PermissionsAndroid, Animated, Vibration, ScrollView } from "react-native";
-import { Swipeable } from "react-native-gesture-handler";
-import Icon from "react-native-vector-icons/Ionicons";
-import { launchImageLibrary, launchCamera, MediaType } from "react-native-image-picker";
-import DocumentPicker from "react-native-document-picker";
-import { useChatStore, useAuthStore, usePresenceStore, useSettingsStore } from "../../stores";
-import { useTheme } from "../../hooks";
-import { config } from "../../constants";
-import { ChatScreenProps } from "../../navigation/types";
-import { Message } from "../../types";
-import { MediaViewer } from "../../components/MediaViewer";
-import { VideoRecorder } from "../../components/VideoRecorder";
-import { Avatar } from "../../components/common/Avatar";
-import { ConversationInfoSheet } from "../../components/ConversationInfoSheet";
-import { sdk, conversations as conversationsApi, contacts as contactsApi } from "../../services/sdk";
-import { signalRService } from "../../services/signalr";
-import { LinkPreview, extractFirstUrl } from "../../components/chat";
-import { LocationPicker } from "../../components/chat/LocationPicker";
-import { LocationMessage } from "../../components/chat/LocationMessage";
-import { locationService, LocationData } from "../../services/locationService";
+import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import {
+  View,
+  Text,
+  FlatList,
+  TouchableOpacity,
+  StyleSheet,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
+  Image,
+  ActivityIndicator,
+  Dimensions,
+  Modal,
+  Alert,
+  PermissionsAndroid,
+  Animated,
+  Vibration,
+  ScrollView,
+} from 'react-native';
+import { Swipeable } from 'react-native-gesture-handler';
+import Icon from 'react-native-vector-icons/Ionicons';
+import { launchImageLibrary, launchCamera, MediaType } from 'react-native-image-picker';
+import DocumentPicker from 'react-native-document-picker';
+// Import chatStore module - we'll access useChatStore from it
+import * as chatStoreModule from '../../stores/chatStore';
+import { useAuthStore } from '../../stores/authStore';
+import { usePresenceStore } from '../../stores/presenceStore';
+import { useSettingsStore } from '../../stores/settingsStore';
+import { useTheme } from '../../hooks';
+import { config } from '../../constants';
+import { ChatScreenProps } from '../../navigation/types';
+import { Message } from '../../types';
+import { MediaViewer } from '../../components/MediaViewer';
+import { VideoRecorder } from '../../components/VideoRecorder';
+import { Avatar } from '../../components/common/Avatar';
+import { ConversationInfoSheet } from '../../components/ConversationInfoSheet';
+// CRITICAL: Do NOT import SDK at top level - it causes module initialization failures on Windows
+// Use lazy loading pattern instead - SDK is loaded only when needed
+const getSDK = () => {
+  const sdkModule = require('../../services/sdk');
+  return sdkModule.sdk;
+};
+const getConversationsApi = () => {
+  const sdkModule = require('../../services/sdk');
+  return sdkModule.conversations;
+};
+const getContactsApi = () => {
+  const sdkModule = require('../../services/sdk');
+  return sdkModule.contacts;
+};
+
+const getSignalRService = () => {
+  const signalrModule = require('../../services/signalr');
+  return signalrModule.signalRService;
+};
+import { LinkPreview, extractFirstUrl } from '../../components/chat';
+import { LocationPicker } from '../../components/chat/LocationPicker';
+import { LocationMessage } from '../../components/chat/LocationMessage';
+import { locationService, LocationData } from '../../services/locationService';
 
 // Helper to convert relative URLs to absolute URLs
 const toAbsoluteUrl = (url: string | null | undefined): string | undefined => {
-  if (!url) return undefined;
-  if (url.startsWith('http')) return url;
+  if (!url) {
+    return undefined;
+  }
+  if (url.startsWith('http')) {
+    return url;
+  }
   const baseUrl = config.API_BASE_URL.replace(/\/api$/, '');
   // Handle URLs with or without leading slash
   const path = url.startsWith('/') ? url : `/${url}`;
@@ -53,10 +96,26 @@ const MAX_MESSAGE_LENGTH = 300;
 
 const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
   const { conversationId, conversation: routeConversation } = route.params;
-  const { messages, conversations, fetchMessages, fetchMoreMessages, fetchBroadcastMessages, fetchConversations, sendMessage, markViewOnceViewed, updateMessage, deleteMessage, editMessage, setActiveConversation, isLoading, isLoadingMore, hasMoreMessages } = useChatStore();
+  const {
+    messages,
+    conversations,
+    fetchMessages,
+    fetchMoreMessages,
+    fetchBroadcastMessages,
+    fetchConversations,
+    sendMessage,
+    markViewOnceViewed,
+    updateMessage,
+    deleteMessage,
+    editMessage,
+    setActiveConversation,
+    isLoading,
+    isLoadingMore,
+    hasMoreMessages,
+  } = chatStoreModule.useChatStore();
 
   // Get conversation from store (updates when store changes) or fallback to route params
-  const conversation = conversations.find(c => c.id === conversationId) || routeConversation;
+  const conversation = conversations.find((c) => c.id === conversationId) || routeConversation;
   const { user } = useAuthStore();
   const { onlineUsers, version: presenceVersion } = usePresenceStore();
   // Get settings from store - read directly from publicSettings to trigger re-renders
@@ -91,7 +150,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
   // Create dynamic styles based on theme colors
   const styles = useMemo(() => createStyles(colors), [colors]);
 
-  const [inputText, setInputText] = useState("");
+  const [inputText, setInputText] = useState('');
   const [sending, _setSending] = useState(false);
   const [mediaViewerVisible, setMediaViewerVisible] = useState(false);
   const [attachmentMenuVisible, setAttachmentMenuVisible] = useState(false);
@@ -115,14 +174,16 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
   const [messageActionsVisible, setMessageActionsVisible] = useState(false);
   const [editModalVisible, setEditModalVisible] = useState(false);
-  const [editText, setEditText] = useState("");
+  const [editText, setEditText] = useState('');
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [forwardModalVisible, setForwardModalVisible] = useState(false);
   const [forwardTargets, setForwardTargets] = useState<any[]>([]);
   const [forwardLoading, setForwardLoading] = useState(false);
-  const [forwardSearchQuery, setForwardSearchQuery] = useState("");
+  const [forwardSearchQuery, setForwardSearchQuery] = useState('');
   const [deleteConfirmVisible, setDeleteConfirmVisible] = useState(false);
-  const [deletingMessage, setDeletingMessage] = useState<{ id: string; isOwn: boolean } | null>(null);
+  const [deletingMessage, setDeletingMessage] = useState<{ id: string; isOwn: boolean } | null>(
+    null
+  );
   const [reportModalVisible, setReportModalVisible] = useState(false);
   const [reportingMessage, setReportingMessage] = useState<Message | null>(null);
   const [reactionPickerVisible, setReactionPickerVisible] = useState(false);
@@ -142,7 +203,9 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
   const lastTypingSentRef = useRef<number>(0);
   const conversationMessages = messages[conversationId] || [];
   // Check if this is a Platform Channel (broadcast) - declared early to use in handleLoadMore
-  const isBroadcast = (conversation as any)?.isBroadcast === true || (conversation as any)?.type === "BroadcastChannel";
+  const isBroadcast =
+    (conversation as any)?.isBroadcast === true ||
+    (conversation as any)?.type === 'BroadcastChannel';
   const reversedMessages = useMemo(() => {
     return [...conversationMessages].reverse();
   }, [conversationMessages]);
@@ -180,7 +243,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
 
   // Toggle message expansion
   const toggleMessageExpansion = useCallback((messageId: string) => {
-    setExpandedMessages(prev => {
+    setExpandedMessages((prev) => {
       const newSet = new Set(prev);
       if (newSet.has(messageId)) {
         newSet.delete(messageId);
@@ -192,56 +255,65 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
   }, []);
 
   // Handle view-once message reveal
-  const handleViewOnceReveal = useCallback(async (messageId: string) => {
-    if (revealingViewOnce || viewOnceRevealedMessages.has(messageId)) return;
-
-    setRevealingViewOnce(messageId);
-    try {
-      await markViewOnceViewed(conversationId, messageId);
-      setViewOnceRevealedMessages(prev => new Set(prev).add(messageId));
-
-      // Start countdown timer (10 seconds default)
-      const timerDuration = 10;
-      setViewOnceTimers(prev => ({ ...prev, [messageId]: timerDuration }));
-
-      // Clear any existing timer
-      if (viewOnceTimerRefs.current[messageId]) {
-        clearInterval(viewOnceTimerRefs.current[messageId]);
+  const handleViewOnceReveal = useCallback(
+    async (messageId: string) => {
+      if (revealingViewOnce || viewOnceRevealedMessages.has(messageId)) {
+        return;
       }
 
-      // Start countdown
-      viewOnceTimerRefs.current[messageId] = setInterval(() => {
-        setViewOnceTimers(prev => {
-          const currentTime = prev[messageId];
-          if (currentTime === undefined || currentTime <= 1) {
-            clearInterval(viewOnceTimerRefs.current[messageId]);
-            delete viewOnceTimerRefs.current[messageId];
-            // Update message in store after timer expires
-            updateMessage(conversationId, messageId, {
-              viewOnceViewedAt: new Date().toISOString()
-            });
-            const { [messageId]: _, ...rest } = prev;
-            return rest;
-          }
-          return { ...prev, [messageId]: currentTime - 1 };
-        });
-      }, 1000);
-    } catch (error) {
-      console.error('Failed to reveal view-once message:', error);
-      Alert.alert('Error', 'Failed to open view-once message');
-    } finally {
-      setRevealingViewOnce(null);
-    }
-  }, [conversationId, revealingViewOnce, viewOnceRevealedMessages, markViewOnceViewed, updateMessage]);
+      setRevealingViewOnce(messageId);
+      try {
+        await markViewOnceViewed(conversationId, messageId);
+        setViewOnceRevealedMessages((prev) => new Set(prev).add(messageId));
+
+        // Start countdown timer (10 seconds default)
+        const timerDuration = 10;
+        setViewOnceTimers((prev) => ({ ...prev, [messageId]: timerDuration }));
+
+        // Clear any existing timer
+        if (viewOnceTimerRefs.current[messageId]) {
+          clearInterval(viewOnceTimerRefs.current[messageId]);
+        }
+
+        // Start countdown
+        viewOnceTimerRefs.current[messageId] = setInterval(() => {
+          setViewOnceTimers((prev) => {
+            const currentTime = prev[messageId];
+            if (currentTime === undefined || currentTime <= 1) {
+              clearInterval(viewOnceTimerRefs.current[messageId]);
+              delete viewOnceTimerRefs.current[messageId];
+              // Update message in store after timer expires
+              updateMessage(conversationId, messageId, {
+                viewOnceViewedAt: new Date().toISOString(),
+              });
+              const { [messageId]: _, ...rest } = prev;
+              return rest;
+            }
+            return { ...prev, [messageId]: currentTime - 1 };
+          });
+        }, 1000);
+      } catch (error) {
+        console.error('Failed to reveal view-once message:', error);
+        Alert.alert('Error', 'Failed to open view-once message');
+      } finally {
+        setRevealingViewOnce(null);
+      }
+    },
+    [conversationId, revealingViewOnce, viewOnceRevealedMessages, markViewOnceViewed, updateMessage]
+  );
 
   // Cleanup view-once timers on unmount
   useEffect(() => {
     return () => {
-      Object.values(viewOnceTimerRefs.current).forEach(timer => clearInterval(timer));
+      Object.values(viewOnceTimerRefs.current).forEach((timer) => clearInterval(timer));
     };
   }, []);
 
-  const openMedia = (url: string, type: 'image' | 'video' | 'audio' | 'file', fileName?: string) => {
+  const openMedia = (
+    url: string,
+    type: 'image' | 'video' | 'audio' | 'file',
+    fileName?: string
+  ) => {
     setSelectedMedia({ url, type, fileName });
     setMediaViewerVisible(true);
   };
@@ -252,7 +324,11 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
   };
 
   useEffect(() => {
-    setActiveConversation(conversationId);
+    // Defer setActiveConversation to break synchronous update cycle
+    // This prevents "Cannot update component while rendering" warning
+    const timeoutId = setTimeout(() => {
+      setActiveConversation(conversationId);
+    }, 0);
 
     // Fetch messages based on conversation type
     if (isBroadcast) {
@@ -267,6 +343,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
     }
 
     return () => {
+      clearTimeout(timeoutId);
       setActiveConversation(null);
       if (pollIntervalRef.current) {
         clearInterval(pollIntervalRef.current);
@@ -277,8 +354,11 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
 
   // Subscribe to typing indicators
   useEffect(() => {
-    if (isBroadcast) return; // No typing indicators for broadcasts
+    if (isBroadcast) {
+      return;
+    } // No typing indicators for broadcasts
 
+    const signalRService = getSignalRService();
     const unsubscribe = signalRService.onTyping((data: any) => {
       const typingConversationId = data?.conversationId || data?.ConversationId;
       const typingUserId = data?.userId || data?.UserId;
@@ -292,20 +372,22 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
 
       // If user stopped typing, remove them from the list
       if (isStoppedTyping) {
-        setTypingUsers(prev => prev.filter(u => u.userId !== typingUserId));
+        setTypingUsers((prev) => prev.filter((u) => u.userId !== typingUserId));
         return;
       }
 
       // Add user to typing list
-      setTypingUsers(prev => {
-        const exists = prev.some(u => u.userId === typingUserId);
-        if (exists) return prev;
+      setTypingUsers((prev) => {
+        const exists = prev.some((u) => u.userId === typingUserId);
+        if (exists) {
+          return prev;
+        }
         return [...prev, { userId: typingUserId, userName: typingUserName }];
       });
 
       // Remove user from typing list after 3 seconds (fallback if StoppedTyping event not received)
       setTimeout(() => {
-        setTypingUsers(prev => prev.filter(u => u.userId !== typingUserId));
+        setTypingUsers((prev) => prev.filter((u) => u.userId !== typingUserId));
       }, 3000);
     });
 
@@ -319,8 +401,11 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
 
   // Subscribe to recording indicators
   useEffect(() => {
-    if (isBroadcast) return; // No recording indicators for broadcasts
+    if (isBroadcast) {
+      return;
+    } // No recording indicators for broadcasts
 
+    const signalRService = getSignalRService();
     const unsubscribe = signalRService.onRecording((data: any) => {
       const recordingConversationId = data?.conversationId || data?.ConversationId;
       const recordingUserId = data?.userId || data?.UserId;
@@ -334,20 +419,22 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
 
       // If user stopped recording, remove them from the list
       if (isStoppedRecording) {
-        setRecordingUsers(prev => prev.filter(u => u.userId !== recordingUserId));
+        setRecordingUsers((prev) => prev.filter((u) => u.userId !== recordingUserId));
         return;
       }
 
       // Add user to recording list
-      setRecordingUsers(prev => {
-        const exists = prev.some(u => u.userId === recordingUserId);
-        if (exists) return prev;
+      setRecordingUsers((prev) => {
+        const exists = prev.some((u) => u.userId === recordingUserId);
+        if (exists) {
+          return prev;
+        }
         return [...prev, { userId: recordingUserId, userName: recordingUserName }];
       });
 
       // Remove user from recording list after 10 seconds (fallback)
       setTimeout(() => {
-        setRecordingUsers(prev => prev.filter(u => u.userId !== recordingUserId));
+        setRecordingUsers((prev) => prev.filter((u) => u.userId !== recordingUserId));
       }, 10000);
     });
 
@@ -358,106 +445,128 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
 
   // Send typing indicator (debounced)
   const sendTypingIndicator = useCallback(() => {
-    if (isBroadcast) return;
+    if (isBroadcast) {
+      return;
+    }
 
     const now = Date.now();
     // Only send typing indicator every 2 seconds
-    if (now - lastTypingSentRef.current < 2000) return;
+    if (now - lastTypingSentRef.current < 2000) {
+      return;
+    }
 
     lastTypingSentRef.current = now;
-    signalRService.sendTyping(conversationId).catch(err => {
+    const signalRService = getSignalRService();
+    signalRService.sendTyping(conversationId).catch((err) => {
       console.log('Failed to send typing indicator:', err);
     });
   }, [conversationId, isBroadcast]);
 
   // Handle initiating a call
-  const handleCall = useCallback(async (callType: 'voice' | 'video') => {
-    if (isDM) {
-      // For DMs, use otherUserId directly (more reliable) or fallback to participants
-      let targetUserId = (conversation as any)?.otherUserId;
-      let targetUserName = conversation?.name || 'Unknown';
-      let targetUserAvatar = (conversation as any)?.otherUserAvatarUrl;
+  const handleCall = useCallback(
+    async (callType: 'voice' | 'video') => {
+      if (isDM) {
+        // For DMs, use otherUserId directly (more reliable) or fallback to participants
+        let targetUserId = (conversation as any)?.otherUserId;
+        let targetUserName = conversation?.name || 'Unknown';
+        let targetUserAvatar = (conversation as any)?.otherUserAvatarUrl;
 
-      // If otherUserId not available, try to find from participants
-      if (!targetUserId && conversation?.participants) {
-        const otherParticipant = conversation.participants.find(
-          (p: any) => (p.userId || p.user?.id) !== user?.id
-        );
-        targetUserId = otherParticipant?.userId || otherParticipant?.user?.id;
-        targetUserName = otherParticipant?.user?.name || otherParticipant?.user?.username || conversation?.name || 'Unknown';
-        targetUserAvatar = otherParticipant?.user?.avatarUrl;
-      }
-
-      // If still no target user ID, fetch conversation details from API
-      if (!targetUserId && conversationId) {
-        try {
-          console.log('Fetching conversation details to get other user ID...');
-          const detail = await sdk.conversations.get(conversationId);
-          console.log('Conversation detail:', JSON.stringify(detail, null, 2));
-
-          if (detail?.participants) {
-            const otherParticipant = detail.participants.find(
-              (p: any) => (p.userId || p.user?.id) !== user?.id
-            );
-            targetUserId = otherParticipant?.userId || otherParticipant?.user?.id;
-            targetUserName = otherParticipant?.user?.name || otherParticipant?.user?.username || conversation?.name || 'Unknown';
-            targetUserAvatar = otherParticipant?.user?.avatarUrl;
-          }
-        } catch (error) {
-          console.error('Failed to fetch conversation details:', error);
+        // If otherUserId not available, try to find from participants
+        if (!targetUserId && conversation?.participants) {
+          const otherParticipant = conversation.participants.find(
+            (p: any) => (p.userId || p.user?.id) !== user?.id
+          );
+          targetUserId = otherParticipant?.userId || otherParticipant?.user?.id;
+          targetUserName =
+            otherParticipant?.user?.name ||
+            otherParticipant?.user?.username ||
+            conversation?.name ||
+            'Unknown';
+          targetUserAvatar = otherParticipant?.user?.avatarUrl;
         }
-      }
 
-      if (!targetUserId) {
-        console.error('Cannot initiate call: No target user ID found. Conversation:', JSON.stringify(conversation, null, 2));
-        Alert.alert('Error', 'Unable to start call. Could not find target user.');
-        return;
-      }
+        // If still no target user ID, fetch conversation details from API
+        if (!targetUserId && conversationId) {
+          try {
+            console.log('Fetching conversation details to get other user ID...');
+            const sdk = getSDK();
+            const detail = await sdk.conversations.get(conversationId);
+            console.log('Conversation detail:', JSON.stringify(detail, null, 2));
 
-      const targetUser = {
-        id: targetUserId,
-        name: targetUserName,
-        username: '',
-        avatarUrl: targetUserAvatar,
-      };
+            if (detail?.participants) {
+              const otherParticipant = detail.participants.find(
+                (p: any) => (p.userId || p.user?.id) !== user?.id
+              );
+              targetUserId = otherParticipant?.userId || otherParticipant?.user?.id;
+              targetUserName =
+                otherParticipant?.user?.name ||
+                otherParticipant?.user?.username ||
+                conversation?.name ||
+                'Unknown';
+              targetUserAvatar = otherParticipant?.user?.avatarUrl;
+            }
+          } catch (error) {
+            console.error('Failed to fetch conversation details:', error);
+          }
+        }
 
-      console.log('Initiating call to user:', targetUser);
+        if (!targetUserId) {
+          console.error(
+            'Cannot initiate call: No target user ID found. Conversation:',
+            JSON.stringify(conversation, null, 2)
+          );
+          Alert.alert('Error', 'Unable to start call. Could not find target user.');
+          return;
+        }
 
-      // Navigate to the CallsTab -> Call screen
-      navigation.getParent()?.navigate('CallsTab', {
-        screen: 'Call',
-        params: {
-          user: targetUser,
-          type: callType,
-        },
-      });
-    } else if (isChatroom) {
-      // For chatrooms, navigate to LiveKit group call
-      Alert.alert(
-        'Group Call',
-        `Start a ${callType} call with ${conversation?.name || 'this group'}?`,
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Start',
-            onPress: () => {
-              // Navigate to GroupCall screen (uses LiveKit)
-              navigation.getParent()?.getParent()?.navigate('GroupCall', {
-                conversationId: conversationId,
-                conversationName: conversation?.name,
-                type: callType,
-              });
-            },
+        const targetUser = {
+          id: targetUserId,
+          name: targetUserName,
+          username: '',
+          avatarUrl: targetUserAvatar,
+        };
+
+        console.log('Initiating call to user:', targetUser);
+
+        // Navigate to the CallsTab -> Call screen
+        navigation.getParent()?.navigate('CallsTab', {
+          screen: 'Call',
+          params: {
+            user: targetUser,
+            type: callType,
           },
-        ]
-      );
-    }
-  }, [isDM, isChatroom, conversation, conversationId, user, navigation]);
+        });
+      } else if (isChatroom) {
+        // For chatrooms, navigate to LiveKit group call
+        Alert.alert(
+          'Group Call',
+          `Start a ${callType} call with ${conversation?.name || 'this group'}?`,
+          [
+            { text: 'Cancel', style: 'cancel' },
+            {
+              text: 'Start',
+              onPress: () => {
+                // Navigate to GroupCall screen (uses LiveKit)
+                navigation.getParent()?.getParent()?.navigate('GroupCall', {
+                  conversationId: conversationId,
+                  conversationName: conversation?.name,
+                  type: callType,
+                });
+              },
+            },
+          ]
+        );
+      }
+    },
+    [isDM, isChatroom, conversation, conversationId, user, navigation]
+  );
 
   // Determine the display name for the conversation
   // API returns 'name' directly for all types: DMs (other user's name), Chatrooms, Channels
   const getConversationDisplayName = useCallback(() => {
-    if (!conversation) return 'Chat';
+    if (!conversation) {
+      return 'Chat';
+    }
 
     // Use conversation name directly (API provides correct name for all types)
     if (conversation.name) {
@@ -465,16 +574,24 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
     }
 
     // Fallbacks based on type
-    if (isDM) return 'Direct Message';
-    if (isChatroom) return 'Chatroom';
-    if (isBroadcast) return 'Platform Channel';
+    if (isDM) {
+      return 'Direct Message';
+    }
+    if (isChatroom) {
+      return 'Chatroom';
+    }
+    if (isBroadcast) {
+      return 'Platform Channel';
+    }
 
     return 'Chat';
   }, [conversation, isDM, isChatroom, isBroadcast]);
 
   // Get other participant's status for DMs - uses presence store for real-time updates
   const getOtherParticipantStatus = useCallback((): 'online' | 'offline' | undefined => {
-    if (!isDM || !conversation) return undefined;
+    if (!isDM || !conversation) {
+      return undefined;
+    }
 
     // API returns otherUserId directly for DMs (may not be in type definition)
     const otherUserId = (conversation as any).otherUserId;
@@ -512,23 +629,34 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
             style={{ marginRight: 10 }}
           />
           <View style={{ flex: 1, maxWidth: maxTitleWidth - 50 }}>
-            <Text style={{ fontSize: 17, fontWeight: '600', color: colors.text }} numberOfLines={1} ellipsizeMode="tail">
+            <Text
+              style={{ fontSize: 17, fontWeight: '600', color: colors.text }}
+              numberOfLines={1}
+              ellipsizeMode="tail"
+            >
               {displayName}
             </Text>
             {isDM && userStatus && (
-              <Text style={{ fontSize: 12, color: userStatus === 'online' ? colors.online : colors.textSecondary }}>
+              <Text
+                style={{
+                  fontSize: 12,
+                  color: userStatus === 'online' ? colors.online : colors.textSecondary,
+                }}
+              >
                 {userStatus.charAt(0).toUpperCase() + userStatus.slice(1)}
               </Text>
             )}
             {isBroadcast && (
               <Text style={{ fontSize: 12, color: colors.textSecondary }}>
-                {(conversation as any)?.isPlatformChannel ? 'Official Channel' : 'Broadcast Channel'}
+                {(conversation as any)?.isPlatformChannel
+                  ? 'Official Channel'
+                  : 'Broadcast Channel'}
               </Text>
             )}
           </View>
         </TouchableOpacity>
       ),
-      headerRight: () => (
+      headerRight: () =>
         !isBroadcast ? (
           <View style={{ flexDirection: 'row', marginRight: 8 }}>
             <TouchableOpacity
@@ -537,30 +665,39 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
             >
               <Icon name="call-outline" size={24} color={colors.primary} />
             </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => handleCall('video')}
-              style={{ padding: 8 }}
-            >
+            <TouchableOpacity onPress={() => handleCall('video')} style={{ padding: 8 }}>
               <Icon name="videocam-outline" size={24} color={colors.primary} />
             </TouchableOpacity>
           </View>
-        ) : null
-      ),
+        ) : null,
     });
-  }, [navigation, conversation, isBroadcast, isDM, handleCall, getConversationDisplayName, getOtherParticipantStatus, onlineUsers, presenceVersion]);
+  }, [
+    navigation,
+    conversation,
+    isBroadcast,
+    isDM,
+    handleCall,
+    getConversationDisplayName,
+    getOtherParticipantStatus,
+    onlineUsers,
+    presenceVersion,
+  ]);
 
   const handleSend = useCallback(() => {
-    if (!inputText.trim() || sending) return;
+    if (!inputText.trim() || sending) {
+      return;
+    }
 
     // Clear input immediately for responsive UI
     const messageContent = inputText.trim();
     const viewOnceFlag = isViewOnce;
     const replyId = replyToMessage?.id;
-    setInputText("");
+    setInputText('');
     setIsViewOnce(false);
     setReplyToMessage(null);
 
     // Send stopped typing indicator
+    const signalRService = getSignalRService();
     signalRService.sendStoppedTyping(conversationId).catch(() => {});
 
     // Start sending message (don't await - optimistic update happens immediately)
@@ -571,111 +708,147 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
   }, [inputText, sending, sendMessage, conversationId, isViewOnce, replyToMessage]);
 
   // Upload file to server - returns attachment data with id and url
-  const uploadFile = useCallback(async (uri: string, fileName: string, mimeType: string): Promise<{id: string, url: string, fileName?: string, contentType?: string, fileSize?: number} | null> => {
-    try {
-      // On Android, ensure the URI has proper format
-      let fileUri = uri;
-      if (Platform.OS === 'android' && !uri.startsWith('file://') && !uri.startsWith('content://')) {
-        fileUri = `file://${uri}`;
-      }
-
-      console.log('Uploading file:', { uri: fileUri, fileName, mimeType });
-
-      const formData = new FormData();
-      formData.append('file', {
-        uri: fileUri,
-        type: mimeType,
-        name: fileName,
-      } as any);
-
-      const token = sdk.getAccessToken();
-      const baseUrl = config.API_BASE_URL;
-      const uploadUrl = `${baseUrl}/media/upload?conversationId=${conversationId}`;
-
-      console.log('Upload URL:', uploadUrl);
-
-      const response = await fetch(uploadUrl, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          // Don't set Content-Type - fetch will set it with the correct boundary for FormData
-        },
-        body: formData,
-      });
-
-      console.log('Upload response status:', response.status);
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Upload failed:', response.status, errorText);
-        throw new Error(`Upload failed: ${response.status} - ${errorText}`);
-      }
-
-      const responseText = await response.text();
-      console.log('Upload response text:', responseText);
-
-      let result;
+  const uploadFile = useCallback(
+    async (
+      uri: string,
+      fileName: string,
+      mimeType: string
+    ): Promise<{
+      id: string;
+      url: string;
+      fileName?: string;
+      contentType?: string;
+      fileSize?: number;
+    } | null> => {
       try {
-        result = JSON.parse(responseText);
-      } catch (parseError) {
-        console.error('Failed to parse upload response:', parseError);
+        // On Android, ensure the URI has proper format
+        let fileUri = uri;
+        if (
+          Platform.OS === 'android' &&
+          !uri.startsWith('file://') &&
+          !uri.startsWith('content://')
+        ) {
+          fileUri = `file://${uri}`;
+        }
+
+        console.log('Uploading file:', { uri: fileUri, fileName, mimeType });
+
+        const formData = new FormData();
+        formData.append('file', {
+          uri: fileUri,
+          type: mimeType,
+          name: fileName,
+        } as any);
+
+        const sdk = getSDK();
+        const token = sdk.getAccessToken();
+        const baseUrl = config.API_BASE_URL;
+        const uploadUrl = `${baseUrl}/media/upload?conversationId=${conversationId}`;
+
+        console.log('Upload URL:', uploadUrl);
+
+        const response = await fetch(uploadUrl, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            // Don't set Content-Type - fetch will set it with the correct boundary for FormData
+          },
+          body: formData,
+        });
+
+        console.log('Upload response status:', response.status);
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('Upload failed:', response.status, errorText);
+          throw new Error(`Upload failed: ${response.status} - ${errorText}`);
+        }
+
+        const responseText = await response.text();
+        console.log('Upload response text:', responseText);
+
+        let result;
+        try {
+          result = JSON.parse(responseText);
+        } catch (parseError) {
+          console.error('Failed to parse upload response:', parseError);
+          return null;
+        }
+        console.log('Upload result:', JSON.stringify(result, null, 2));
+
+        // Handle wrapped API response format: { success: true, data: {...} }
+        const data = result.data || result;
+
+        // Return the full upload data including id (attachment ID) and downloadUrl
+        if (!data.id) {
+          console.error('No attachment ID in upload response:', result);
+          Alert.alert(
+            'Upload Response Error',
+            `Server returned: ${JSON.stringify(result).substring(0, 200)}`
+          );
+          return null;
+        }
+
+        console.log('Uploaded file - ID:', data.id, 'URL:', data.downloadUrl);
+
+        // Return object with both id and url
+        return {
+          id: data.id,
+          url: data.downloadUrl || data.url,
+          fileName: data.fileName,
+          contentType: data.contentType,
+          fileSize: data.fileSize,
+        };
+      } catch (error: any) {
+        console.error('Upload error:', error?.message || error);
         return null;
       }
-      console.log('Upload result:', JSON.stringify(result, null, 2));
-
-      // Handle wrapped API response format: { success: true, data: {...} }
-      const data = result.data || result;
-
-      // Return the full upload data including id (attachment ID) and downloadUrl
-      if (!data.id) {
-        console.error('No attachment ID in upload response:', result);
-        Alert.alert('Upload Response Error', `Server returned: ${JSON.stringify(result).substring(0, 200)}`);
-        return null;
-      }
-
-      console.log('Uploaded file - ID:', data.id, 'URL:', data.downloadUrl);
-
-      // Return object with both id and url
-      return {
-        id: data.id,
-        url: data.downloadUrl || data.url,
-        fileName: data.fileName,
-        contentType: data.contentType,
-        fileSize: data.fileSize,
-      };
-    } catch (error: any) {
-      console.error('Upload error:', error?.message || error);
-      return null;
-    }
-  }, [conversationId]);
+    },
+    [conversationId]
+  );
 
   // Send message with attachment - uses attachment ID from upload response
-  const sendWithAttachment = useCallback((
-    attachmentData: {id: string, url: string, fileName?: string, contentType?: string, fileSize?: number},
-    messageType: string,
-    caption?: string,
-    viewOnce?: boolean
-  ) => {
-    const content = caption || '';
-    // Pass the attachment with its ID - the backend expects attachmentIds
-    const attachments = [{
-      id: attachmentData.id,
-      url: attachmentData.url,
-      type: messageType,
-      fileName: attachmentData.fileName,
-      contentType: attachmentData.contentType,
-      fileSize: attachmentData.fileSize,
-    }];
-    console.log('Sending with attachment:', { content, attachments, isViewOnce: viewOnce || isViewOnce });
+  const sendWithAttachment = useCallback(
+    (
+      attachmentData: {
+        id: string;
+        url: string;
+        fileName?: string;
+        contentType?: string;
+        fileSize?: number;
+      },
+      messageType: string,
+      caption?: string,
+      viewOnce?: boolean
+    ) => {
+      const content = caption || '';
+      // Pass the attachment with its ID - the backend expects attachmentIds
+      const attachments = [
+        {
+          id: attachmentData.id,
+          url: attachmentData.url,
+          type: messageType,
+          fileName: attachmentData.fileName,
+          contentType: attachmentData.contentType,
+          fileSize: attachmentData.fileSize,
+        },
+      ];
+      console.log('Sending with attachment:', {
+        content,
+        attachments,
+        isViewOnce: viewOnce || isViewOnce,
+      });
 
-    // Reset view-once immediately
-    setIsViewOnce(false);
+      // Reset view-once immediately
+      setIsViewOnce(false);
 
-    // Fire and forget - optimistic update happens immediately in sendMessage
-    sendMessage(conversationId, content, attachments, viewOnce || isViewOnce).catch((error) => {
-      console.error('Failed to send attachment:', error);
-    });
-  }, [conversationId, sendMessage, isViewOnce]);
+      // Fire and forget - optimistic update happens immediately in sendMessage
+      sendMessage(conversationId, content, attachments, viewOnce || isViewOnce).catch((error) => {
+        console.error('Failed to send attachment:', error);
+      });
+    },
+    [conversationId, sendMessage, isViewOnce]
+  );
 
   // Pick image from gallery
   const handlePickImage = useCallback(async () => {
@@ -690,7 +863,11 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
 
       if (result.assets && result.assets[0]) {
         const asset = result.assets[0];
-        console.log('Selected image:', { uri: asset.uri, fileName: asset.fileName, type: asset.type });
+        console.log('Selected image:', {
+          uri: asset.uri,
+          fileName: asset.fileName,
+          type: asset.type,
+        });
         if (asset.uri) {
           setUploadingMedia(true);
           try {
@@ -727,7 +904,11 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
 
       if (result.assets && result.assets[0]) {
         const asset = result.assets[0];
-        console.log('Selected video:', { uri: asset.uri, fileName: asset.fileName, type: asset.type });
+        console.log('Selected video:', {
+          uri: asset.uri,
+          fileName: asset.fileName,
+          type: asset.type,
+        });
         if (asset.uri) {
           setUploadingMedia(true);
           try {
@@ -775,7 +956,11 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
 
       if (result.assets && result.assets[0]) {
         const asset = result.assets[0];
-        console.log('Captured photo:', { uri: asset.uri, fileName: asset.fileName, type: asset.type });
+        console.log('Captured photo:', {
+          uri: asset.uri,
+          fileName: asset.fileName,
+          type: asset.type,
+        });
         if (asset.uri) {
           setUploadingMedia(true);
           try {
@@ -845,13 +1030,15 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
   }, []);
 
   // Handle location selected from picker
-  const handleLocationSelect = useCallback((location: LocationData) => {
-    const locationContent = locationService.serializeLocationData(location);
+  const handleLocationSelect = useCallback(
+    (location: LocationData) => {
+      const locationContent = locationService.serializeLocationData(location);
 
-    // Fire and forget - optimistic update happens immediately
-    sendMessage(conversationId, locationContent, [{ type: 'location' }]).catch(console.error);
-  }, [conversationId, sendMessage]);
-
+      // Fire and forget - optimistic update happens immediately
+      sendMessage(conversationId, locationContent, [{ type: 'location' }]).catch(console.error);
+    },
+    [conversationId, sendMessage]
+  );
 
   // Record video using in-app camera
   const handleRecordVideo = useCallback(() => {
@@ -860,25 +1047,28 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
   }, []);
 
   // Handle video recorded from VideoRecorder
-  const handleVideoRecorded = useCallback(async (videoUri: string, duration: number) => {
-    console.log('Video recorded:', { videoUri, duration });
-    setUploadingMedia(true);
-    try {
-      const fileName = `video_${Date.now()}.mp4`;
-      const mimeType = 'video/mp4';
-      const uploadResult = await uploadFile(videoUri, fileName, mimeType);
-      if (uploadResult) {
-        sendWithAttachment(uploadResult, 'video');
-      } else {
-        Alert.alert('Upload Failed', 'Could not upload video.');
+  const handleVideoRecorded = useCallback(
+    async (videoUri: string, duration: number) => {
+      console.log('Video recorded:', { videoUri, duration });
+      setUploadingMedia(true);
+      try {
+        const fileName = `video_${Date.now()}.mp4`;
+        const mimeType = 'video/mp4';
+        const uploadResult = await uploadFile(videoUri, fileName, mimeType);
+        if (uploadResult) {
+          sendWithAttachment(uploadResult, 'video');
+        } else {
+          Alert.alert('Upload Failed', 'Could not upload video.');
+        }
+      } catch (error: any) {
+        console.error('Video upload error:', error);
+        Alert.alert('Upload Error', error?.message || 'Failed to upload video');
+      } finally {
+        setUploadingMedia(false);
       }
-    } catch (error: any) {
-      console.error('Video upload error:', error);
-      Alert.alert('Upload Error', error?.message || 'Failed to upload video');
-    } finally {
-      setUploadingMedia(false);
-    }
-  }, [uploadFile, sendWithAttachment]);
+    },
+    [uploadFile, sendWithAttachment]
+  );
 
   // Process video asset (shared between record and pick)
 
@@ -932,12 +1122,16 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
     setEmojiPickerVisible(false);
   }, []);
 
-  const formatTime = (d: string) => new Date(d).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  const formatTime = (d: string) =>
+    new Date(d).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
   // Helper to check if URL is an image
-  const isImageUrl = (url: string) => /\.(jpg|jpeg|png|gif|webp|bmp|svg|ico|tiff|heic|heif)(\?|$)/i.test(url);
-  const isVideoUrl = (url: string) => /\.(mp4|webm|mov|avi|mkv|m4v|wmv|flv|3gp|3g2|ogv|ts|mts)(\?|$)/i.test(url);
-  const isAudioUrl = (url: string) => /\.(mp3|wav|ogg|m4a|aac|flac|wma|opus|amr|3gpp)(\?|$)/i.test(url);
+  const isImageUrl = (url: string) =>
+    /\.(jpg|jpeg|png|gif|webp|bmp|svg|ico|tiff|heic|heif)(\?|$)/i.test(url);
+  const isVideoUrl = (url: string) =>
+    /\.(mp4|webm|mov|avi|mkv|m4v|wmv|flv|3gp|3g2|ogv|ts|mts)(\?|$)/i.test(url);
+  const isAudioUrl = (url: string) =>
+    /\.(mp3|wav|ogg|m4a|aac|flac|wma|opus|amr|3gpp)(\?|$)/i.test(url);
 
   // Helper to parse location data from message content
 
@@ -966,7 +1160,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
     }
 
     // Convert relative URL to absolute
-    return url ? (toAbsoluteUrl(url) || null) : null;
+    return url ? toAbsoluteUrl(url) || null : null;
   };
 
   // Get attachment file name from message
@@ -974,15 +1168,27 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
     // Check attachments array for fileName
     if (item.attachments && item.attachments.length > 0) {
       const attachment = item.attachments[0];
-      if (attachment.fileName) return attachment.fileName;
-      if (attachment.name) return attachment.name;
-      if (attachment.originalName) return attachment.originalName;
+      if (attachment.fileName) {
+        return attachment.fileName;
+      }
+      if (attachment.name) {
+        return attachment.name;
+      }
+      if (attachment.originalName) {
+        return attachment.originalName;
+      }
     }
     // Check direct fileName field
-    if (item.fileName) return item.fileName;
-    if (item.originalFileName) return item.originalFileName;
+    if (item.fileName) {
+      return item.fileName;
+    }
+    if (item.originalFileName) {
+      return item.originalFileName;
+    }
     // Check title field (some APIs use this)
-    if (item.title) return item.title;
+    if (item.title) {
+      return item.title;
+    }
 
     // Fall back to extracting from URL
     const url = getAttachmentUrl(item);
@@ -997,30 +1203,50 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
         const ext = urlFileName.split('.').pop()?.toLowerCase() || '';
         const friendlyNames: Record<string, string> = {
           // Images
-          jpg: 'Image.jpg', jpeg: 'Image.jpeg', png: 'Image.png', gif: 'Image.gif', webp: 'Image.webp',
+          jpg: 'Image.jpg',
+          jpeg: 'Image.jpeg',
+          png: 'Image.png',
+          gif: 'Image.gif',
+          webp: 'Image.webp',
           // Videos
-          mp4: 'Video.mp4', webm: 'Video.webm', mov: 'Video.mov', avi: 'Video.avi',
+          mp4: 'Video.mp4',
+          webm: 'Video.webm',
+          mov: 'Video.mov',
+          avi: 'Video.avi',
           // Audio
-          mp3: 'Audio.mp3', wav: 'Audio.wav', ogg: 'Audio.ogg', m4a: 'Audio.m4a',
+          mp3: 'Audio.mp3',
+          wav: 'Audio.wav',
+          ogg: 'Audio.ogg',
+          m4a: 'Audio.m4a',
           // Documents
-          pdf: 'Document.pdf', doc: 'Document.doc', docx: 'Document.docx',
-          xls: 'Spreadsheet.xls', xlsx: 'Spreadsheet.xlsx',
-          ppt: 'Presentation.ppt', pptx: 'Presentation.pptx',
-          txt: 'Text File.txt', csv: 'Data File.csv',
-          zip: 'Archive.zip', rar: 'Archive.rar',
+          pdf: 'Document.pdf',
+          doc: 'Document.doc',
+          docx: 'Document.docx',
+          xls: 'Spreadsheet.xls',
+          xlsx: 'Spreadsheet.xlsx',
+          ppt: 'Presentation.ppt',
+          pptx: 'Presentation.pptx',
+          txt: 'Text File.txt',
+          csv: 'Data File.csv',
+          zip: 'Archive.zip',
+          rar: 'Archive.rar',
         };
         return friendlyNames[ext] || `File.${ext}`;
       }
 
       // Return the actual filename if it doesn't look like a UUID
-      if (urlFileName) return urlFileName;
+      if (urlFileName) {
+        return urlFileName;
+      }
     }
     return 'File';
   };
 
   // Helper to get thumbnail URL for a message
   const getMessageThumbnailUrl = (item: any): string | null => {
-    if (!item) return null;
+    if (!item) {
+      return null;
+    }
     // Check for thumbnailUrl in attachments
     if (item.attachments && item.attachments.length > 0) {
       const attachment = item.attachments[0];
@@ -1037,8 +1263,17 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
   };
 
   // Helper to get media type and info for reply preview
-  const getReplyMediaInfo = (message: any): { type: 'text' | 'image' | 'video' | 'audio' | 'file'; thumbnailUrl: string | null; fileName: string | null; duration: number | null } => {
-    if (!message) return { type: 'text', thumbnailUrl: null, fileName: null, duration: null };
+  const getReplyMediaInfo = (
+    message: any
+  ): {
+    type: 'text' | 'image' | 'video' | 'audio' | 'file';
+    thumbnailUrl: string | null;
+    fileName: string | null;
+    duration: number | null;
+  } => {
+    if (!message) {
+      return { type: 'text', thumbnailUrl: null, fileName: null, duration: null };
+    }
 
     const attachmentUrl = getAttachmentUrl(message);
     if (!attachmentUrl) {
@@ -1062,10 +1297,16 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
   };
 
   // Render reply preview content with media support
-  const renderReplyPreviewContent = (message: any, isOwn: boolean = false, isInBubble: boolean = false) => {
+  const renderReplyPreviewContent = (
+    message: any,
+    isOwn: boolean = false,
+    isInBubble: boolean = false
+  ) => {
     const mediaInfo = getReplyMediaInfo(message);
     const textColor = isInBubble
-      ? (isOwn ? 'rgba(255,255,255,0.7)' : colors.textSecondary)
+      ? isOwn
+        ? 'rgba(255,255,255,0.7)'
+        : colors.textSecondary
       : colors.textSecondary;
 
     // For text messages, just show the content
@@ -1074,7 +1315,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
         <Text
           style={[
             isInBubble ? styles.replyPreviewText : styles.replyText,
-            isInBubble && isOwn && styles.replyPreviewTextOwn
+            isInBubble && isOwn && styles.replyPreviewTextOwn,
           ]}
           numberOfLines={1}
         >
@@ -1086,21 +1327,31 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
     // For media messages, show thumbnail/icon + description
     const getIconName = () => {
       switch (mediaInfo.type) {
-        case 'image': return 'image';
-        case 'video': return 'videocam';
-        case 'audio': return 'mic';
-        case 'file': return 'document';
-        default: return 'attach';
+        case 'image':
+          return 'image';
+        case 'video':
+          return 'videocam';
+        case 'audio':
+          return 'mic';
+        case 'file':
+          return 'document';
+        default:
+          return 'attach';
       }
     };
 
     const getMediaTypeLabel = () => {
       switch (mediaInfo.type) {
-        case 'image': return 'Photo';
-        case 'video': return 'Video';
-        case 'audio': return 'Voice message';
-        case 'file': return 'File';
-        default: return 'Media';
+        case 'image':
+          return 'Photo';
+        case 'video':
+          return 'Video';
+        case 'audio':
+          return 'Voice message';
+        case 'file':
+          return 'File';
+        default:
+          return 'Media';
       }
     };
 
@@ -1121,7 +1372,8 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
       return getMediaTypeLabel();
     };
 
-    const hasThumbnail = mediaInfo.thumbnailUrl && (mediaInfo.type === 'image' || mediaInfo.type === 'video');
+    const hasThumbnail =
+      mediaInfo.thumbnailUrl && (mediaInfo.type === 'image' || mediaInfo.type === 'video');
     const iconColor = isOwn ? 'rgba(255,255,255,0.8)' : colors.primary;
 
     return (
@@ -1142,10 +1394,12 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
           </View>
         ) : (
           /* Show larger icon placeholder when no thumbnail */
-          <View style={[
-            styles.replyMediaIcon,
-            { backgroundColor: isOwn ? 'rgba(255,255,255,0.15)' : `${colors.primary}15` }
-          ]}>
+          <View
+            style={[
+              styles.replyMediaIcon,
+              { backgroundColor: isOwn ? 'rgba(255,255,255,0.15)' : `${colors.primary}15` },
+            ]}
+          >
             <Icon name={getIconName()} size={20} color={iconColor} />
           </View>
         )}
@@ -1161,7 +1415,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
             style={[
               isInBubble ? styles.replyPreviewText : styles.replyText,
               isInBubble && isOwn && styles.replyPreviewTextOwn,
-              styles.replyMediaText
+              styles.replyMediaText,
             ]}
             numberOfLines={1}
           >
@@ -1178,10 +1432,18 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
 
     // Determine actual media type from URL, not from message type field
     const getMediaType = (url: string | null): 'image' | 'video' | 'audio' | 'file' | null => {
-      if (!url) return null;
-      if (isImageUrl(url)) return 'image';
-      if (isVideoUrl(url)) return 'video';
-      if (isAudioUrl(url)) return 'audio';
+      if (!url) {
+        return null;
+      }
+      if (isImageUrl(url)) {
+        return 'image';
+      }
+      if (isVideoUrl(url)) {
+        return 'video';
+      }
+      if (isAudioUrl(url)) {
+        return 'audio';
+      }
       return 'file'; // Default to file for any other attachment
     };
 
@@ -1192,11 +1454,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
       return (
         <View>
           <TouchableOpacity onPress={() => attachmentUrl && openMedia(attachmentUrl, 'image')}>
-            <Image
-              source={{ uri: attachmentUrl! }}
-              style={styles.messageImage}
-              resizeMode="cover"
-            />
+            <Image source={{ uri: attachmentUrl }} style={styles.messageImage} resizeMode="cover" />
           </TouchableOpacity>
           {hasText && (
             <Text style={[styles.messageText, isOwn && styles.messageTextOwn, { marginTop: 8 }]}>
@@ -1256,14 +1514,19 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
             <Text style={[styles.fileName, isOwn && { color: colors.white }]} numberOfLines={1}>
               {fileName}
             </Text>
-            <Text style={[styles.fileTap, isOwn && { color: 'rgba(255,255,255,0.7)' }]}>Tap to download</Text>
+            <Text style={[styles.fileTap, isOwn && { color: 'rgba(255,255,255,0.7)' }]}>
+              Tap to download
+            </Text>
           </View>
         </TouchableOpacity>
       );
     }
 
     // Render location with LocationMessage component
-    if (item.type?.toLowerCase() === 'location' || (hasText && item.content.includes('"latitude"'))) {
+    if (
+      item.type?.toLowerCase() === 'location' ||
+      (hasText && item.content.includes('"latitude"'))
+    ) {
       const parsedLocation = locationService.parseLocationData(item.content);
       if (parsedLocation) {
         return <LocationMessage location={parsedLocation} isOwn={isOwn} />;
@@ -1276,14 +1539,16 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
             // Try to parse any coordinates from content
             const match = item.content.match(/(-?\d+\.?\d*),\s*(-?\d+\.?\d*)/);
             if (match) {
-              locationService.openInMaps(parseFloat(match[1]), parseFloat(match[2]), 'Shared Location');
+              locationService.openInMaps(
+                parseFloat(match[1]),
+                parseFloat(match[2]),
+                'Shared Location'
+              );
             }
           }}
         >
           <Icon name="location" size={32} color={isOwn ? colors.white : colors.primary} />
-          <Text style={[styles.locationLabel, isOwn && { color: colors.white }]}>
-            Location
-          </Text>
+          <Text style={[styles.locationLabel, isOwn && { color: colors.white }]}>Location</Text>
         </TouchableOpacity>
       );
     }
@@ -1293,18 +1558,15 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
       const content = item.content;
       const isLongMessage = content.length > MAX_MESSAGE_LENGTH;
       const isExpanded = expandedMessages.has(item.id);
-      const displayText = isLongMessage && !isExpanded
-        ? content.substring(0, MAX_MESSAGE_LENGTH) + '...'
-        : content;
+      const displayText =
+        isLongMessage && !isExpanded ? content.substring(0, MAX_MESSAGE_LENGTH) + '...' : content;
 
       // Check for URLs to show link preview
       const firstUrl = linkPreviewEnabled ? extractFirstUrl(content) : null;
 
       return (
         <View>
-          <Text style={[styles.messageText, isOwn && styles.messageTextOwn]}>
-            {displayText}
-          </Text>
+          <Text style={[styles.messageText, isOwn && styles.messageTextOwn]}>{displayText}</Text>
           {isLongMessage && (
             <TouchableOpacity onPress={() => toggleMessageExpansion(item.id)}>
               <Text style={[styles.readMoreText, isOwn && styles.readMoreTextOwn]}>
@@ -1312,9 +1574,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
               </Text>
             </TouchableOpacity>
           )}
-          {firstUrl && (
-            <LinkPreview url={firstUrl} isOwn={isOwn} />
-          )}
+          {firstUrl && <LinkPreview url={firstUrl} isOwn={isOwn} />}
         </View>
       );
     }
@@ -1328,43 +1588,62 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
 
   // Render message status indicator
   const renderStatusIndicator = (status: string | undefined, isOwn: boolean) => {
-    if (!isOwn) return null;
+    if (!isOwn) {
+      return null;
+    }
 
     const iconColor = 'rgba(255,255,255,0.7)';
     const iconSize = 14;
 
     switch (status) {
       case 'sending':
-        return <Icon name="time-outline" size={iconSize} color={iconColor} style={styles.statusIcon} />;
+        return (
+          <Icon name="time-outline" size={iconSize} color={iconColor} style={styles.statusIcon} />
+        );
       case 'sent':
-        return <Icon name="checkmark" size={iconSize} color={iconColor} style={styles.statusIcon} />;
+        return (
+          <Icon name="checkmark" size={iconSize} color={iconColor} style={styles.statusIcon} />
+        );
       case 'delivered':
-        return <Icon name="checkmark-done" size={iconSize} color={iconColor} style={styles.statusIcon} />;
+        return (
+          <Icon name="checkmark-done" size={iconSize} color={iconColor} style={styles.statusIcon} />
+        );
       case 'read':
-        return <Icon name="checkmark-done" size={iconSize} color="#4FC3F7" style={styles.statusIcon} />;
+        return (
+          <Icon name="checkmark-done" size={iconSize} color="#4FC3F7" style={styles.statusIcon} />
+        );
       case 'viewed':
         return <Icon name="eye" size={iconSize} color="#4FC3F7" style={styles.statusIcon} />;
       case 'played':
         return <Icon name="play" size={iconSize} color="#4FC3F7" style={styles.statusIcon} />;
       case 'failed':
-        return <Icon name="alert-circle" size={iconSize} color="#FF5252" style={styles.statusIcon} />;
+        return (
+          <Icon name="alert-circle" size={iconSize} color="#FF5252" style={styles.statusIcon} />
+        );
       default:
         // Default to sent for messages without status (older messages)
-        return <Icon name="checkmark" size={iconSize} color={iconColor} style={styles.statusIcon} />;
+        return (
+          <Icon name="checkmark" size={iconSize} color={iconColor} style={styles.statusIcon} />
+        );
     }
   };
 
   // Handle reply action when message is swiped
-  const handleReply = useCallback((message: Message) => {
-    // Check if reply is allowed
-    if (!replyAllowed) return;
+  const handleReply = useCallback(
+    (message: Message) => {
+      // Check if reply is allowed
+      if (!replyAllowed) {
+        return;
+      }
 
-    setReplyToMessage(message);
-    // Close the swipeable
-    if (swipeableRefs.current[message.id]) {
-      swipeableRefs.current[message.id]?.close();
-    }
-  }, [replyAllowed]);
+      setReplyToMessage(message);
+      // Close the swipeable
+      if (swipeableRefs.current[message.id]) {
+        swipeableRefs.current[message.id]?.close();
+      }
+    },
+    [replyAllowed]
+  );
 
   // Clear reply
   const clearReply = useCallback(() => {
@@ -1443,47 +1722,64 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
 
   // Helper to check if message is within time limit
   const isWithinTimeLimit = useCallback((createdAt: string, timeLimitMinutes: number): boolean => {
-    if (timeLimitMinutes === -1) return true; // No limit
+    if (timeLimitMinutes === -1) {
+      return true;
+    } // No limit
     const messageTime = new Date(createdAt).getTime();
     const now = Date.now();
     const limitMs = timeLimitMinutes * 60 * 1000;
-    return (now - messageTime) <= limitMs;
+    return now - messageTime <= limitMs;
   }, []);
 
   // Check if user can edit a message (following User Portal business logic)
-  const canEditMessage = useCallback((message: Message): boolean => {
-    // Use editingSettings from component scope (triggers re-render on change)
-    const allowEditing = editingSettings.allowEditing ?? true;
-    const timeLimit = editingSettings.editTimeLimitMinutes ?? 15;
-    if (allowEditing === false) return false;
-    return isWithinTimeLimit(message.createdAt, timeLimit);
-  }, [editingSettings, isWithinTimeLimit]);
+  const canEditMessage = useCallback(
+    (message: Message): boolean => {
+      // Use editingSettings from component scope (triggers re-render on change)
+      const allowEditing = editingSettings.allowEditing ?? true;
+      const timeLimit = editingSettings.editTimeLimitMinutes ?? 15;
+      if (allowEditing === false) {
+        return false;
+      }
+      return isWithinTimeLimit(message.createdAt, timeLimit);
+    },
+    [editingSettings, isWithinTimeLimit]
+  );
 
   // Check if user can delete a message (following User Portal business logic)
-  const canDeleteMessage = useCallback((message: Message, isOwn: boolean): boolean => {
-    // Use deletionSettings from component scope (triggers re-render on change)
-    // For "delete for me", always allowed if setting permits (default true)
-    if (!isOwn && (deletionSettings.deleteForMeAlwaysAllowed !== false)) return true;
-    // For own messages, check time limit (default -1 = no limit)
-    const timeLimit = deletionSettings.timeLimitMinutes ?? -1;
-    return isWithinTimeLimit(message.createdAt, timeLimit);
-  }, [deletionSettings, isWithinTimeLimit]);
+  const canDeleteMessage = useCallback(
+    (message: Message, isOwn: boolean): boolean => {
+      // Use deletionSettings from component scope (triggers re-render on change)
+      // For "delete for me", always allowed if setting permits (default true)
+      if (!isOwn && deletionSettings.deleteForMeAlwaysAllowed !== false) {
+        return true;
+      }
+      // For own messages, check time limit (default -1 = no limit)
+      const timeLimit = deletionSettings.timeLimitMinutes ?? -1;
+      return isWithinTimeLimit(message.createdAt, timeLimit);
+    },
+    [deletionSettings, isWithinTimeLimit]
+  );
 
   // Perform the actual delete
-  const performDelete = useCallback(async (messageId: string, forEveryone: boolean) => {
-    try {
-      await deleteMessage(conversationId, messageId, forEveryone);
-      setDeleteConfirmVisible(false);
-      setDeletingMessage(null);
-      setSelectedMessage(null);
-    } catch (error) {
-      Alert.alert('Error', 'Failed to delete message');
-    }
-  }, [conversationId, deleteMessage]);
+  const performDelete = useCallback(
+    async (messageId: string, forEveryone: boolean) => {
+      try {
+        await deleteMessage(conversationId, messageId, forEveryone);
+        setDeleteConfirmVisible(false);
+        setDeletingMessage(null);
+        setSelectedMessage(null);
+      } catch (error) {
+        Alert.alert('Error', 'Failed to delete message');
+      }
+    },
+    [conversationId, deleteMessage]
+  );
 
   // Delete message - follows User Portal business logic
   const handleDeleteMessage = useCallback(() => {
-    if (!selectedMessage) return;
+    if (!selectedMessage) {
+      return;
+    }
 
     const isOwnMessage = selectedMessage.senderId === user?.id;
 
@@ -1503,13 +1799,17 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
 
   // Handle delete for me
   const handleDeleteForMe = useCallback(() => {
-    if (!deletingMessage) return;
+    if (!deletingMessage) {
+      return;
+    }
     performDelete(deletingMessage.id, false);
   }, [deletingMessage, performDelete]);
 
   // Handle delete for everyone (own messages only)
   const handleDeleteForEveryone = useCallback(() => {
-    if (!deletingMessage || !deletingMessage.isOwn) return;
+    if (!deletingMessage || !deletingMessage.isOwn) {
+      return;
+    }
     performDelete(deletingMessage.id, true);
   }, [deletingMessage, performDelete]);
 
@@ -1522,9 +1822,13 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
 
   // Report message - open report modal (only for other's messages)
   const handleReportMessage = useCallback(() => {
-    if (!selectedMessage) return;
+    if (!selectedMessage) {
+      return;
+    }
     const isOwnMessage = selectedMessage.senderId === user?.id;
-    if (isOwnMessage) return; // Can't report own messages
+    if (isOwnMessage) {
+      return;
+    } // Can't report own messages
 
     setMessageActionsVisible(false);
     setReportingMessage(selectedMessage);
@@ -1532,23 +1836,29 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
   }, [selectedMessage, user?.id]);
 
   // Submit report
-  const handleSubmitReport = useCallback(async (reportType: string, description: string) => {
-    if (!reportingMessage) return;
+  const handleSubmitReport = useCallback(
+    async (reportType: string, description: string) => {
+      if (!reportingMessage) {
+        return;
+      }
 
-    try {
-      await sdk.reports.create({
-        reportType: reportType as any,
-        description,
-        reportedMessageId: reportingMessage.id,
-      });
-      setReportModalVisible(false);
-      setReportingMessage(null);
-      setSelectedMessage(null);
-      Alert.alert('Report Submitted', 'Thank you for your report. We will review it shortly.');
-    } catch (error) {
-      Alert.alert('Error', 'Failed to submit report. Please try again.');
-    }
-  }, [reportingMessage]);
+      try {
+        const sdk = getSDK();
+        await sdk.reports.create({
+          reportType: reportType as any,
+          description,
+          reportedMessageId: reportingMessage.id,
+        });
+        setReportModalVisible(false);
+        setReportingMessage(null);
+        setSelectedMessage(null);
+        Alert.alert('Report Submitted', 'Thank you for your report. We will review it shortly.');
+      } catch (error) {
+        Alert.alert('Error', 'Failed to submit report. Please try again.');
+      }
+    },
+    [reportingMessage]
+  );
 
   // Cancel report
   const handleCancelReport = useCallback(() => {
@@ -1562,11 +1872,12 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
     setMessageActionsVisible(false);
     setForwardModalVisible(true);
     setForwardLoading(true);
-    setForwardSearchQuery("");
+    setForwardSearchQuery('');
     setForwardTargets([]);
 
     try {
       // Fetch conversations using the same method as chatStore
+      const conversationsApi = getConversationsApi();
       const result = await conversationsApi.list();
       console.log('Forward - conversations result:', JSON.stringify(result, null, 2));
 
@@ -1595,121 +1906,141 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
   }, [conversationId]);
 
   // Handle forward to a target (conversation or user)
-  const handleForwardTo = useCallback(async (target: any) => {
-    if (!selectedMessage) return;
-
-    setForwardLoading(true);
-    try {
-      let targetConversationId = target.id;
-
-      // If it's a user, create or get DM first
-      if (target.type === 'user') {
-        const dm = await conversationsApi.createDM({ userId: target.id });
-        targetConversationId = dm.id;
+  const handleForwardTo = useCallback(
+    async (target: any) => {
+      if (!selectedMessage) {
+        return;
       }
 
-      // Forward the message using the API
-      await sdk.messages.forward(conversationId, selectedMessage.id, [targetConversationId]);
+      setForwardLoading(true);
+      try {
+        let targetConversationId = target.id;
 
-      // Refresh conversations list to show the forwarded message
-      await fetchConversations();
+        // If it's a user, create or get DM first
+        if (target.type === 'user') {
+          const conversationsApi = getConversationsApi();
+          const dm = await conversationsApi.createDM({ userId: target.id });
+          targetConversationId = dm.id;
+        }
 
-      // Close modal
-      setForwardModalVisible(false);
-      setForwardTargets([]);
-      setForwardSearchQuery("");
-      setSelectedMessage(null);
-    } catch (error) {
-      console.error('Failed to forward message:', error);
-      Alert.alert('Error', 'Failed to forward message');
-    } finally {
-      setForwardLoading(false);
-    }
-  }, [selectedMessage, conversationId, fetchConversations]);
+        // Forward the message using the API
+        const sdk = getSDK();
+        await sdk.messages.forward(conversationId, selectedMessage.id, [targetConversationId]);
+
+        // Refresh conversations list to show the forwarded message
+        await fetchConversations();
+
+        // Close modal
+        setForwardModalVisible(false);
+        setForwardTargets([]);
+        setForwardSearchQuery('');
+        setSelectedMessage(null);
+      } catch (error) {
+        console.error('Failed to forward message:', error);
+        Alert.alert('Error', 'Failed to forward message');
+      } finally {
+        setForwardLoading(false);
+      }
+    },
+    [selectedMessage, conversationId, fetchConversations]
+  );
 
   // Search for forward targets (users)
-  const handleForwardSearchChange = useCallback(async (query: string) => {
-    setForwardSearchQuery(query);
+  const handleForwardSearchChange = useCallback(
+    async (query: string) => {
+      setForwardSearchQuery(query);
 
-    if (query.trim().length < 2) {
-      // Reset to conversations when not searching
+      if (query.trim().length < 2) {
+        // Reset to conversations when not searching
+        try {
+          const conversationsApi = getConversationsApi();
+          const result = await conversationsApi.list();
+          const convList = Array.isArray(result) ? result : (result as any).items || [];
+          const targets = convList
+            .filter((c: any) => c.id !== conversationId && !c.isArchived)
+            .map((c: any) => ({
+              id: c.id,
+              type: 'conversation' as const,
+              name: c.name || 'Chat',
+              avatarUrl: c.avatarUrl,
+              conversationType: c.type,
+            }));
+          setForwardTargets(targets);
+        } catch (e) {
+          console.error('Failed to reload conversations:', e);
+        }
+        return;
+      }
+
+      setForwardLoading(true);
       try {
+        // Search for users
+        const contactsApi = getContactsApi();
+        const users = await contactsApi.searchUsers(query.trim(), 20);
+        console.log('Forward search - users result:', users);
+
+        const userTargets = (users || [])
+          .filter((u: any) => u.id !== user?.id)
+          .map((u: any) => ({
+            id: u.id,
+            type: 'user' as const,
+            name: u.name || u.username,
+            username: u.username,
+            avatarUrl: u.avatarUrl,
+          }));
+
+        // Also filter conversations by name
+        const conversationsApi = getConversationsApi();
         const result = await conversationsApi.list();
         const convList = Array.isArray(result) ? result : (result as any).items || [];
-        const targets = convList
-          .filter((c: any) => c.id !== conversationId && !c.isArchived)
+        const q = query.trim().toLowerCase();
+        const convTargets = convList
+          .filter(
+            (c: any) =>
+              c.id !== conversationId && !c.isArchived && (c.name || '').toLowerCase().includes(q)
+          )
           .map((c: any) => ({
             id: c.id,
             type: 'conversation' as const,
-            name: c.name || 'Chat',
+            name: c.name || 'Unknown',
             avatarUrl: c.avatarUrl,
             conversationType: c.type,
           }));
-        setForwardTargets(targets);
-      } catch (e) {
-        console.error('Failed to reload conversations:', e);
+
+        setForwardTargets([...userTargets, ...convTargets]);
+      } catch (error) {
+        console.error('Forward search error:', error);
+      } finally {
+        setForwardLoading(false);
       }
-      return;
-    }
-
-    setForwardLoading(true);
-    try {
-      // Search for users
-      const users = await contactsApi.searchUsers(query.trim(), 20);
-      console.log('Forward search - users result:', users);
-
-      const userTargets = (users || [])
-        .filter((u: any) => u.id !== user?.id)
-        .map((u: any) => ({
-          id: u.id,
-          type: 'user' as const,
-          name: u.name || u.username,
-          username: u.username,
-          avatarUrl: u.avatarUrl,
-        }));
-
-      // Also filter conversations by name
-      const result = await conversationsApi.list();
-      const convList = Array.isArray(result) ? result : (result as any).items || [];
-      const q = query.trim().toLowerCase();
-      const convTargets = convList
-        .filter((c: any) => c.id !== conversationId && !c.isArchived && (c.name || '').toLowerCase().includes(q))
-        .map((c: any) => ({
-          id: c.id,
-          type: 'conversation' as const,
-          name: c.name || 'Unknown',
-          avatarUrl: c.avatarUrl,
-          conversationType: c.type,
-        }));
-
-      setForwardTargets([...userTargets, ...convTargets]);
-    } catch (error) {
-      console.error('Forward search error:', error);
-    } finally {
-      setForwardLoading(false);
-    }
-  }, [conversationId, user]);
+    },
+    [conversationId, user]
+  );
 
   // Add reaction to message
-  const handleAddReaction = useCallback(async (emoji: string) => {
-    if (selectedMessage) {
-      try {
-        await sdk.messages.react(conversationId, selectedMessage.id, emoji);
-        // Update local state with reaction
-        updateMessage(conversationId, selectedMessage.id, {
-          reactions: [
-            ...(selectedMessage.reactions || []),
-            { emoji, count: 1, users: [{ userId: user?.id || '' }], hasReacted: true }
-          ]
-        });
-      } catch (error) {
-        console.error('Failed to add reaction:', error);
-        Alert.alert('Error', 'Failed to add reaction');
+  const handleAddReaction = useCallback(
+    async (emoji: string) => {
+      if (selectedMessage) {
+        try {
+          const sdk = getSDK();
+          await sdk.messages.react(conversationId, selectedMessage.id, emoji);
+          // Update local state with reaction
+          updateMessage(conversationId, selectedMessage.id, {
+            reactions: [
+              ...(selectedMessage.reactions || []),
+              { emoji, count: 1, users: [{ userId: user?.id || '' }], hasReacted: true },
+            ],
+          });
+        } catch (error) {
+          console.error('Failed to add reaction:', error);
+          Alert.alert('Error', 'Failed to add reaction');
+        }
       }
-    }
-    setReactionPickerVisible(false);
-    setSelectedMessage(null);
-  }, [selectedMessage, conversationId, updateMessage, user]);
+      setReactionPickerVisible(false);
+      setSelectedMessage(null);
+    },
+    [selectedMessage, conversationId, updateMessage, user]
+  );
 
   // Show reaction picker (keep selectedMessage so we can add reaction to it)
   const handleShowReactionPicker = useCallback(() => {
@@ -1739,7 +2070,12 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
       return (
         <View style={styles.systemMessageContainer}>
           <View style={styles.systemMessageBubble}>
-            <Icon name="information-circle-outline" size={14} color={colors.textSecondary} style={{ marginRight: 6 }} />
+            <Icon
+              name="information-circle-outline"
+              size={14}
+              color={colors.textSecondary}
+              style={{ marginRight: 6 }}
+            />
             <Text style={styles.systemMessageText}>{item.content}</Text>
           </View>
         </View>
@@ -1765,7 +2101,9 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
 
       return (
         <View style={styles.systemMessageContainer}>
-          <View style={[styles.systemMessageBubble, { paddingVertical: 10, paddingHorizontal: 16 }]}>
+          <View
+            style={[styles.systemMessageBubble, { paddingVertical: 10, paddingHorizontal: 16 }]}
+          >
             <Icon name={callIcon} size={18} color={iconColor} style={{ marginRight: 8 }} />
             <Text style={[styles.systemMessageText, isMissed && { color: colors.error }]}>
               {callText}
@@ -1776,12 +2114,15 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
     }
 
     // Check view-once status
-    const isViewOnceMsg = (item as any).isViewOnce || (item as any).IsViewOnce || (item as any).viewOnce;
+    const isViewOnceMsg =
+      (item as any).isViewOnce || (item as any).IsViewOnce || (item as any).viewOnce;
     const viewOnceViewedAt = (item as any).viewOnceViewedAt || (item as any).ViewOnceViewedAt;
-    const isViewOnceHidden = isViewOnceMsg && !viewOnceViewedAt && !viewOnceRevealedMessages.has(item.id);
+    const isViewOnceHidden =
+      isViewOnceMsg && !viewOnceViewedAt && !viewOnceRevealedMessages.has(item.id);
     const isViewOnceViewed = isViewOnceMsg && !!viewOnceViewedAt;
     const viewOnceTimer = viewOnceTimers[item.id];
-    const isViewOnceTimerActive = viewOnceRevealedMessages.has(item.id) && viewOnceTimer !== undefined && viewOnceTimer > 0;
+    const isViewOnceTimerActive =
+      viewOnceRevealedMessages.has(item.id) && viewOnceTimer !== undefined && viewOnceTimer > 0;
     const isViewOnceExpired = viewOnceRevealedMessages.has(item.id) && viewOnceTimer === undefined;
 
     // Render view-once message content
@@ -1811,8 +2152,12 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
           return (
             <View style={styles.viewOnceContainer}>
               <Icon name={contentIcon} size={32} color={colors.white} />
-              <Text style={[styles.viewOnceText, { color: colors.white }]}>View once {contentLabel}</Text>
-              <Text style={[styles.viewOnceSubtext, { color: 'rgba(255,255,255,0.7)' }]}>Waiting for recipient to view</Text>
+              <Text style={[styles.viewOnceText, { color: colors.white }]}>
+                View once {contentLabel}
+              </Text>
+              <Text style={[styles.viewOnceSubtext, { color: 'rgba(255,255,255,0.7)' }]}>
+                Waiting for recipient to view
+              </Text>
             </View>
           );
         } else {
@@ -1835,7 +2180,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
 
       if (isViewOnceViewed || isViewOnceExpired) {
         // Show "viewed" placeholder with appropriate label
-        const viewedLabel = isPhoto ? 'Photo' : (isVid ? 'Video' : (hasMedia ? 'Media' : 'Message'));
+        const viewedLabel = isPhoto ? 'Photo' : isVid ? 'Video' : hasMedia ? 'Media' : 'Message';
         return (
           <View style={styles.viewOnceViewedContainer}>
             <Icon name="eye-off-outline" size={24} color={colors.textSecondary} />
@@ -1859,12 +2204,28 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
     };
 
     // Get reply info (the message this item is replying to)
-    const replyTo = item.replyTo || (item as any).ReplyTo || (item as any).replyToMessage || (item as any).ReplyToMessage;
-    console.log("[REPLY CHECK]", item.id, "replyTo:", replyTo, "replyToId:", item.replyToId || (item as any).replyToMessageId);
-    const replyToIdVal = item.replyToId || (item as any).ReplyToId || (item as any).replyToMessageId || (item as any).ReplyToMessageId;
+    const replyTo =
+      item.replyTo ||
+      (item as any).ReplyTo ||
+      (item as any).replyToMessage ||
+      (item as any).ReplyToMessage;
+    console.log(
+      '[REPLY CHECK]',
+      item.id,
+      'replyTo:',
+      replyTo,
+      'replyToId:',
+      item.replyToId || (item as any).replyToMessageId
+    );
+    const replyToIdVal =
+      item.replyToId ||
+      (item as any).ReplyToId ||
+      (item as any).replyToMessageId ||
+      (item as any).ReplyToMessageId;
 
     // Find the replied message in conversation if we have replyToId but not full replyTo
-    const repliedToMsg = replyTo || (replyToIdVal ? conversationMessages.find(m => m.id === replyToIdVal) : null);
+    const repliedToMsg =
+      replyTo || (replyToIdVal ? conversationMessages.find((m) => m.id === replyToIdVal) : null);
 
     // Get reactions
     const reactions = item.reactions || [];
@@ -1876,20 +2237,40 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
         delayLongPress={300}
       >
         <View style={[styles.messageRow, isOwn && styles.messageRowOwn]}>
-          {!isOwn && <View style={styles.messageAvatar}><Icon name="person" size={16} color={colors.white} /></View>}
+          {!isOwn && (
+            <View style={styles.messageAvatar}>
+              <Icon name="person" size={16} color={colors.white} />
+            </View>
+          )}
           <View>
-            <View style={[
-              styles.messageBubble,
-              isOwn ? styles.messageBubbleOwn : styles.messageBubbleOther,
-              isImageMedia && !isViewOnceHidden && !isViewOnceViewed && !isViewOnceExpired && styles.mediaBubble
-            ]}>
+            <View
+              style={[
+                styles.messageBubble,
+                isOwn ? styles.messageBubbleOwn : styles.messageBubbleOther,
+                isImageMedia &&
+                  !isViewOnceHidden &&
+                  !isViewOnceViewed &&
+                  !isViewOnceExpired ?
+                  styles.mediaBubble : undefined,
+              ]}
+            >
               {/* Reply preview inside bubble */}
               {repliedToMsg && (
-                <View style={[styles.replyPreviewInBubble, isOwn && styles.replyPreviewInBubbleOwn]}>
-                  <View style={[styles.replyBar, { backgroundColor: isOwn ? 'rgba(255,255,255,0.5)' : colors.primary }]} />
+                <View
+                  style={[styles.replyPreviewInBubble, isOwn && styles.replyPreviewInBubbleOwn]}
+                >
+                  <View
+                    style={[
+                      styles.replyBar,
+                      { backgroundColor: isOwn ? 'rgba(255,255,255,0.5)' : colors.primary },
+                    ]}
+                  />
                   <View style={styles.replyPreviewContent}>
-                    <Text style={[styles.replyPreviewName, isOwn && styles.replyPreviewNameOwn]} numberOfLines={1}>
-                      {(repliedToMsg as any).senderName || (repliedToMsg as any).sender?.name || 'Unknown'}
+                    <Text
+                      style={[styles.replyPreviewName, isOwn && styles.replyPreviewNameOwn]}
+                      numberOfLines={1}
+                    >
+                      {repliedToMsg.senderName || repliedToMsg.sender?.name || 'Unknown'}
                     </Text>
                     {renderReplyPreviewContent(repliedToMsg, isOwn, true)}
                   </View>
@@ -1897,7 +2278,9 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
               )}
               {isViewOnceMsg ? renderViewOnceContent() : renderMessageContent(item, isOwn)}
               <View style={styles.messageFooter}>
-                <Text style={[styles.messageTime, isOwn && styles.messageTimeOwn]}>{formatTime(item.createdAt)}</Text>
+                <Text style={[styles.messageTime, isOwn && styles.messageTimeOwn]}>
+                  {formatTime(item.createdAt)}
+                </Text>
                 {renderStatusIndicator((item as any).status, isOwn)}
               </View>
             </View>
@@ -1932,7 +2315,9 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
 
     return (
       <Swipeable
-        ref={(ref) => { swipeableRefs.current[item.id] = ref; }}
+        ref={(ref) => {
+          swipeableRefs.current[item.id] = ref;
+        }}
         renderRightActions={renderRightActions}
         rightThreshold={40}
         overshootRight={false}
@@ -1949,13 +2334,21 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
   };
 
   return (
-    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === "ios" ? "padding" : undefined} keyboardVerticalOffset={90}>
-      {isLoading && conversationMessages.length === 0 ? <View style={styles.loadingContainer}><ActivityIndicator size="large" color={colors.primary} /></View> :
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={90}
+    >
+      {isLoading && conversationMessages.length === 0 ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.primary} />
+        </View>
+      ) : (
         <FlatList
           ref={flatListRef}
           data={reversedMessages as any}
           renderItem={renderMessage}
-          keyExtractor={item => item.id}
+          keyExtractor={(item) => item.id}
           contentContainerStyle={styles.messagesList}
           inverted
           onEndReached={handleLoadMore}
@@ -1977,7 +2370,8 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
           windowSize={10}
           initialNumToRender={20}
           updateCellsBatchingPeriod={50}
-        />}
+        />
+      )}
       {/* Typing/Recording Indicator */}
       {(typingUsers.length > 0 || recordingUsers.length > 0) && (
         <View style={styles.typingIndicatorContainer}>
@@ -1988,8 +2382,8 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
                 {recordingUsers.length === 1
                   ? `${recordingUsers[0].userName || 'Someone'} is recording...`
                   : recordingUsers.length === 2
-                  ? `${recordingUsers[0].userName || 'Someone'} and ${recordingUsers[1].userName || 'someone'} are recording...`
-                  : `${recordingUsers.length} people are recording...`}
+                    ? `${recordingUsers[0].userName || 'Someone'} and ${recordingUsers[1].userName || 'someone'} are recording...`
+                    : `${recordingUsers.length} people are recording...`}
               </Text>
             </>
           ) : (
@@ -2003,8 +2397,8 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
                 {typingUsers.length === 1
                   ? `${typingUsers[0].userName || 'Someone'} is typing...`
                   : typingUsers.length === 2
-                  ? `${typingUsers[0].userName || 'Someone'} and ${typingUsers[1].userName || 'someone'} are typing...`
-                  : `${typingUsers.length} people are typing...`}
+                    ? `${typingUsers[0].userName || 'Someone'} and ${typingUsers[1].userName || 'someone'} are typing...`
+                    : `${typingUsers.length} people are typing...`}
               </Text>
             </>
           )}
@@ -2017,7 +2411,10 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
           <View style={[styles.replyBar, { backgroundColor: colors.primary }]} />
           <View style={styles.replyContent}>
             <Text style={styles.replyName} numberOfLines={1}>
-              Replying to {(replyToMessage as any).senderName || (replyToMessage as any).sender?.name || 'message'}
+              Replying to{' '}
+              {(replyToMessage as any).senderName ||
+                (replyToMessage as any).sender?.name ||
+                'message'}
             </Text>
             {renderReplyPreviewContent(replyToMessage, false, false)}
           </View>
@@ -2028,8 +2425,8 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
       )}
 
       {/* Hide input for Platform Channel - only admins can post */}
-      {!isBroadcast && (
-        isRecording ? (
+      {!isBroadcast &&
+        (isRecording ? (
           // Recording UI
           <View style={styles.recordingContainer}>
             <TouchableOpacity style={styles.cancelRecordButton} onPress={cancelAudioRecording}>
@@ -2037,7 +2434,9 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
             </TouchableOpacity>
             <View style={styles.recordingInfo}>
               <Animated.View style={[styles.recordingDot, { opacity: recordingAnimValue }]} />
-              <Text style={styles.recordingDuration}>{formatRecordingDuration(recordingDuration)}</Text>
+              <Text style={styles.recordingDuration}>
+                {formatRecordingDuration(recordingDuration)}
+              </Text>
               <Text style={styles.recordingText}>Recording...</Text>
             </View>
             <TouchableOpacity style={styles.sendRecordButton} onPress={stopAudioRecording}>
@@ -2058,8 +2457,23 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
               )}
             </TouchableOpacity>
             <View style={styles.inputWrapper}>
-              <TextInput style={styles.input} placeholder="Type a message..." placeholderTextColor={colors.textSecondary} value={inputText} onChangeText={(text) => { setInputText(text); if (text.length > 0) sendTypingIndicator(); }} multiline />
-              <TouchableOpacity style={styles.emojiButton} onPress={() => setEmojiPickerVisible(true)}>
+              <TextInput
+                style={styles.input}
+                placeholder="Type a message..."
+                placeholderTextColor={colors.textSecondary}
+                value={inputText}
+                onChangeText={(text) => {
+                  setInputText(text);
+                  if (text.length > 0) {
+                    sendTypingIndicator();
+                  }
+                }}
+                multiline
+              />
+              <TouchableOpacity
+                style={styles.emojiButton}
+                onPress={() => setEmojiPickerVisible(true)}
+              >
                 <Icon name="happy-outline" size={24} color={colors.textSecondary} />
               </TouchableOpacity>
             </View>
@@ -2068,28 +2482,42 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
                 <TouchableOpacity
                   style={[
                     styles.viewOnceToggle,
-                    isViewOnce ? styles.viewOnceToggleActive : styles.viewOnceToggleInactive
+                    isViewOnce ? styles.viewOnceToggleActive : styles.viewOnceToggleInactive,
                   ]}
                   onPress={() => setIsViewOnce(!isViewOnce)}
                 >
                   <Icon
-                    name={isViewOnce ? "eye-off" : "eye-outline"}
+                    name={isViewOnce ? 'eye-off' : 'eye-outline'}
                     size={20}
                     color={isViewOnce ? colors.white : colors.textSecondary}
                   />
                 </TouchableOpacity>
-                <TouchableOpacity style={[styles.sendButton, (sending || uploadingMedia) && styles.sendButtonDisabled]} onPress={handleSend} disabled={sending || uploadingMedia}>
-                  {sending ? <ActivityIndicator size="small" color={colors.white} /> : <Icon name="send" size={20} color={colors.white} />}
+                <TouchableOpacity
+                  style={[
+                    styles.sendButton,
+                    (sending || uploadingMedia) && styles.sendButtonDisabled,
+                  ]}
+                  onPress={handleSend}
+                  disabled={sending || uploadingMedia}
+                >
+                  {sending ? (
+                    <ActivityIndicator size="small" color={colors.white} />
+                  ) : (
+                    <Icon name="send" size={20} color={colors.white} />
+                  )}
                 </TouchableOpacity>
               </View>
             ) : (
-              <TouchableOpacity style={styles.micButton} onPress={startAudioRecording} disabled={uploadingMedia || sending}>
+              <TouchableOpacity
+                style={styles.micButton}
+                onPress={startAudioRecording}
+                disabled={uploadingMedia || sending}
+              >
                 <Icon name="mic" size={24} color={colors.primary} />
               </TouchableOpacity>
             )}
           </View>
-        )
-      )}
+        ))}
 
       {/* Attachment Menu Modal */}
       <Modal
@@ -2111,12 +2539,12 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
                   style={[
                     styles.viewOnceToggle,
                     isViewOnce ? styles.viewOnceToggleActive : styles.viewOnceToggleInactive,
-                    { marginRight: 8 }
+                    { marginRight: 8 },
                   ]}
                   onPress={() => setIsViewOnce(!isViewOnce)}
                 >
                   <Icon
-                    name={isViewOnce ? "eye-off" : "eye-outline"}
+                    name={isViewOnce ? 'eye-off' : 'eye-outline'}
                     size={18}
                     color={isViewOnce ? colors.white : colors.textSecondary}
                   />
@@ -2127,7 +2555,13 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
               </View>
             </View>
             {isViewOnce && (
-              <View style={{ backgroundColor: colors.warning + '20', paddingHorizontal: 16, paddingVertical: 8 }}>
+              <View
+                style={{
+                  backgroundColor: colors.warning + '20',
+                  paddingHorizontal: 16,
+                  paddingVertical: 8,
+                }}
+              >
                 <Text style={{ fontSize: 12, color: colors.warning, textAlign: 'center' }}>
                   🔒 View once enabled - recipient can only view once
                 </Text>
@@ -2190,12 +2624,14 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
         onClose={() => setVideoRecorderVisible(false)}
         onVideoRecorded={handleVideoRecorded}
         onRecordingStart={() => {
-          signalRService.sendRecording(conversationId).catch(err => {
+          const signalRService = getSignalRService();
+          signalRService.sendRecording(conversationId).catch((err) => {
             console.log('Failed to send recording indicator:', err);
           });
         }}
         onRecordingStop={() => {
-          signalRService.sendStoppedRecording(conversationId).catch(err => {
+          const signalRService = getSignalRService();
+          signalRService.sendStoppedRecording(conversationId).catch((err) => {
             console.log('Failed to send stopped recording indicator:', err);
           });
         }}
@@ -2227,7 +2663,24 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
             <View style={styles.emojiPickerFallback}>
               <Text style={styles.emojiPickerTitle}>Quick Emojis</Text>
               <View style={styles.emojiGrid}>
-                {['😀', '😂', '😍', '🥰', '😎', '🤔', '😢', '😡', '👍', '👎', '❤️', '🎉', '🔥', '💯', '✨', '🙏'].map((emoji) => (
+                {[
+                  '😀',
+                  '😂',
+                  '😍',
+                  '🥰',
+                  '😎',
+                  '🤔',
+                  '😢',
+                  '😡',
+                  '👍',
+                  '👎',
+                  '❤️',
+                  '🎉',
+                  '🔥',
+                  '💯',
+                  '✨',
+                  '🙏',
+                ].map((emoji) => (
                   <TouchableOpacity
                     key={emoji}
                     style={styles.emojiItem}
@@ -2255,6 +2708,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
         }}
         onLeaveGroup={async () => {
           try {
+            const sdk = getSDK();
             await sdk.conversations.leave(conversationId);
             navigation.goBack();
           } catch (error) {
@@ -2263,6 +2717,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
         }}
         onDeleteConversation={async () => {
           try {
+            const sdk = getSDK();
             await sdk.conversations.delete(conversationId);
             navigation.goBack();
           } catch (error) {
@@ -2300,24 +2755,29 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
               <Text style={styles.messageActionText}>Forward</Text>
             </TouchableOpacity>
             {/* Edit - only for own messages AND within time limit */}
-            {selectedMessage && selectedMessage.senderId === user?.id && canEditMessage(selectedMessage) && (
-              <TouchableOpacity style={styles.messageActionItem} onPress={handleEditMessage}>
-                <Icon name="create-outline" size={24} color={colors.text} />
-                <Text style={styles.messageActionText}>Edit</Text>
-              </TouchableOpacity>
-            )}
+            {selectedMessage &&
+              selectedMessage.senderId === user?.id &&
+              canEditMessage(selectedMessage) && (
+                <TouchableOpacity style={styles.messageActionItem} onPress={handleEditMessage}>
+                  <Icon name="create-outline" size={24} color={colors.text} />
+                  <Text style={styles.messageActionText}>Edit</Text>
+                </TouchableOpacity>
+              )}
             {/* Delete - check if allowed based on settings */}
-            {selectedMessage && canDeleteMessage(selectedMessage, selectedMessage.senderId === user?.id) && (
-              <TouchableOpacity style={styles.messageActionItem} onPress={handleDeleteMessage}>
-                <Icon name="trash-outline" size={24} color={colors.error} />
-                <Text style={[styles.messageActionText, { color: colors.error }]}>Delete</Text>
-              </TouchableOpacity>
-            )}
+            {selectedMessage &&
+              canDeleteMessage(selectedMessage, selectedMessage.senderId === user?.id) && (
+                <TouchableOpacity style={styles.messageActionItem} onPress={handleDeleteMessage}>
+                  <Icon name="trash-outline" size={24} color={colors.error} />
+                  <Text style={[styles.messageActionText, { color: colors.error }]}>Delete</Text>
+                </TouchableOpacity>
+              )}
             {/* Report - only for other's messages */}
             {selectedMessage && selectedMessage.senderId !== user?.id && (
               <TouchableOpacity style={styles.messageActionItem} onPress={handleReportMessage}>
                 <Icon name="flag-outline" size={24} color={colors.warning || '#FFA500'} />
-                <Text style={[styles.messageActionText, { color: colors.warning || '#FFA500' }]}>Report</Text>
+                <Text style={[styles.messageActionText, { color: colors.warning || '#FFA500' }]}>
+                  Report
+                </Text>
               </TouchableOpacity>
             )}
           </View>
@@ -2329,13 +2789,23 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
         visible={editModalVisible}
         transparent
         animationType="slide"
-        onRequestClose={() => { setEditModalVisible(false); setEditingMessageId(null); setEditText(''); }}
+        onRequestClose={() => {
+          setEditModalVisible(false);
+          setEditingMessageId(null);
+          setEditText('');
+        }}
       >
         <View style={styles.editModalContainer}>
           <View style={styles.editModalContent}>
             <View style={styles.editModalHeader}>
               <Text style={styles.editModalTitle}>Edit Message</Text>
-              <TouchableOpacity onPress={() => { setEditModalVisible(false); setEditingMessageId(null); setEditText(''); }}>
+              <TouchableOpacity
+                onPress={() => {
+                  setEditModalVisible(false);
+                  setEditingMessageId(null);
+                  setEditText('');
+                }}
+              >
                 <Icon name="close" size={24} color={colors.text} />
               </TouchableOpacity>
             </View>
@@ -2351,7 +2821,11 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
             <View style={styles.editModalButtons}>
               <TouchableOpacity
                 style={[styles.editModalButton, styles.editModalCancelButton]}
-                onPress={() => { setEditModalVisible(false); setEditingMessageId(null); setEditText(''); }}
+                onPress={() => {
+                  setEditModalVisible(false);
+                  setEditingMessageId(null);
+                  setEditText('');
+                }}
               >
                 <Text style={styles.editModalCancelText}>Cancel</Text>
               </TouchableOpacity>
@@ -2371,22 +2845,42 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
         visible={forwardModalVisible}
         transparent
         animationType="slide"
-        onRequestClose={() => { setForwardModalVisible(false); setForwardTargets([]); setForwardSearchQuery(""); }}
+        onRequestClose={() => {
+          setForwardModalVisible(false);
+          setForwardTargets([]);
+          setForwardSearchQuery('');
+        }}
       >
         <View style={styles.forwardModalContainer}>
           <View style={styles.forwardModalContent}>
             {/* Header */}
             <View style={styles.forwardModalHeader}>
               <Text style={styles.forwardModalTitle}>Forward Message</Text>
-              <TouchableOpacity onPress={() => { setForwardModalVisible(false); setForwardTargets([]); setForwardSearchQuery(""); }}>
+              <TouchableOpacity
+                onPress={() => {
+                  setForwardModalVisible(false);
+                  setForwardTargets([]);
+                  setForwardSearchQuery('');
+                }}
+              >
                 <Icon name="close" size={24} color={colors.text} />
               </TouchableOpacity>
             </View>
 
             {/* Message Preview */}
             {selectedMessage && (
-              <View style={{ backgroundColor: colors.surface, margin: 16, marginTop: 0, padding: 12, borderRadius: 8 }}>
-                <Text style={{ fontSize: 12, color: colors.textSecondary, marginBottom: 4 }}>Forwarding:</Text>
+              <View
+                style={{
+                  backgroundColor: colors.surface,
+                  margin: 16,
+                  marginTop: 0,
+                  padding: 12,
+                  borderRadius: 8,
+                }}
+              >
+                <Text style={{ fontSize: 12, color: colors.textSecondary, marginBottom: 4 }}>
+                  Forwarding:
+                </Text>
                 <Text style={{ color: colors.text, fontSize: 14 }} numberOfLines={2}>
                   {selectedMessage.content || '[Media]'}
                 </Text>
@@ -2425,41 +2919,57 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
               )}
 
               {/* Target Items */}
-              {!forwardLoading && forwardTargets.map((item) => (
-                <TouchableOpacity
-                  key={`${item.type}-${item.id}`}
-                  style={styles.forwardConversationItem}
-                  onPress={() => handleForwardTo(item)}
-                >
-                  <View style={styles.forwardConversationAvatar}>
-                    {item.avatarUrl ? (
-                      <Image source={{ uri: toAbsoluteUrl(item.avatarUrl) }} style={styles.forwardAvatarImage} />
-                    ) : (
-                      <Icon
-                        name={item.type === 'user' ? 'person' : (item.conversationType === 'Chatroom' ? 'people' : 'person')}
-                        size={20}
-                        color={colors.white}
-                      />
-                    )}
-                  </View>
-                  <View style={styles.forwardUserInfo}>
-                    <Text style={styles.forwardConversationName} numberOfLines={1}>
-                      {item.name}
-                    </Text>
-                    <Text style={styles.forwardUsername} numberOfLines={1}>
-                      {item.type === 'user' ? `@${item.username}` : (item.conversationType === 'Chatroom' ? 'Group' : 'Direct Message')}
-                    </Text>
-                  </View>
-                  <Icon name="chevron-forward" size={20} color={colors.textSecondary} />
-                </TouchableOpacity>
-              ))}
+              {!forwardLoading &&
+                forwardTargets.map((item) => (
+                  <TouchableOpacity
+                    key={`${item.type}-${item.id}`}
+                    style={styles.forwardConversationItem}
+                    onPress={() => handleForwardTo(item)}
+                  >
+                    <View style={styles.forwardConversationAvatar}>
+                      {item.avatarUrl ? (
+                        <Image
+                          source={{ uri: toAbsoluteUrl(item.avatarUrl) }}
+                          style={styles.forwardAvatarImage}
+                        />
+                      ) : (
+                        <Icon
+                          name={
+                            item.type === 'user'
+                              ? 'person'
+                              : item.conversationType === 'Chatroom'
+                                ? 'people'
+                                : 'person'
+                          }
+                          size={20}
+                          color={colors.white}
+                        />
+                      )}
+                    </View>
+                    <View style={styles.forwardUserInfo}>
+                      <Text style={styles.forwardConversationName} numberOfLines={1}>
+                        {item.name}
+                      </Text>
+                      <Text style={styles.forwardUsername} numberOfLines={1}>
+                        {item.type === 'user'
+                          ? `@${item.username}`
+                          : item.conversationType === 'Chatroom'
+                            ? 'Group'
+                            : 'Direct Message'}
+                      </Text>
+                    </View>
+                    <Icon name="chevron-forward" size={20} color={colors.textSecondary} />
+                  </TouchableOpacity>
+                ))}
 
               {/* Empty State */}
               {!forwardLoading && forwardTargets.length === 0 && (
                 <View style={{ padding: 40, alignItems: 'center' }}>
                   <Icon name="chatbubbles-outline" size={48} color={colors.textSecondary} />
                   <Text style={{ color: colors.textSecondary, marginTop: 12, textAlign: 'center' }}>
-                    {forwardSearchQuery.length >= 2 ? 'No results found' : 'No conversations available'}
+                    {forwardSearchQuery.length >= 2
+                      ? 'No results found'
+                      : 'No conversations available'}
                   </Text>
                 </View>
               )}
@@ -2492,7 +3002,12 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
                 style={[styles.deleteModalButton, styles.deleteForMeButton]}
                 onPress={handleDeleteForMe}
               >
-                <Icon name="person-outline" size={18} color={colors.text} style={{ marginRight: 8 }} />
+                <Icon
+                  name="person-outline"
+                  size={18}
+                  color={colors.text}
+                  style={{ marginRight: 8 }}
+                />
                 <Text style={styles.deleteForMeText}>Delete for me</Text>
               </TouchableOpacity>
 
@@ -2502,16 +3017,18 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
                   style={[styles.deleteModalButton, styles.deleteForEveryoneButton]}
                   onPress={handleDeleteForEveryone}
                 >
-                  <Icon name="people-outline" size={18} color={colors.white} style={{ marginRight: 8 }} />
+                  <Icon
+                    name="people-outline"
+                    size={18}
+                    color={colors.white}
+                    style={{ marginRight: 8 }}
+                  />
                   <Text style={styles.deleteForEveryoneText}>Delete for everyone</Text>
                 </TouchableOpacity>
               )}
 
               {/* Cancel button */}
-              <TouchableOpacity
-                style={styles.deleteCancelButton}
-                onPress={handleCancelDelete}
-              >
+              <TouchableOpacity style={styles.deleteCancelButton} onPress={handleCancelDelete}>
                 <Text style={styles.deleteCancelText}>Cancel</Text>
               </TouchableOpacity>
             </View>
@@ -2532,13 +3049,19 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
         visible={reactionPickerVisible}
         transparent
         animationType="fade"
-        onRequestClose={() => { setReactionPickerVisible(false); setSelectedMessage(null); }}
+        onRequestClose={() => {
+          setReactionPickerVisible(false);
+          setSelectedMessage(null);
+        }}
       >
         <View style={styles.reactionPickerOverlay}>
           <TouchableOpacity
             style={StyleSheet.absoluteFill}
             activeOpacity={1}
-            onPress={() => { setReactionPickerVisible(false); setSelectedMessage(null); }}
+            onPress={() => {
+              setReactionPickerVisible(false);
+              setSelectedMessage(null);
+            }}
           />
           <View style={styles.reactionPickerContainer}>
             {['👍', '❤️', '😂', '😮', '😢', '😡', '🎉', '🙏'].map((emoji) => (
@@ -2579,7 +3102,12 @@ interface ReportModalProps {
   messageContent?: string;
 }
 
-const ReportModal: React.FC<ReportModalProps> = ({ visible, onClose, onSubmit, messageContent }) => {
+const ReportModal: React.FC<ReportModalProps> = ({
+  visible,
+  onClose,
+  onSubmit,
+  messageContent,
+}) => {
   const { colors } = useTheme();
   const [selectedType, setSelectedType] = useState<string | null>(null);
   const [description, setDescription] = useState('');
@@ -2614,21 +3142,34 @@ const ReportModal: React.FC<ReportModalProps> = ({ visible, onClose, onSubmit, m
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={handleClose}>
-      <View style={{
-        flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.5)',
-        justifyContent: 'flex-end',
-      }}>
-        <View style={{
-          backgroundColor: colors.background,
-          borderTopLeftRadius: 20,
-          borderTopRightRadius: 20,
-          padding: 20,
-          maxHeight: '80%',
-        }}>
+      <View
+        style={{
+          flex: 1,
+          backgroundColor: 'rgba(0,0,0,0.5)',
+          justifyContent: 'flex-end',
+        }}
+      >
+        <View
+          style={{
+            backgroundColor: colors.background,
+            borderTopLeftRadius: 20,
+            borderTopRightRadius: 20,
+            padding: 20,
+            maxHeight: '80%',
+          }}
+        >
           {/* Header */}
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-            <Text style={{ fontSize: 18, fontWeight: '600', color: colors.text }}>Report Message</Text>
+          <View
+            style={{
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: 16,
+            }}
+          >
+            <Text style={{ fontSize: 18, fontWeight: '600', color: colors.text }}>
+              Report Message
+            </Text>
             <TouchableOpacity onPress={handleClose}>
               <Icon name="close" size={24} color={colors.text} />
             </TouchableOpacity>
@@ -2636,14 +3177,20 @@ const ReportModal: React.FC<ReportModalProps> = ({ visible, onClose, onSubmit, m
 
           {/* Message Preview */}
           {messageContent && (
-            <View style={{
-              backgroundColor: colors.surface,
-              padding: 12,
-              borderRadius: 8,
-              marginBottom: 16,
-            }}>
-              <Text style={{ fontSize: 12, color: colors.textSecondary, marginBottom: 4 }}>Message:</Text>
-              <Text style={{ color: colors.text, fontSize: 14 }} numberOfLines={3}>{messageContent}</Text>
+            <View
+              style={{
+                backgroundColor: colors.surface,
+                padding: 12,
+                borderRadius: 8,
+                marginBottom: 16,
+              }}
+            >
+              <Text style={{ fontSize: 12, color: colors.textSecondary, marginBottom: 4 }}>
+                Message:
+              </Text>
+              <Text style={{ color: colors.text, fontSize: 14 }} numberOfLines={3}>
+                {messageContent}
+              </Text>
             </View>
           )}
 
@@ -2661,40 +3208,58 @@ const ReportModal: React.FC<ReportModalProps> = ({ visible, onClose, onSubmit, m
                   padding: 12,
                   borderRadius: 8,
                   marginBottom: 8,
-                  backgroundColor: selectedType === type.value ? colors.primary + '20' : colors.surface,
+                  backgroundColor:
+                    selectedType === type.value ? colors.primary + '20' : colors.surface,
                   borderWidth: selectedType === type.value ? 1 : 0,
                   borderColor: colors.primary,
                 }}
                 onPress={() => setSelectedType(type.value)}
               >
-                <View style={{
-                  width: 20,
-                  height: 20,
-                  borderRadius: 10,
-                  borderWidth: 2,
-                  borderColor: selectedType === type.value ? colors.primary : colors.textSecondary,
-                  marginRight: 12,
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                }}>
+                <View
+                  style={{
+                    width: 20,
+                    height: 20,
+                    borderRadius: 10,
+                    borderWidth: 2,
+                    borderColor:
+                      selectedType === type.value ? colors.primary : colors.textSecondary,
+                    marginRight: 12,
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                  }}
+                >
                   {selectedType === type.value && (
-                    <View style={{
-                      width: 10,
-                      height: 10,
-                      borderRadius: 5,
-                      backgroundColor: colors.primary,
-                    }} />
+                    <View
+                      style={{
+                        width: 10,
+                        height: 10,
+                        borderRadius: 5,
+                        backgroundColor: colors.primary,
+                      }}
+                    />
                   )}
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 14, fontWeight: '500', color: colors.text }}>{type.label}</Text>
-                  <Text style={{ fontSize: 12, color: colors.textSecondary }}>{type.description}</Text>
+                  <Text style={{ fontSize: 14, fontWeight: '500', color: colors.text }}>
+                    {type.label}
+                  </Text>
+                  <Text style={{ fontSize: 12, color: colors.textSecondary }}>
+                    {type.description}
+                  </Text>
                 </View>
               </TouchableOpacity>
             ))}
 
             {/* Description */}
-            <Text style={{ fontSize: 14, fontWeight: '500', color: colors.text, marginTop: 16, marginBottom: 8 }}>
+            <Text
+              style={{
+                fontSize: 14,
+                fontWeight: '500',
+                color: colors.text,
+                marginTop: 16,
+                marginBottom: 8,
+              }}
+            >
               Additional details
             </Text>
             <TextInput
@@ -2730,15 +3295,14 @@ const ReportModal: React.FC<ReportModalProps> = ({ visible, onClose, onSubmit, m
             {isSubmitting ? (
               <ActivityIndicator color={colors.white} />
             ) : (
-              <Text style={{ color: colors.white, fontWeight: '600', fontSize: 16 }}>Submit Report</Text>
+              <Text style={{ color: colors.white, fontWeight: '600', fontSize: 16 }}>
+                Submit Report
+              </Text>
             )}
           </TouchableOpacity>
 
           {/* Cancel Button */}
-          <TouchableOpacity
-            style={{ padding: 16, alignItems: 'center' }}
-            onPress={handleClose}
-          >
+          <TouchableOpacity style={{ padding: 16, alignItems: 'center' }} onPress={handleClose}>
             <Text style={{ color: colors.textSecondary, fontSize: 16 }}>Cancel</Text>
           </TouchableOpacity>
         </View>
@@ -2748,778 +3312,828 @@ const ReportModal: React.FC<ReportModalProps> = ({ visible, onClose, onSubmit, m
 };
 
 // Create dynamic styles based on theme colors
-const createStyles = (colors: ReturnType<typeof import('../../hooks').useTheme>['colors']) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
-  loadingContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
-  loadingMoreContainer: { flexDirection: "row", justifyContent: "center", alignItems: "center", padding: 16 },
-  loadingMoreText: { marginLeft: 8, fontSize: 14, color: colors.textSecondary },
-  messagesList: { padding: 16 },
-  messageRow: { flexDirection: "row", marginBottom: 8, alignItems: "flex-end" },
-  messageRowOwn: { justifyContent: "flex-end" },
-  messageAvatar: { width: 32, height: 32, borderRadius: 16, marginRight: 8, backgroundColor: colors.primary, justifyContent: "center", alignItems: "center" },
-  messageBubble: { maxWidth: "75%", borderRadius: 20, padding: 12, paddingBottom: 8 },
-  messageBubbleOwn: { backgroundColor: colors.messageBubbleOwn, borderBottomRightRadius: 4 },
-  messageBubbleOther: { backgroundColor: colors.messageBubbleOther, borderBottomLeftRadius: 4 },
-  mediaBubble: { padding: 4, paddingBottom: 8 },
-  messageText: { fontSize: 16, color: colors.messageTextOther, lineHeight: 22 },
-  messageTextOwn: { color: colors.messageTextOwn },
-  readMoreText: { fontSize: 14, color: colors.primary, fontWeight: '600', marginTop: 4 },
-  readMoreTextOwn: { color: 'rgba(255,255,255,0.9)' },
-  messageTime: { fontSize: 11, color: colors.messageTextOther, opacity: 0.7, textAlign: "right" },
-  messageTimeOwn: { color: colors.messageTextOwn, opacity: 0.7 },
-  messageFooter: { flexDirection: "row", alignItems: "center", justifyContent: "flex-end", marginTop: 4, paddingHorizontal: 4 },
-  statusIcon: { marginLeft: 4 },
-  // Media styles
-  messageImage: {
-    width: MAX_IMAGE_WIDTH,
-    height: MAX_IMAGE_WIDTH * 0.75,
-    borderRadius: 16,
-    backgroundColor: colors.gray[200],
-  },
-  mediaContainer: { alignItems: "center" },
-  videoPlaceholder: {
-    width: MAX_IMAGE_WIDTH,
-    height: MAX_IMAGE_WIDTH * 0.56,
-    borderRadius: 16,
-    backgroundColor: colors.gray[800],
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  mediaLabel: { color: colors.white, marginTop: 4, fontSize: 12 },
-  audioContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 8,
-    paddingHorizontal: 4,
-    minWidth: 150,
-  },
-  audioLabel: { flex: 1, marginHorizontal: 8, fontSize: 14, color: colors.messageTextOther },
-  fileContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 8,
-    paddingHorizontal: 4,
-    minWidth: 180,
-  },
-  fileInfo: { flex: 1, marginLeft: 8 },
-  fileName: { fontSize: 14, color: colors.text, fontWeight: "500" },
-  fileTap: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
-  locationContainer: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    paddingVertical: 4,
-    minWidth: 200,
-  },
-  locationMapPreview: {
-    width: 50,
-    height: 50,
-    borderRadius: 8,
-    backgroundColor: 'rgba(0,122,255,0.1)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  locationMapPreviewOwn: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
-  },
-  locationInfo: {
-    flex: 1,
-    marginLeft: 10,
-    justifyContent: 'center',
-  },
-  locationName: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: colors.text,
-    marginBottom: 2,
-  },
-  locationAddress: {
-    fontSize: 13,
-    color: colors.textSecondary,
-    lineHeight: 18,
-  },
-  locationTap: {
-    fontSize: 12,
-    color: colors.primary,
-    marginTop: 4,
-  },
-  locationLabel: { marginLeft: 8, fontSize: 14, color: colors.text },
-  // Typing indicator styles
-  typingIndicatorContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    backgroundColor: colors.background,
-  },
-  typingDots: {
-    flexDirection: 'row',
-    marginRight: 8,
-  },
-  typingDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: colors.primary,
-    marginHorizontal: 2,
-  },
-  typingText: {
-    fontSize: 13,
-    color: colors.textSecondary,
-    fontStyle: 'italic',
-  },
-  // Input styles
-  inputContainer: { flexDirection: "row", alignItems: "flex-end", padding: 8, paddingBottom: 24, borderTopWidth: 1, borderTopColor: colors.border },
-  attachButton: { padding: 8 },
-  inputWrapper: { flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, borderRadius: 24, paddingHorizontal: 12, marginHorizontal: 8, minHeight: 44, maxHeight: 120 },
-  input: { flex: 1, fontSize: 16, color: colors.text, paddingVertical: 10 },
-  emojiButton: { padding: 4 },
-  micButton: { width: 44, height: 44, borderRadius: 22, justifyContent: "center", alignItems: "center" },
-  sendButton: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.primary, justifyContent: "center", alignItems: "center" },
-  sendButtonDisabled: { backgroundColor: colors.gray[300] },
-  // Recording styles
-  recordingContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    paddingBottom: 28,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-    backgroundColor: colors.background,
-  },
-  cancelRecordButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  recordingInfo: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  recordingDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: colors.error,
-    marginRight: 8,
-  },
-  recordingDuration: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: colors.text,
-    marginRight: 8,
-  },
-  recordingText: {
-    fontSize: 14,
-    color: colors.textSecondary,
-  },
-  sendRecordButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: colors.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  // Attachment menu styles
-  attachmentModalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end',
-  },
-  attachmentMenuContainer: {
-    backgroundColor: colors.white,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingBottom: 34,
-  },
-  attachmentMenuHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  attachmentMenuTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: colors.text,
-  },
-  attachmentMenuGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    padding: 16,
-    justifyContent: 'flex-start',
-  },
-  attachmentMenuItem: {
-    width: '25%',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  attachmentMenuIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  attachmentMenuLabel: {
-    fontSize: 12,
-    color: colors.text,
-    textAlign: 'center',
-  },
-  // Emoji picker fallback styles
-  emojiPickerFallback: {
-    backgroundColor: colors.white,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 16,
-    paddingBottom: 34,
-  },
-  emojiPickerTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: colors.text,
-    marginBottom: 16,
-    textAlign: 'center',
-  },
-  emojiGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-  },
-  emojiItem: {
-    width: '12.5%',
-    aspectRatio: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  emojiText: {
-    fontSize: 28,
-  },
-  emojiNote: {
-    fontSize: 12,
-    color: colors.textSecondary,
-    textAlign: 'center',
-    marginTop: 16,
-  },
-  // System message styles
-  systemMessageContainer: {
-    alignItems: 'center',
-    marginVertical: 8,
-  },
-  systemMessageBubble: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: colors.surface,
-  },
-  systemMessageText: {
-    fontSize: 12,
-    color: colors.textSecondary,
-  },
-  // View-once message styles
-  viewOnceContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 24,
-    paddingHorizontal: 16,
-    minWidth: 180,
-  },
-  viewOnceText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: colors.text,
-    marginTop: 8,
-  },
-  viewOnceSubtext: {
-    fontSize: 12,
-    color: colors.textSecondary,
-    marginTop: 4,
-  },
-  viewOnceViewedContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 16,
-    paddingHorizontal: 16,
-    minWidth: 150,
-  },
-  viewOnceViewedText: {
-    fontSize: 13,
-    color: colors.textSecondary,
-    fontStyle: 'italic',
-    marginTop: 4,
-  },
-  viewOnceTimerContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  viewOnceTimerText: {
-    fontSize: 12,
-    color: colors.warning,
-    fontWeight: '500',
-    marginLeft: 4,
-  },
-  // View-once toggle button
-  viewOnceToggle: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 4,
-  },
-  viewOnceToggleActive: {
-    backgroundColor: colors.primary,
-  },
-  viewOnceToggleInactive: {
-    backgroundColor: 'transparent',
-  },
-  // Swipe to reply styles
-  swipeAction: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    width: 60,
-    marginVertical: 4,
-  },
-  // Reply container above input
-  replyContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.surface,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-  },
-  replyBar: {
-    width: 3,
-    height: '100%',
-    minHeight: 36,
-    borderRadius: 1.5,
-    marginRight: 10,
-  },
-  replyContent: {
-    flex: 1,
-    justifyContent: 'center',
-  },
-  replyName: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: colors.primary,
-    marginBottom: 2,
-  },
-  replyText: {
-    fontSize: 13,
-    color: colors.textSecondary,
-  },
-  replyCancelButton: {
-    padding: 8,
-    marginLeft: 8,
-  },
-  // Reply preview inside message bubble
-  replyPreviewInBubble: {
-    flexDirection: 'row',
-    backgroundColor: 'rgba(0,0,0,0.08)',
-    borderRadius: 8,
-    padding: 10,
-    marginBottom: 8,
-    minWidth: 150,
-  },
-  replyPreviewInBubbleOwn: {
-    backgroundColor: 'rgba(255,255,255,0.15)',
-  },
-  replyPreviewContent: {
-    flex: 1,
-    minWidth: 0,
-  },
-  replyPreviewName: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: colors.primary,
-    marginBottom: 2,
-  },
-  replyPreviewNameOwn: {
-    color: 'rgba(255,255,255,0.9)',
-  },
-  replyPreviewText: {
-    fontSize: 12,
-    color: colors.textSecondary,
-  },
-  replyPreviewTextOwn: {
-    color: 'rgba(255,255,255,0.7)',
-  },
-  // Reply media styles
-  replyMediaContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    minHeight: 24,
-  },
-  replyThumbnailContainer: {
-    position: 'relative',
-    marginRight: 8,
-  },
-  replyThumbnail: {
-    width: 40,
-    height: 40,
-    borderRadius: 6,
-    backgroundColor: colors.surface,
-  },
-  replyVideoOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.35)',
-    borderRadius: 6,
-  },
-  replyMediaIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 6,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 8,
-  },
-  replyMediaIconSmall: {
-    marginRight: 4,
-  },
-  replyMediaText: {
-    flex: 1,
-  },
-  replyMediaLabel: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  // Reactions styles
-  reactionsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginTop: 4,
-    marginLeft: 40,
-  },
-  reactionsContainerOwn: {
-    justifyContent: 'flex-end',
-    marginLeft: 0,
-    marginRight: 0,
-  },
-  reactionBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderRadius: 12,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    marginRight: 4,
-    marginBottom: 2,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  reactionEmoji: {
-    fontSize: 14,
-  },
-  reactionCount: {
-    fontSize: 12,
-    color: colors.textSecondary,
-    marginLeft: 2,
-  },
-  // Message Actions Modal styles
-  messageActionsOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  messageActionsContainer: {
-    backgroundColor: colors.background,
-    borderRadius: 16,
-    padding: 8,
-    minWidth: 200,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-  messageActionItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-  },
-  messageActionText: {
-    fontSize: 16,
-    color: colors.text,
-    marginLeft: 12,
-  },
-  // Edit Modal styles
-  editModalContainer: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    padding: 20,
-  },
-  editModalContent: {
-    backgroundColor: colors.background,
-    borderRadius: 16,
-    padding: 20,
-  },
-  editModalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  editModalTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: colors.text,
-  },
-  editModalInput: {
-    backgroundColor: colors.surface,
-    borderRadius: 12,
-    padding: 12,
-    fontSize: 16,
-    color: colors.text,
-    minHeight: 100,
-    textAlignVertical: 'top',
-  },
-  editModalButtons: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    marginTop: 16,
-    gap: 12,
-  },
-  editModalButton: {
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 8,
-  },
-  editModalCancelButton: {
-    backgroundColor: colors.surface,
-  },
-  editModalCancelText: {
-    fontSize: 16,
-    color: colors.text,
-  },
-  editModalSaveButton: {
-    backgroundColor: colors.primary,
-  },
-  editModalSaveText: {
-    fontSize: 16,
-    color: colors.white,
-    fontWeight: '600',
-  },
-  // Forward Modal styles
-  forwardModalContainer: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end',
-  },
-  forwardModalContent: {
-    backgroundColor: colors.background,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    height: '75%',
-    paddingBottom: 34,
-  },
-  forwardModalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  forwardModalTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: colors.text,
-  },
-  forwardConversationItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  forwardConversationAvatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: colors.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  forwardAvatarImage: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-  },
-  forwardConversationName: {
-    flex: 1,
-    fontSize: 16,
-    color: colors.text,
-  },
-  forwardSearchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.surface,
-    marginHorizontal: 16,
-    marginVertical: 12,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  forwardSearchInput: {
-    flex: 1,
-    fontSize: 16,
-    color: colors.text,
-    marginLeft: 8,
-    paddingVertical: 4,
-  },
-  forwardScrollView: {
-    flex: 1,
-  },
-  forwardSectionTitle: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: colors.textSecondary,
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 8,
-    textTransform: 'uppercase',
-  },
-  forwardUserInfo: {
-    flex: 1,
-  },
-  forwardUsername: {
-    fontSize: 13,
-    color: colors.textSecondary,
-    marginTop: 2,
-  },
-  forwardEmptyText: {
-    textAlign: 'center',
-    color: colors.textSecondary,
-    padding: 20,
-    fontSize: 14,
-  },
-  // Delete Confirmation Modal styles
-  deleteModalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 24,
-  },
-  deleteModalContent: {
-    backgroundColor: colors.background,
-    borderRadius: 16,
-    padding: 24,
-    width: '100%',
-    maxWidth: 340,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  deleteModalHeader: {
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  deleteModalTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: colors.text,
-    marginTop: 12,
-  },
-  deleteModalMessage: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    textAlign: 'center',
-    marginBottom: 24,
-    lineHeight: 20,
-  },
-  deleteModalButtons: {
-    width: '100%',
-    gap: 12,
-  },
-  deleteModalButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: 20,
-    borderRadius: 12,
-    width: '100%',
-  },
-  deleteForMeButton: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  deleteForMeText: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: colors.text,
-  },
-  deleteForEveryoneButton: {
-    backgroundColor: colors.error,
-  },
-  deleteForEveryoneText: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: colors.white,
-  },
-  deleteCancelButton: {
-    paddingVertical: 14,
-    alignItems: 'center',
-    marginTop: 4,
-  },
-  deleteCancelText: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: colors.textSecondary,
-  },
-  // Reaction Picker styles
-  reactionPickerOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  reactionPickerContainer: {
-    flexDirection: 'row',
-    backgroundColor: colors.background,
-    borderRadius: 24,
-    padding: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-  reactionPickerItem: {
-    padding: 8,
-  },
-  reactionPickerEmoji: {
-    fontSize: 28,
-  },
-});
+const createStyles = (colors: ReturnType<typeof import('../../hooks').useTheme>['colors']) =>
+  StyleSheet.create({
+    container: { backgroundColor: colors.background, flex: 1 },
+    loadingContainer: { alignItems: 'center', flex: 1, justifyContent: 'center' },
+    loadingMoreContainer: {
+      alignItems: 'center',
+      flexDirection: 'row',
+      justifyContent: 'center',
+      padding: 16,
+    },
+    loadingMoreText: { color: colors.textSecondary, fontSize: 14, marginLeft: 8 },
+    messagesList: { padding: 16 },
+    messageRow: { alignItems: 'flex-end', flexDirection: 'row', marginBottom: 8 },
+    messageRowOwn: { justifyContent: 'flex-end' },
+    messageAvatar: {
+      alignItems: 'center',
+      backgroundColor: colors.primary,
+      borderRadius: 16,
+      height: 32,
+      justifyContent: 'center',
+      marginRight: 8,
+      width: 32,
+    },
+    messageBubble: { borderRadius: 20, maxWidth: '75%', padding: 12, paddingBottom: 8 },
+    messageBubbleOwn: { backgroundColor: colors.messageBubbleOwn, borderBottomRightRadius: 4 },
+    messageBubbleOther: { backgroundColor: colors.messageBubbleOther, borderBottomLeftRadius: 4 },
+    mediaBubble: { padding: 4, paddingBottom: 8 },
+    messageText: { color: colors.messageTextOther, fontSize: 16, lineHeight: 22 },
+    messageTextOwn: { color: colors.messageTextOwn },
+    readMoreText: { color: colors.primary, fontSize: 14, fontWeight: '600', marginTop: 4 },
+    readMoreTextOwn: { color: 'rgba(255,255,255,0.9)' },
+    messageTime: { color: colors.messageTextOther, fontSize: 11, opacity: 0.7, textAlign: 'right' },
+    messageTimeOwn: { color: colors.messageTextOwn, opacity: 0.7 },
+    messageFooter: {
+      alignItems: 'center',
+      flexDirection: 'row',
+      justifyContent: 'flex-end',
+      marginTop: 4,
+      paddingHorizontal: 4,
+    },
+    statusIcon: { marginLeft: 4 },
+    // Media styles
+    messageImage: {
+      backgroundColor: colors.gray[200],
+      borderRadius: 16,
+      height: MAX_IMAGE_WIDTH * 0.75,
+      width: MAX_IMAGE_WIDTH,
+    },
+    mediaContainer: { alignItems: 'center' },
+    videoPlaceholder: {
+      alignItems: 'center',
+      backgroundColor: colors.gray[800],
+      borderRadius: 16,
+      height: MAX_IMAGE_WIDTH * 0.56,
+      justifyContent: 'center',
+      width: MAX_IMAGE_WIDTH,
+    },
+    mediaLabel: { color: colors.white, fontSize: 12, marginTop: 4 },
+    audioContainer: {
+      alignItems: 'center',
+      flexDirection: 'row',
+      minWidth: 150,
+      paddingHorizontal: 4,
+      paddingVertical: 8,
+    },
+    audioLabel: { color: colors.messageTextOther, flex: 1, fontSize: 14, marginHorizontal: 8 },
+    fileContainer: {
+      alignItems: 'center',
+      flexDirection: 'row',
+      minWidth: 180,
+      paddingHorizontal: 4,
+      paddingVertical: 8,
+    },
+    fileInfo: { flex: 1, marginLeft: 8 },
+    fileName: { color: colors.text, fontSize: 14, fontWeight: '500' },
+    fileTap: { color: colors.textSecondary, fontSize: 12, marginTop: 2 },
+    locationContainer: {
+      alignItems: 'flex-start',
+      flexDirection: 'row',
+      minWidth: 200,
+      paddingVertical: 4,
+    },
+    locationMapPreview: {
+      alignItems: 'center',
+      backgroundColor: 'rgba(0,122,255,0.1)',
+      borderRadius: 8,
+      height: 50,
+      justifyContent: 'center',
+      width: 50,
+    },
+    locationMapPreviewOwn: {
+      backgroundColor: 'rgba(255,255,255,0.2)',
+    },
+    locationInfo: {
+      flex: 1,
+      justifyContent: 'center',
+      marginLeft: 10,
+    },
+    locationName: {
+      color: colors.text,
+      fontSize: 15,
+      fontWeight: '600',
+      marginBottom: 2,
+    },
+    locationAddress: {
+      color: colors.textSecondary,
+      fontSize: 13,
+      lineHeight: 18,
+    },
+    locationTap: {
+      color: colors.primary,
+      fontSize: 12,
+      marginTop: 4,
+    },
+    locationLabel: { color: colors.text, fontSize: 14, marginLeft: 8 },
+    // Typing indicator styles
+    typingIndicatorContainer: {
+      alignItems: 'center',
+      backgroundColor: colors.background,
+      flexDirection: 'row',
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+    },
+    typingDots: {
+      flexDirection: 'row',
+      marginRight: 8,
+    },
+    typingDot: {
+      backgroundColor: colors.primary,
+      borderRadius: 3,
+      height: 6,
+      marginHorizontal: 2,
+      width: 6,
+    },
+    typingText: {
+      color: colors.textSecondary,
+      fontSize: 13,
+      fontStyle: 'italic',
+    },
+    // Input styles
+    inputContainer: {
+      alignItems: 'flex-end',
+      borderTopColor: colors.border,
+      borderTopWidth: 1,
+      flexDirection: 'row',
+      padding: 8,
+      paddingBottom: 24,
+    },
+    attachButton: { padding: 8 },
+    inputWrapper: {
+      alignItems: 'center',
+      backgroundColor: colors.surface,
+      borderRadius: 24,
+      flex: 1,
+      flexDirection: 'row',
+      marginHorizontal: 8,
+      maxHeight: 120,
+      minHeight: 44,
+      paddingHorizontal: 12,
+    },
+    input: { color: colors.text, flex: 1, fontSize: 16, paddingVertical: 10 },
+    emojiButton: { padding: 4 },
+    micButton: {
+      alignItems: 'center',
+      borderRadius: 22,
+      height: 44,
+      justifyContent: 'center',
+      width: 44,
+    },
+    sendButton: {
+      alignItems: 'center',
+      backgroundColor: colors.primary,
+      borderRadius: 22,
+      height: 44,
+      justifyContent: 'center',
+      width: 44,
+    },
+    sendButtonDisabled: { backgroundColor: colors.gray[300] },
+    // Recording styles
+    recordingContainer: {
+      alignItems: 'center',
+      backgroundColor: colors.background,
+      borderTopColor: colors.border,
+      borderTopWidth: 1,
+      flexDirection: 'row',
+      padding: 12,
+      paddingBottom: 28,
+    },
+    cancelRecordButton: {
+      alignItems: 'center',
+      borderRadius: 22,
+      height: 44,
+      justifyContent: 'center',
+      width: 44,
+    },
+    recordingInfo: {
+      alignItems: 'center',
+      flex: 1,
+      flexDirection: 'row',
+      justifyContent: 'center',
+    },
+    recordingDot: {
+      backgroundColor: colors.error,
+      borderRadius: 6,
+      height: 12,
+      marginRight: 8,
+      width: 12,
+    },
+    recordingDuration: {
+      color: colors.text,
+      fontSize: 18,
+      fontWeight: '600',
+      marginRight: 8,
+    },
+    recordingText: {
+      color: colors.textSecondary,
+      fontSize: 14,
+    },
+    sendRecordButton: {
+      alignItems: 'center',
+      backgroundColor: colors.primary,
+      borderRadius: 22,
+      height: 44,
+      justifyContent: 'center',
+      width: 44,
+    },
+    // Attachment menu styles
+    attachmentModalOverlay: {
+      backgroundColor: 'rgba(0,0,0,0.5)',
+      flex: 1,
+      justifyContent: 'flex-end',
+    },
+    attachmentMenuContainer: {
+      backgroundColor: colors.white,
+      borderTopLeftRadius: 20,
+      borderTopRightRadius: 20,
+      paddingBottom: 34,
+    },
+    attachmentMenuHeader: {
+      alignItems: 'center',
+      borderBottomColor: colors.border,
+      borderBottomWidth: 1,
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      padding: 16,
+    },
+    attachmentMenuTitle: {
+      color: colors.text,
+      fontSize: 18,
+      fontWeight: '600',
+    },
+    attachmentMenuGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      justifyContent: 'flex-start',
+      padding: 16,
+    },
+    attachmentMenuItem: {
+      alignItems: 'center',
+      marginBottom: 20,
+      width: '25%',
+    },
+    attachmentMenuIcon: {
+      alignItems: 'center',
+      borderRadius: 28,
+      height: 56,
+      justifyContent: 'center',
+      marginBottom: 8,
+      width: 56,
+    },
+    attachmentMenuLabel: {
+      color: colors.text,
+      fontSize: 12,
+      textAlign: 'center',
+    },
+    // Emoji picker fallback styles
+    emojiPickerFallback: {
+      backgroundColor: colors.white,
+      borderTopLeftRadius: 20,
+      borderTopRightRadius: 20,
+      padding: 16,
+      paddingBottom: 34,
+    },
+    emojiPickerTitle: {
+      color: colors.text,
+      fontSize: 18,
+      fontWeight: '600',
+      marginBottom: 16,
+      textAlign: 'center',
+    },
+    emojiGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      justifyContent: 'center',
+    },
+    emojiItem: {
+      alignItems: 'center',
+      aspectRatio: 1,
+      justifyContent: 'center',
+      width: '12.5%',
+    },
+    emojiText: {
+      fontSize: 28,
+    },
+    emojiNote: {
+      color: colors.textSecondary,
+      fontSize: 12,
+      marginTop: 16,
+      textAlign: 'center',
+    },
+    // System message styles
+    systemMessageContainer: {
+      alignItems: 'center',
+      marginVertical: 8,
+    },
+    systemMessageBubble: {
+      alignItems: 'center',
+      backgroundColor: colors.surface,
+      borderRadius: 20,
+      flexDirection: 'row',
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+    },
+    systemMessageText: {
+      color: colors.textSecondary,
+      fontSize: 12,
+    },
+    // View-once message styles
+    viewOnceContainer: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      minWidth: 180,
+      paddingHorizontal: 16,
+      paddingVertical: 24,
+    },
+    viewOnceText: {
+      color: colors.text,
+      fontSize: 14,
+      fontWeight: '500',
+      marginTop: 8,
+    },
+    viewOnceSubtext: {
+      color: colors.textSecondary,
+      fontSize: 12,
+      marginTop: 4,
+    },
+    viewOnceViewedContainer: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      minWidth: 150,
+      paddingHorizontal: 16,
+      paddingVertical: 16,
+    },
+    viewOnceViewedText: {
+      color: colors.textSecondary,
+      fontSize: 13,
+      fontStyle: 'italic',
+      marginTop: 4,
+    },
+    viewOnceTimerContainer: {
+      alignItems: 'center',
+      flexDirection: 'row',
+      marginBottom: 8,
+    },
+    viewOnceTimerText: {
+      color: colors.warning,
+      fontSize: 12,
+      fontWeight: '500',
+      marginLeft: 4,
+    },
+    // View-once toggle button
+    viewOnceToggle: {
+      alignItems: 'center',
+      borderRadius: 20,
+      height: 40,
+      justifyContent: 'center',
+      marginRight: 4,
+      width: 40,
+    },
+    viewOnceToggleActive: {
+      backgroundColor: colors.primary,
+    },
+    viewOnceToggleInactive: {
+      backgroundColor: 'transparent',
+    },
+    // Swipe to reply styles
+    swipeAction: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginVertical: 4,
+      width: 60,
+    },
+    // Reply container above input
+    replyContainer: {
+      alignItems: 'center',
+      backgroundColor: colors.surface,
+      borderTopColor: colors.border,
+      borderTopWidth: 1,
+      flexDirection: 'row',
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+    },
+    replyBar: {
+      borderRadius: 1.5,
+      height: '100%',
+      marginRight: 10,
+      minHeight: 36,
+      width: 3,
+    },
+    replyContent: {
+      flex: 1,
+      justifyContent: 'center',
+    },
+    replyName: {
+      color: colors.primary,
+      fontSize: 13,
+      fontWeight: '600',
+      marginBottom: 2,
+    },
+    replyText: {
+      color: colors.textSecondary,
+      fontSize: 13,
+    },
+    replyCancelButton: {
+      marginLeft: 8,
+      padding: 8,
+    },
+    // Reply preview inside message bubble
+    replyPreviewInBubble: {
+      backgroundColor: 'rgba(0,0,0,0.08)',
+      borderRadius: 8,
+      flexDirection: 'row',
+      marginBottom: 8,
+      minWidth: 150,
+      padding: 10,
+    },
+    replyPreviewInBubbleOwn: {
+      backgroundColor: 'rgba(255,255,255,0.15)',
+    },
+    replyPreviewContent: {
+      flex: 1,
+      minWidth: 0,
+    },
+    replyPreviewName: {
+      color: colors.primary,
+      fontSize: 12,
+      fontWeight: '600',
+      marginBottom: 2,
+    },
+    replyPreviewNameOwn: {
+      color: 'rgba(255,255,255,0.9)',
+    },
+    replyPreviewText: {
+      color: colors.textSecondary,
+      fontSize: 12,
+    },
+    replyPreviewTextOwn: {
+      color: 'rgba(255,255,255,0.7)',
+    },
+    // Reply media styles
+    replyMediaContainer: {
+      alignItems: 'center',
+      flexDirection: 'row',
+      minHeight: 24,
+    },
+    replyThumbnailContainer: {
+      marginRight: 8,
+      position: 'relative',
+    },
+    replyThumbnail: {
+      backgroundColor: colors.surface,
+      borderRadius: 6,
+      height: 40,
+      width: 40,
+    },
+    replyVideoOverlay: {
+      alignItems: 'center',
+      backgroundColor: 'rgba(0,0,0,0.35)',
+      borderRadius: 6,
+      bottom: 0,
+      justifyContent: 'center',
+      left: 0,
+      position: 'absolute',
+      right: 0,
+      top: 0,
+    },
+    replyMediaIcon: {
+      alignItems: 'center',
+      borderRadius: 6,
+      height: 40,
+      justifyContent: 'center',
+      marginRight: 8,
+      width: 40,
+    },
+    replyMediaIconSmall: {
+      marginRight: 4,
+    },
+    replyMediaText: {
+      flex: 1,
+    },
+    replyMediaLabel: {
+      alignItems: 'center',
+      flexDirection: 'row',
+      flex: 1,
+    },
+    // Reactions styles
+    reactionsContainer: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      marginLeft: 40,
+      marginTop: 4,
+    },
+    reactionsContainerOwn: {
+      justifyContent: 'flex-end',
+      marginLeft: 0,
+      marginRight: 0,
+    },
+    reactionBadge: {
+      alignItems: 'center',
+      backgroundColor: colors.surface,
+      borderColor: colors.border,
+      borderRadius: 12,
+      borderWidth: 1,
+      flexDirection: 'row',
+      marginBottom: 2,
+      marginRight: 4,
+      paddingHorizontal: 6,
+      paddingVertical: 2,
+    },
+    reactionEmoji: {
+      fontSize: 14,
+    },
+    reactionCount: {
+      color: colors.textSecondary,
+      fontSize: 12,
+      marginLeft: 2,
+    },
+    // Message Actions Modal styles
+    messageActionsOverlay: {
+      alignItems: 'center',
+      backgroundColor: 'rgba(0,0,0,0.5)',
+      flex: 1,
+      justifyContent: 'center',
+    },
+    messageActionsContainer: {
+      backgroundColor: colors.background,
+      borderRadius: 16,
+      elevation: 5,
+      minWidth: 200,
+      padding: 8,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.25,
+      shadowRadius: 4,
+    },
+    messageActionItem: {
+      alignItems: 'center',
+      flexDirection: 'row',
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+    },
+    messageActionText: {
+      color: colors.text,
+      fontSize: 16,
+      marginLeft: 12,
+    },
+    // Edit Modal styles
+    editModalContainer: {
+      backgroundColor: 'rgba(0,0,0,0.5)',
+      flex: 1,
+      justifyContent: 'center',
+      padding: 20,
+    },
+    editModalContent: {
+      backgroundColor: colors.background,
+      borderRadius: 16,
+      padding: 20,
+    },
+    editModalHeader: {
+      alignItems: 'center',
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      marginBottom: 16,
+    },
+    editModalTitle: {
+      color: colors.text,
+      fontSize: 18,
+      fontWeight: '600',
+    },
+    editModalInput: {
+      backgroundColor: colors.surface,
+      borderRadius: 12,
+      color: colors.text,
+      fontSize: 16,
+      minHeight: 100,
+      padding: 12,
+      textAlignVertical: 'top',
+    },
+    editModalButtons: {
+      flexDirection: 'row',
+      gap: 12,
+      justifyContent: 'flex-end',
+      marginTop: 16,
+    },
+    editModalButton: {
+      borderRadius: 8,
+      paddingHorizontal: 20,
+      paddingVertical: 10,
+    },
+    editModalCancelButton: {
+      backgroundColor: colors.surface,
+    },
+    editModalCancelText: {
+      color: colors.text,
+      fontSize: 16,
+    },
+    editModalSaveButton: {
+      backgroundColor: colors.primary,
+    },
+    editModalSaveText: {
+      color: colors.white,
+      fontSize: 16,
+      fontWeight: '600',
+    },
+    // Forward Modal styles
+    forwardModalContainer: {
+      backgroundColor: 'rgba(0,0,0,0.5)',
+      flex: 1,
+      justifyContent: 'flex-end',
+    },
+    forwardModalContent: {
+      backgroundColor: colors.background,
+      borderTopLeftRadius: 20,
+      borderTopRightRadius: 20,
+      height: '75%',
+      paddingBottom: 34,
+    },
+    forwardModalHeader: {
+      alignItems: 'center',
+      borderBottomColor: colors.border,
+      borderBottomWidth: 1,
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      padding: 16,
+    },
+    forwardModalTitle: {
+      color: colors.text,
+      fontSize: 18,
+      fontWeight: '600',
+    },
+    forwardConversationItem: {
+      alignItems: 'center',
+      borderBottomColor: colors.border,
+      borderBottomWidth: 1,
+      flexDirection: 'row',
+      padding: 12,
+    },
+    forwardConversationAvatar: {
+      alignItems: 'center',
+      backgroundColor: colors.primary,
+      borderRadius: 22,
+      height: 44,
+      justifyContent: 'center',
+      marginRight: 12,
+      width: 44,
+    },
+    forwardAvatarImage: {
+      borderRadius: 22,
+      height: 44,
+      width: 44,
+    },
+    forwardConversationName: {
+      color: colors.text,
+      flex: 1,
+      fontSize: 16,
+    },
+    forwardSearchContainer: {
+      alignItems: 'center',
+      backgroundColor: colors.surface,
+      borderRadius: 12,
+      flexDirection: 'row',
+      marginHorizontal: 16,
+      marginVertical: 12,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+    },
+    forwardSearchInput: {
+      color: colors.text,
+      flex: 1,
+      fontSize: 16,
+      marginLeft: 8,
+      paddingVertical: 4,
+    },
+    forwardScrollView: {
+      flex: 1,
+    },
+    forwardSectionTitle: {
+      color: colors.textSecondary,
+      fontSize: 13,
+      fontWeight: '600',
+      paddingBottom: 8,
+      paddingHorizontal: 16,
+      paddingTop: 12,
+      textTransform: 'uppercase',
+    },
+    forwardUserInfo: {
+      flex: 1,
+    },
+    forwardUsername: {
+      color: colors.textSecondary,
+      fontSize: 13,
+      marginTop: 2,
+    },
+    forwardEmptyText: {
+      color: colors.textSecondary,
+      fontSize: 14,
+      padding: 20,
+      textAlign: 'center',
+    },
+    // Delete Confirmation Modal styles
+    deleteModalOverlay: {
+      alignItems: 'center',
+      backgroundColor: 'rgba(0,0,0,0.5)',
+      flex: 1,
+      justifyContent: 'center',
+      padding: 24,
+    },
+    deleteModalContent: {
+      alignItems: 'center',
+      backgroundColor: colors.background,
+      borderRadius: 16,
+      elevation: 8,
+      maxWidth: 340,
+      padding: 24,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.3,
+      shadowRadius: 8,
+      width: '100%',
+    },
+    deleteModalHeader: {
+      alignItems: 'center',
+      marginBottom: 16,
+    },
+    deleteModalTitle: {
+      color: colors.text,
+      fontSize: 20,
+      fontWeight: '600',
+      marginTop: 12,
+    },
+    deleteModalMessage: {
+      color: colors.textSecondary,
+      fontSize: 14,
+      lineHeight: 20,
+      marginBottom: 24,
+      textAlign: 'center',
+    },
+    deleteModalButtons: {
+      gap: 12,
+      width: '100%',
+    },
+    deleteModalButton: {
+      alignItems: 'center',
+      borderRadius: 12,
+      flexDirection: 'row',
+      justifyContent: 'center',
+      paddingHorizontal: 20,
+      paddingVertical: 14,
+      width: '100%',
+    },
+    deleteForMeButton: {
+      backgroundColor: colors.surface,
+      borderColor: colors.border,
+      borderWidth: 1,
+    },
+    deleteForMeText: {
+      color: colors.text,
+      fontSize: 16,
+      fontWeight: '500',
+    },
+    deleteForEveryoneButton: {
+      backgroundColor: colors.error,
+    },
+    deleteForEveryoneText: {
+      color: colors.white,
+      fontSize: 16,
+      fontWeight: '500',
+    },
+    deleteCancelButton: {
+      alignItems: 'center',
+      marginTop: 4,
+      paddingVertical: 14,
+    },
+    deleteCancelText: {
+      color: colors.textSecondary,
+      fontSize: 16,
+      fontWeight: '500',
+    },
+    // Reaction Picker styles
+    reactionPickerOverlay: {
+      alignItems: 'center',
+      backgroundColor: 'rgba(0,0,0,0.5)',
+      flex: 1,
+      justifyContent: 'center',
+    },
+    reactionPickerContainer: {
+      backgroundColor: colors.background,
+      borderRadius: 24,
+      elevation: 5,
+      flexDirection: 'row',
+      padding: 8,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.25,
+      shadowRadius: 4,
+    },
+    reactionPickerItem: {
+      padding: 8,
+    },
+    reactionPickerEmoji: {
+      fontSize: 28,
+    },
+  });
 
 export default ChatScreen;
