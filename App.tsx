@@ -146,6 +146,10 @@ LogBox.ignoreLogs([
   // Stale connection errors are handled by forceReconnect
   'No Connection with that ID',
   'Connection disconnected with error',
+  // LiveKit ping timeout warnings are expected on mobile networks
+  // We handle reconnection via reconnectPolicy in GroupCallScreen
+  'ping timeout triggered',
+  'last pong received at',
 ]);
 
 function App(): React.JSX.Element {

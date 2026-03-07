@@ -623,6 +623,11 @@ interface RoomContentInnerProps extends Omit<RoomContentProps, 'onReconnecting' 
   isReconnecting?: boolean;
 }
 
+// Minimum number of participants to stay in the call (just yourself = alone)
+const MIN_PARTICIPANTS_TO_STAY = 1;
+// Delay before auto-ending call when alone (in milliseconds)
+const AUTO_END_DELAY_MS = 5000;
+
 const RoomContent: React.FC<RoomContentInnerProps> = ({
   roomName,
   isMuted,
@@ -639,6 +644,73 @@ const RoomContent: React.FC<RoomContentInnerProps> = ({
   const participants = useParticipants ? useParticipants() : [];
   const tracks = useTracks ? useTracks([Track?.Source?.Camera, Track?.Source?.ScreenShare]) : [];
 
+  // State for auto-end call when alone
+  const [isAlone, setIsAlone] = useState(false);
+  const [autoEndCountdown, setAutoEndCountdown] = useState<number | null>(null);
+  const autoEndTimerRef = React.useRef<NodeJS.Timeout | null>(null);
+  const countdownIntervalRef = React.useRef<NodeJS.Timeout | null>(null);
+  const hasHadOtherParticipantsRef = React.useRef(false);
+
+  // Track when we've had other participants (to avoid auto-ending immediately on join)
+  React.useEffect(() => {
+    if (participants.length > MIN_PARTICIPANTS_TO_STAY) {
+      hasHadOtherParticipantsRef.current = true;
+    }
+  }, [participants.length]);
+
+  // Detect when user is alone in the call and auto-end after delay
+  React.useEffect(() => {
+    const isCurrentlyAlone = participants.length <= MIN_PARTICIPANTS_TO_STAY;
+
+    // Only consider auto-ending if we previously had other participants
+    // This prevents auto-ending when joining an empty room or being the first to join
+    if (isCurrentlyAlone && hasHadOtherParticipantsRef.current) {
+      console.log('[GroupCall] User is alone in the call, starting auto-end timer...');
+      setIsAlone(true);
+      setAutoEndCountdown(AUTO_END_DELAY_MS / 1000);
+
+      // Start countdown display
+      countdownIntervalRef.current = setInterval(() => {
+        setAutoEndCountdown((prev) => {
+          if (prev !== null && prev > 1) {
+            return prev - 1;
+          }
+          return prev;
+        });
+      }, 1000);
+
+      // Set timer to end call
+      autoEndTimerRef.current = setTimeout(() => {
+        console.log('[GroupCall] Auto-ending call - all other participants have left');
+        onEndCall();
+      }, AUTO_END_DELAY_MS);
+    } else {
+      // Clear timer if someone else joins or we haven't had participants yet
+      if (autoEndTimerRef.current) {
+        console.log('[GroupCall] Other participant joined, canceling auto-end timer');
+        clearTimeout(autoEndTimerRef.current);
+        autoEndTimerRef.current = null;
+      }
+      if (countdownIntervalRef.current) {
+        clearInterval(countdownIntervalRef.current);
+        countdownIntervalRef.current = null;
+      }
+      setIsAlone(false);
+      setAutoEndCountdown(null);
+    }
+
+    return () => {
+      if (autoEndTimerRef.current) {
+        clearTimeout(autoEndTimerRef.current);
+        autoEndTimerRef.current = null;
+      }
+      if (countdownIntervalRef.current) {
+        clearInterval(countdownIntervalRef.current);
+        countdownIntervalRef.current = null;
+      }
+    };
+  }, [participants.length, onEndCall]);
+
   const gridSize = Math.ceil(Math.sqrt(Math.max(participants.length, 1)));
   const tileWidth = width / gridSize - 8;
   const tileHeight = (height - 200) / gridSize - 8;
@@ -650,6 +722,16 @@ const RoomContent: React.FC<RoomContentInnerProps> = ({
         <View style={styles.reconnectingBanner}>
           <ActivityIndicator size="small" color={colors.white} />
           <Text style={styles.reconnectingText}>Reconnecting...</Text>
+        </View>
+      )}
+
+      {/* Alone in call banner - shows when all other participants have left */}
+      {isAlone && autoEndCountdown !== null && (
+        <View style={styles.aloneBanner}>
+          <Icon name="person-outline" size={20} color={colors.white} />
+          <Text style={styles.aloneText}>
+            Everyone has left. Call ending in {autoEndCountdown}s...
+          </Text>
         </View>
       )}
 
@@ -802,6 +884,20 @@ const createStyles = (colors: any) =>
       paddingVertical: 8,
     },
     reconnectingText: {
+      color: colors.white,
+      fontSize: 14,
+      fontWeight: '600',
+      marginLeft: 8,
+    },
+    aloneBanner: {
+      alignItems: 'center',
+      backgroundColor: colors.error || '#ef4444',
+      flexDirection: 'row',
+      justifyContent: 'center',
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+    },
+    aloneText: {
       color: colors.white,
       fontSize: 14,
       fontWeight: '600',
