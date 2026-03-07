@@ -547,10 +547,13 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
               text: 'Start',
               onPress: () => {
                 // Navigate to GroupCall screen (uses LiveKit)
+                // isJoining: false means this user is INITIATING the call (will send call message when call ends)
+                console.log('[ChatScreen] Starting group call for conversation:', conversationId);
                 navigation.getParent()?.getParent()?.navigate('GroupCall', {
                   conversationId: conversationId,
                   conversationName: conversation?.name,
                   type: callType,
+                  isJoining: false, // Explicitly false - initiator will send call message
                 });
               },
             },

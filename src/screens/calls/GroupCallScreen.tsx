@@ -35,6 +35,10 @@ const getCalls = () => {
   const sdkModule = require('../../services/sdk');
   return sdkModule.calls;
 };
+const getMessages = () => {
+  const sdkModule = require('../../services/sdk');
+  return sdkModule.messages;
+};
 const calls = {
   getLiveKitToken: (id: string) => getCalls().getLiveKitToken(id),
   getIceServers: () => getCalls().getIceServers(),
@@ -187,6 +191,11 @@ const GroupCallScreen: React.FC<GroupCallScreenProps> = ({ route, navigation }) 
   const [isSpeakerOn, setIsSpeakerOn] = useState(true);
   const [notificationSent, setNotificationSent] = useState(false);
   const [iceServers, setIceServers] = useState<IceServer[]>(DEFAULT_ICE_SERVERS);
+
+  // Call tracking for sending call message when call ends
+  const connectedTimeRef = React.useRef<number | null>(null);
+  const callMessageSentRef = React.useRef<boolean>(false);
+  const participantsRef = React.useRef<string[]>([]);
 
   // Create reconnect policy once
   const reconnectPolicy = useMemo(() => createReconnectPolicy(), []);
@@ -386,9 +395,82 @@ const GroupCallScreen: React.FC<GroupCallScreenProps> = ({ route, navigation }) 
     fetchToken();
   }, [fetchToken, user, isAuthenticated]);
 
-  const handleEndCall = useCallback(() => {
+  // Send call message to conversation when call ends
+  const sendCallMessage = useCallback(async () => {
+    console.log('[GroupCall] sendCallMessage called with:', {
+      conversationId,
+      type,
+      isJoining,
+      callMessageSentRef: callMessageSentRef.current,
+    });
+
+    // Only initiator sends call message to avoid duplicates
+    if (isJoining || callMessageSentRef.current) {
+      console.log('[GroupCall] Skipping call message - isJoining:', isJoining, 'alreadySent:', callMessageSentRef.current);
+      return;
+    }
+
+    // Validate conversationId before proceeding
+    if (!conversationId) {
+      console.error('[GroupCall] Cannot send call message - conversationId is empty or undefined');
+      return;
+    }
+
+    callMessageSentRef.current = true;
+
+    try {
+      console.log('[GroupCall] Getting messages service...');
+      const messagesService = getMessages();
+      console.log('[GroupCall] Messages service obtained:', typeof messagesService, 'has send:', typeof messagesService?.send);
+
+      const wasConnected = connectedTimeRef.current !== null;
+      const duration = wasConnected
+        ? Math.floor((Date.now() - connectedTimeRef.current!) / 1000)
+        : 0;
+
+      const messageType = type === 'video' ? 'VideoCall' : 'VoiceCall';
+      const minutes = Math.floor(duration / 60);
+      const seconds = duration % 60;
+      const durationText = wasConnected ? `${minutes}:${seconds.toString().padStart(2, '0')}` : 'Missed';
+
+      // Build message content with duration and participants
+      const participants = participantsRef.current.filter((p) => p); // Filter empty strings
+      const participantNames = participants.length > 0 ? participants.join(', ') : '';
+      const messageContent =
+        wasConnected && participantNames ? `${durationText}|${participantNames}` : durationText;
+
+      console.log('[GroupCall] Sending call message:', {
+        conversationId,
+        messageType,
+        content: messageContent,
+        duration,
+        wasConnected,
+        participants: participantNames,
+      });
+
+      const result = await messagesService.send(conversationId, {
+        content: messageContent,
+        type: messageType,
+      });
+
+      console.log('[GroupCall] Call message sent successfully, result:', result?.id || result);
+    } catch (error: any) {
+      console.error('[GroupCall] Failed to send call message:', {
+        message: error?.message || String(error),
+        stack: error?.stack,
+        name: error?.name,
+        fullError: JSON.stringify(error, Object.getOwnPropertyNames(error || {})),
+      });
+    }
+  }, [conversationId, type, isJoining]);
+
+  const handleEndCall = useCallback(async () => {
+    console.log('[GroupCall] handleEndCall called - about to send call message');
+    // Send call message before navigating away
+    await sendCallMessage();
+    console.log('[GroupCall] handleEndCall - call message sent, navigating back');
     navigation.goBack();
-  }, [navigation]);
+  }, [navigation, sendCallMessage]);
 
   const handleToggleMute = useCallback(() => {
     setIsMuted((prev) => !prev);
@@ -431,6 +513,12 @@ const GroupCallScreen: React.FC<GroupCallScreenProps> = ({ route, navigation }) 
     console.log('[GroupCall] Connection established with token:', token?.substring(0, 30) || 'NO TOKEN');
     console.log('[GroupCall] User identity used:', username);
     setIsConnecting(false);
+    // Track connection time for call duration calculation
+    connectedTimeRef.current = Date.now();
+    // Add current user to participants list
+    if (username && !participantsRef.current.includes(username)) {
+      participantsRef.current.push(username);
+    }
   }, [token, username]);
 
   // Handle LiveKit disconnection
@@ -452,6 +540,12 @@ const GroupCallScreen: React.FC<GroupCallScreenProps> = ({ route, navigation }) 
   const handleLiveKitReconnected = useCallback(() => {
     console.log('[GroupCall] LiveKit reconnected successfully');
     setIsReconnecting(false);
+  }, []);
+
+  // Handle participants changed - update ref for call message
+  const handleParticipantsChanged = useCallback((participantNames: string[]) => {
+    participantsRef.current = participantNames;
+    console.log('[GroupCall] Participants updated:', participantNames);
   }, []);
 
   if (!LiveKitRoom) {
@@ -559,6 +653,7 @@ const GroupCallScreen: React.FC<GroupCallScreenProps> = ({ route, navigation }) 
         onEndCall={handleEndCall}
         onReconnecting={handleLiveKitReconnecting}
         onReconnected={handleLiveKitReconnected}
+        onParticipantsChanged={handleParticipantsChanged}
         colors={colors}
         styles={styles}
       />
@@ -577,6 +672,7 @@ interface RoomContentProps {
   onEndCall: () => void;
   onReconnecting: () => void;
   onReconnected: () => void;
+  onParticipantsChanged?: (participants: string[]) => void;
   colors: any;
   styles: any;
 }
@@ -650,11 +746,22 @@ const RoomContent: React.FC<RoomContentInnerProps> = ({
   onToggleVideo,
   onToggleSpeaker,
   onEndCall,
+  onParticipantsChanged,
   colors,
   styles,
 }) => {
   const participants = useParticipants ? useParticipants() : [];
   const tracks = useTracks ? useTracks([Track?.Source?.Camera, Track?.Source?.ScreenShare]) : [];
+
+  // Notify parent of participants changes for call message
+  React.useEffect(() => {
+    if (onParticipantsChanged && participants.length > 0) {
+      const participantNames = participants.map(
+        (p: any) => p.name || p.identity || 'Unknown'
+      );
+      onParticipantsChanged(participantNames);
+    }
+  }, [participants, onParticipantsChanged]);
 
   // Get local participant for controlling camera/microphone
   const localParticipantState = useLocalParticipant ? useLocalParticipant() : null;
