@@ -110,22 +110,61 @@ let LiveKitRoom: any = null;
 let VideoView: any = null;
 let useParticipants: any = null;
 let useTracks: any = null;
+let useConnectionState: any = null;
 let Track: any = null;
+let ConnectionState: any = null;
 let isTrackReference: any = null;
 
 try {
   const livekit = require('@livekit/react-native');
-  // Track is exported from livekit-client, not react-native
+  // Track and ConnectionState are exported from livekit-client, not react-native
   const livekitClient = require('livekit-client');
   LiveKitRoom = livekit.LiveKitRoom;
   VideoView = livekit.VideoView;
   useParticipants = livekit.useParticipants;
   useTracks = livekit.useTracks;
+  useConnectionState = livekit.useConnectionState;
   isTrackReference = livekit.isTrackReference;
   Track = livekitClient.Track;
+  ConnectionState = livekitClient.ConnectionState;
 } catch (e) {
   console.log('LiveKit not available:', e);
 }
+
+// Custom reconnect policy with exponential backoff for ping timeout handling
+// This implements more aggressive reconnection for mobile networks
+const createReconnectPolicy = () => ({
+  nextRetryDelayInMs: (context: { retryCount: number; elapsedMs: number; retryReason?: Error }) => {
+    const { retryCount, elapsedMs, retryReason } = context;
+
+    // Log reconnection attempts for debugging
+    console.log('[GroupCall] Reconnect attempt:', {
+      retryCount,
+      elapsedMs,
+      reason: retryReason?.message,
+    });
+
+    // Give up after 2 minutes of trying
+    if (elapsedMs > 120000) {
+      console.log('[GroupCall] Giving up reconnection after 2 minutes');
+      return null;
+    }
+
+    // Give up after 10 retries
+    if (retryCount >= 10) {
+      console.log('[GroupCall] Giving up reconnection after 10 attempts');
+      return null;
+    }
+
+    // Exponential backoff: 1s, 2s, 4s, 8s, 16s... capped at 30s
+    const baseDelay = 1000;
+    const maxDelay = 30000;
+    const delay = Math.min(baseDelay * Math.pow(2, retryCount), maxDelay);
+
+    console.log('[GroupCall] Will retry in', delay, 'ms');
+    return delay;
+  },
+});
 
 const { width, height } = Dimensions.get('window');
 
@@ -135,15 +174,19 @@ const GroupCallScreen: React.FC<GroupCallScreenProps> = ({ route, navigation }) 
   const user = useAuthStore((state) => state.user);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const [isConnecting, setIsConnecting] = useState(true);
+  const [isReconnecting, setIsReconnecting] = useState(false);
   const [token, setToken] = useState<string | null>(null);
   const [serverUrl, setServerUrl] = useState<string | null>(null);
   const [roomName, setRoomName] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isMuted, setIsMuted] = useState(false);
-  const [isVideoEnabled, setIsVideoEnabled] = useState(true);
+  const [isVideoEnabled, setIsVideoEnabled] = useState(type === 'video');
   const [isSpeakerOn, setIsSpeakerOn] = useState(true);
   const [notificationSent, setNotificationSent] = useState(false);
   const [iceServers, setIceServers] = useState<IceServer[]>(DEFAULT_ICE_SERVERS);
+
+  // Create reconnect policy once
+  const reconnectPolicy = useMemo(() => createReconnectPolicy(), []);
 
   // Debug: Log user state to understand the issue
   console.log('[GroupCall] Auth state:', {
@@ -387,6 +430,21 @@ const GroupCallScreen: React.FC<GroupCallScreenProps> = ({ route, navigation }) 
   // IMPORTANT: This hook MUST be defined before any early returns to comply with Rules of Hooks
   const handleLiveKitDisconnected = useCallback(() => {
     console.log('[GroupCall] LiveKit disconnected');
+    setIsReconnecting(false);
+  }, []);
+
+  // Handle LiveKit reconnecting (ping timeout triggers this)
+  // IMPORTANT: This hook MUST be defined before any early returns to comply with Rules of Hooks
+  const handleLiveKitReconnecting = useCallback(() => {
+    console.log('[GroupCall] LiveKit reconnecting - ping timeout or network issue detected');
+    setIsReconnecting(true);
+  }, []);
+
+  // Handle LiveKit successfully reconnected
+  // IMPORTANT: This hook MUST be defined before any early returns to comply with Rules of Hooks
+  const handleLiveKitReconnected = useCallback(() => {
+    console.log('[GroupCall] LiveKit reconnected successfully');
+    setIsReconnecting(false);
   }, []);
 
   if (!LiveKitRoom) {
@@ -458,6 +516,9 @@ const GroupCallScreen: React.FC<GroupCallScreenProps> = ({ route, navigation }) 
       options={{
         adaptiveStream: true,
         dynacast: true,
+        // Custom reconnect policy for better handling of ping timeouts
+        // Uses exponential backoff: 1s, 2s, 4s, 8s... up to 30s, max 10 retries or 2 minutes
+        reconnectPolicy: reconnectPolicy,
       }}
       connectOptions={{
         // Increase WebSocket timeout for unreliable networks and self-signed certificates
@@ -465,7 +526,7 @@ const GroupCallScreen: React.FC<GroupCallScreenProps> = ({ route, navigation }) 
         // Increase peer connection timeout
         peerConnectionTimeout: 30000, // 30 seconds (default is 15s)
         // Allow more retries for initial connection
-        maxRetries: 3,
+        maxRetries: 5,
         autoSubscribe: true,
         // Provide our own sanitized rtcConfig to prevent using server-provided ICE servers
         // This fixes "username == null" error on Android where server sends ICE servers
@@ -480,7 +541,7 @@ const GroupCallScreen: React.FC<GroupCallScreenProps> = ({ route, navigation }) 
       onDisconnected={handleLiveKitDisconnected}
       onError={handleLiveKitError}
     >
-      <RoomContent
+      <RoomContentWithConnectionState
         roomName={roomName || conversationName || ''}
         isMuted={isMuted}
         isVideoEnabled={isVideoEnabled}
@@ -489,6 +550,8 @@ const GroupCallScreen: React.FC<GroupCallScreenProps> = ({ route, navigation }) 
         onToggleVideo={handleToggleVideo}
         onToggleSpeaker={handleToggleSpeaker}
         onEndCall={handleEndCall}
+        onReconnecting={handleLiveKitReconnecting}
+        onReconnected={handleLiveKitReconnected}
         colors={colors}
         styles={styles}
       />
@@ -505,15 +568,67 @@ interface RoomContentProps {
   onToggleVideo: () => void;
   onToggleSpeaker: () => void;
   onEndCall: () => void;
+  onReconnecting: () => void;
+  onReconnected: () => void;
   colors: any;
   styles: any;
 }
 
-const RoomContent: React.FC<RoomContentProps> = ({
+// Wrapper component that handles connection state monitoring
+// This tracks reconnecting/reconnected states for ping timeout recovery
+const RoomContentWithConnectionState: React.FC<RoomContentProps> = (props) => {
+  const { onReconnecting, onReconnected } = props;
+
+  // Use connection state hook to monitor for reconnecting states
+  const connectionState = useConnectionState ? useConnectionState() : null;
+  const prevConnectionState = React.useRef(connectionState);
+
+  // Handle connection state changes
+  React.useEffect(() => {
+    if (!connectionState || !ConnectionState) return;
+
+    const prevState = prevConnectionState.current;
+    prevConnectionState.current = connectionState;
+
+    console.log('[GroupCall] Connection state changed:', prevState, '->', connectionState);
+
+    // Detect transition to reconnecting state (ping timeout triggers this)
+    if (
+      connectionState === ConnectionState.Reconnecting ||
+      connectionState === ConnectionState.SignalReconnecting
+    ) {
+      onReconnecting();
+    }
+
+    // Detect successful reconnection
+    if (
+      prevState &&
+      (prevState === ConnectionState.Reconnecting || prevState === ConnectionState.SignalReconnecting) &&
+      connectionState === ConnectionState.Connected
+    ) {
+      onReconnected();
+    }
+  }, [connectionState, onReconnecting, onReconnected]);
+
+  // Determine if we're in a reconnecting state
+  const isReconnecting = connectionState && ConnectionState && (
+    connectionState === ConnectionState.Reconnecting ||
+    connectionState === ConnectionState.SignalReconnecting
+  );
+
+  return <RoomContent {...props} isReconnecting={isReconnecting} />;
+};
+
+interface RoomContentInnerProps extends Omit<RoomContentProps, 'onReconnecting' | 'onReconnected'> {
+  isReconnecting?: boolean;
+}
+
+const RoomContent: React.FC<RoomContentInnerProps> = ({
   roomName,
   isMuted,
   isVideoEnabled,
   isSpeakerOn,
+  isReconnecting,
   onToggleMute,
   onToggleVideo,
   onToggleSpeaker,
@@ -530,6 +645,14 @@ const RoomContent: React.FC<RoomContentProps> = ({
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* Reconnecting banner - shows when ping timeout triggers reconnection */}
+      {isReconnecting && (
+        <View style={styles.reconnectingBanner}>
+          <ActivityIndicator size="small" color={colors.white} />
+          <Text style={styles.reconnectingText}>Reconnecting...</Text>
+        </View>
+      )}
+
       <View style={styles.header}>
         <Text style={styles.roomName}>{roomName}</Text>
         <Text style={styles.participantCount}>{participants.length} participants</Text>
@@ -670,6 +793,20 @@ const createStyles = (colors: any) =>
       right: 0,
     },
     participantName: { color: colors.white, flex: 1, fontSize: 12 },
+    reconnectingBanner: {
+      alignItems: 'center',
+      backgroundColor: colors.warning || '#f59e0b',
+      flexDirection: 'row',
+      justifyContent: 'center',
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+    },
+    reconnectingText: {
+      color: colors.white,
+      fontSize: 14,
+      fontWeight: '600',
+      marginLeft: 8,
+    },
     retryButton: {
       backgroundColor: colors.primary,
       borderRadius: 8,

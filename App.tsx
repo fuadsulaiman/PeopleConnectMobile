@@ -779,7 +779,7 @@ function App(): React.JSX.Element {
             console.log('[App] Detected GROUP call from IncomingCall notification');
             const conversationId = data?.conversationId || data?.ConversationId;
             const callerName = data?.callerName || 'Someone';
-            const callType = (data?.type || 'video').toLowerCase() as 'voice' | 'video';
+            const callType = (data?.type || 'voice').toLowerCase() as 'voice' | 'video';
 
             if (!conversationId) {
               console.error('[App] Group call notification missing conversationId');
@@ -854,7 +854,7 @@ function App(): React.JSX.Element {
           // Extract call information from the notification
           const conversationId = data?.conversationId || data?.ConversationId;
           const conversationName = data?.conversationName || data?.ConversationName || 'Group Call';
-          const callType = (data?.type || data?.callType || 'video').toLowerCase() as 'voice' | 'video';
+          const callType = (data?.type || data?.callType || 'voice').toLowerCase() as 'voice' | 'video';
           const callerName = data?.callerName || data?.initiatorName || 'Someone';
 
           if (!conversationId) {
