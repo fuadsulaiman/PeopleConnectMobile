@@ -146,6 +146,9 @@ LogBox.ignoreLogs([
   // Stale connection errors are handled by forceReconnect
   'No Connection with that ID',
   'Connection disconnected with error',
+  // SignalR may warn about missing client methods for events we don't handle
+  // These are informational - the events are optional and handled gracefully
+  'No client method with the name',
   // LiveKit ping timeout warnings are expected on mobile networks
   // We handle reconnection via reconnectPolicy in GroupCallScreen
   'ping timeout triggered',

@@ -768,6 +768,8 @@ class SignalRService {
       'IncomingCall',
       'IncomingGroupCall',
       'CallAnswered',
+      'CallAccepted',
+      'CallParticipantJoined',
       'CallEnded',
       'CallRejected',
       'IceCandidate',

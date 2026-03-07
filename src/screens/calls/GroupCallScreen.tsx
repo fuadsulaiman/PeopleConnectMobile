@@ -945,7 +945,16 @@ const RoomContent: React.FC<RoomContentInnerProps> = ({
 
       <View style={styles.header}>
         <Text style={styles.roomName}>{roomName}</Text>
-        <Text style={styles.participantCount}>{participants.length} participants</Text>
+        <Text style={styles.participantCount}>
+          {participants.length === 1
+            ? '1 participant'
+            : `${participants.length} participants`}
+          {participants.length > 0 && participants.length <= 5 && (
+            `: ${participants
+              .map((p: any) => p.name || p.identity || 'Unknown')
+              .join(', ')}`
+          )}
+        </Text>
       </View>
 
       <View style={styles.videoGrid}>
