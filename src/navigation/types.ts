@@ -67,7 +67,7 @@ export type RootStackParamList = {
   Auth: NavigatorScreenParams<AuthStackParamList>;
   Main: NavigatorScreenParams<MainTabParamList>;
   ActiveCall: { call?: Call; user?: User; type?: CallType };
-  GroupCall: { conversationId: string; conversationName?: string; type: CallType };
+  GroupCall: { conversationId: string; conversationName?: string; type: CallType; isJoining?: boolean };
   Notifications: undefined;
 };
 

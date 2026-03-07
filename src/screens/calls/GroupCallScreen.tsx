@@ -107,10 +107,11 @@ import { GroupCallScreenProps } from '../../navigation/types';
 
 // LiveKit imports - will fail gracefully if not available
 let LiveKitRoom: any = null;
-let VideoView: any = null;
+let VideoTrack: any = null;
 let useParticipants: any = null;
 let useTracks: any = null;
 let useConnectionState: any = null;
+let useLocalParticipant: any = null;
 let Track: any = null;
 let ConnectionState: any = null;
 let isTrackReference: any = null;
@@ -120,10 +121,12 @@ try {
   // Track and ConnectionState are exported from livekit-client, not react-native
   const livekitClient = require('livekit-client');
   LiveKitRoom = livekit.LiveKitRoom;
-  VideoView = livekit.VideoView;
+  // Use VideoTrack (not deprecated VideoView) - VideoTrack correctly accepts trackRef prop
+  VideoTrack = livekit.VideoTrack;
   useParticipants = livekit.useParticipants;
   useTracks = livekit.useTracks;
   useConnectionState = livekit.useConnectionState;
+  useLocalParticipant = livekit.useLocalParticipant;
   isTrackReference = livekit.isTrackReference;
   Track = livekitClient.Track;
   ConnectionState = livekitClient.ConnectionState;
@@ -169,7 +172,7 @@ const createReconnectPolicy = () => ({
 const { width, height } = Dimensions.get('window');
 
 const GroupCallScreen: React.FC<GroupCallScreenProps> = ({ route, navigation }) => {
-  const { conversationId, conversationName, type } = route.params;
+  const { conversationId, conversationName, type, isJoining } = route.params;
   const { colors } = useTheme();
   const user = useAuthStore((state) => state.user);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
@@ -246,7 +249,8 @@ const GroupCallScreen: React.FC<GroupCallScreenProps> = ({ route, navigation }) 
 
       // Step 1: Notify all participants in the chatroom about the group call
       // This sends a SignalR notification to all online participants
-      if (!notificationSent) {
+      // IMPORTANT: Skip this step if isJoining is true (user is joining an existing call, not initiating)
+      if (!notificationSent && !isJoining) {
         try {
           const signalR = getSignalR();
           const callType = type || 'video';
@@ -305,6 +309,9 @@ const GroupCallScreen: React.FC<GroupCallScreenProps> = ({ route, navigation }) 
           // The call initiator can still join, others might miss the notification
           console.warn('[GroupCall] Continuing without SignalR notification...');
         }
+      } else if (isJoining) {
+        console.log('[GroupCall] Joining existing call - skipping InitiateCall notification');
+        setNotificationSent(true); // Mark as sent to prevent future attempts
       }
 
       // Step 2: Get the LiveKit token to join the call
@@ -352,7 +359,7 @@ const GroupCallScreen: React.FC<GroupCallScreenProps> = ({ route, navigation }) 
     } finally {
       setIsConnecting(false);
     }
-  }, [conversationId, navigation, type, notificationSent, username, user, isAuthenticated]);
+  }, [conversationId, navigation, type, notificationSent, username, user, isAuthenticated, isJoining]);
 
   // Wait for user to be available before fetching token
   useEffect(() => {
@@ -616,11 +623,15 @@ const RoomContentWithConnectionState: React.FC<RoomContentProps> = (props) => {
     connectionState === ConnectionState.SignalReconnecting
   );
 
-  return <RoomContent {...props} isReconnecting={isReconnecting} />;
+  // Check if room is fully connected
+  const isRoomConnected = connectionState === ConnectionState?.Connected;
+
+  return <RoomContent {...props} isReconnecting={isReconnecting} isRoomConnected={isRoomConnected} />;
 };
 
 interface RoomContentInnerProps extends Omit<RoomContentProps, 'onReconnecting' | 'onReconnected'> {
   isReconnecting?: boolean;
+  isRoomConnected?: boolean;
 }
 
 // Minimum number of participants to stay in the call (just yourself = alone)
@@ -634,6 +645,7 @@ const RoomContent: React.FC<RoomContentInnerProps> = ({
   isVideoEnabled,
   isSpeakerOn,
   isReconnecting,
+  isRoomConnected,
   onToggleMute,
   onToggleVideo,
   onToggleSpeaker,
@@ -643,6 +655,202 @@ const RoomContent: React.FC<RoomContentInnerProps> = ({
 }) => {
   const participants = useParticipants ? useParticipants() : [];
   const tracks = useTracks ? useTracks([Track?.Source?.Camera, Track?.Source?.ScreenShare]) : [];
+
+  // Get local participant for controlling camera/microphone
+  const localParticipantState = useLocalParticipant ? useLocalParticipant() : null;
+  const localParticipant = localParticipantState?.localParticipant;
+
+  // Track if cleanup is in progress to prevent multiple cleanup attempts
+  const isCleaningUpRef = React.useRef(false);
+
+  // Enhanced end call handler that properly cleans up tracks before disconnecting
+  // This prevents the "NegotiationError: PC manager is closed" warning
+  const handleEndCallWithCleanup = React.useCallback(async () => {
+    if (isCleaningUpRef.current) {
+      console.log('[GroupCall] Cleanup already in progress, skipping');
+      return;
+    }
+    isCleaningUpRef.current = true;
+
+    console.log('[GroupCall] Starting graceful cleanup before ending call...');
+
+    try {
+      if (localParticipant) {
+        // Disable camera and microphone before disconnecting
+        // This stops track negotiation and prevents the NegotiationError
+        console.log('[GroupCall] Disabling local tracks...');
+
+        // Wrap in try-catch to handle any errors during track disable
+        try {
+          await localParticipant.setCameraEnabled(false);
+          console.log('[GroupCall] Camera disabled');
+        } catch (e) {
+          console.log('[GroupCall] Camera disable skipped (may already be off)');
+        }
+
+        try {
+          await localParticipant.setMicrophoneEnabled(false);
+          console.log('[GroupCall] Microphone disabled');
+        } catch (e) {
+          console.log('[GroupCall] Microphone disable skipped (may already be off)');
+        }
+
+        // Small delay to allow track negotiation to settle
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+    } catch (error) {
+      // Log but don't block the call end - user wants to leave
+      console.log('[GroupCall] Cleanup error (non-blocking):', error);
+    }
+
+    console.log('[GroupCall] Cleanup complete, ending call');
+    onEndCall();
+  }, [localParticipant, onEndCall]);
+
+  // Track if initial camera/mic setup has been done
+  const initialSetupDoneRef = React.useRef(false);
+
+  // Simple camera enable - let LiveKit handle device selection
+  // This avoids OverconstrainedError by not specifying constraints
+  const enableCameraSimple = React.useCallback(async (participant: any): Promise<boolean> => {
+    try {
+      console.log('[GroupCall] Enabling camera (simple mode, no constraints)');
+      // Use simple setCameraEnabled(true) without any constraints
+      // LiveKit will automatically select an available camera
+      await participant.setCameraEnabled(true);
+      console.log('[GroupCall] Camera enabled successfully');
+      return true;
+    } catch (err: any) {
+      const errorMessage = err?.message || '';
+      console.warn('[GroupCall] Camera enable failed:', errorMessage);
+
+      // Don't throw - camera failure shouldn't crash the call
+      // User can still participate with audio
+      return false;
+    }
+  }, []);
+
+  // Initial setup: Enable camera/microphone when room is fully connected
+  // IMPORTANT: Wait for isRoomConnected to be true before enabling tracks
+  // This prevents "publishing rejected as engine not connected" errors
+  React.useEffect(() => {
+    // Don't proceed if:
+    // - No local participant yet
+    // - Already did initial setup
+    // - Room is not connected yet (this is the key check!)
+    if (!localParticipant || initialSetupDoneRef.current || !isRoomConnected) {
+      if (!isRoomConnected && localParticipant && !initialSetupDoneRef.current) {
+        console.log('[GroupCall] Waiting for room to be connected before enabling tracks...');
+      }
+      return;
+    }
+
+    const doInitialSetup = async () => {
+      console.log('[GroupCall] Room connected - enabling camera and microphone');
+      try {
+        // Enable microphone first (unless muted) - audio is more important
+        if (!isMuted) {
+          console.log('[GroupCall] Initial setup - enabling microphone');
+          try {
+            await localParticipant.setMicrophoneEnabled(true);
+            console.log('[GroupCall] Initial microphone enabled successfully');
+          } catch (micErr: any) {
+            console.warn('[GroupCall] Microphone enable failed:', micErr.message);
+          }
+        }
+
+        // Enable camera for video calls
+        if (isVideoEnabled) {
+          console.log('[GroupCall] Initial setup - enabling camera');
+          const cameraEnabled = await enableCameraSimple(localParticipant);
+          if (cameraEnabled) {
+            console.log('[GroupCall] Initial camera enabled successfully');
+          } else {
+            console.warn('[GroupCall] Camera could not be enabled, continuing without video');
+          }
+        }
+
+        initialSetupDoneRef.current = true;
+      } catch (err: any) {
+        console.error('[GroupCall] Initial setup failed:', err.message);
+        // Still mark as done to prevent retry loops
+        initialSetupDoneRef.current = true;
+      }
+    };
+
+    // Small delay to ensure everything is stable after connection
+    const timeoutId = setTimeout(doInitialSetup, 300);
+    return () => clearTimeout(timeoutId);
+  }, [localParticipant, isVideoEnabled, isMuted, enableCameraSimple, isRoomConnected]);
+
+  // Sync local participant camera state with UI toggles (after initial setup)
+  React.useEffect(() => {
+    // Don't sync if not ready or room not connected
+    if (!localParticipant || !initialSetupDoneRef.current || !isRoomConnected) {
+      console.log('[GroupCall] Skipping camera sync - not ready');
+      return;
+    }
+
+    const syncCamera = async () => {
+      try {
+        const currentCameraEnabled = localParticipantState?.isCameraEnabled ?? false;
+        if (currentCameraEnabled !== isVideoEnabled) {
+          console.log('[GroupCall] Syncing camera state:', { isVideoEnabled, currentCameraEnabled });
+          if (isVideoEnabled) {
+            // Use simple enable when toggling camera on
+            await enableCameraSimple(localParticipant);
+          } else {
+            // Disabling camera is straightforward
+            await localParticipant.setCameraEnabled(false);
+          }
+          console.log('[GroupCall] Camera state synced successfully');
+        }
+      } catch (err: any) {
+        console.warn('[GroupCall] Failed to toggle camera:', err.message);
+      }
+    };
+
+    syncCamera();
+  }, [isVideoEnabled, localParticipant, localParticipantState?.isCameraEnabled, enableCameraSimple, isRoomConnected]);
+
+  // Sync local participant microphone state with UI toggles (after initial setup)
+  React.useEffect(() => {
+    // Don't sync if not ready or room not connected
+    if (!localParticipant || !initialSetupDoneRef.current || !isRoomConnected) {
+      console.log('[GroupCall] Skipping microphone sync - not ready');
+      return;
+    }
+
+    const syncMicrophone = async () => {
+      try {
+        const currentMicEnabled = localParticipantState?.isMicrophoneEnabled ?? true;
+        const shouldMicBeEnabled = !isMuted;
+        if (currentMicEnabled !== shouldMicBeEnabled) {
+          console.log('[GroupCall] Syncing microphone state:', { isMuted, currentMicEnabled, shouldMicBeEnabled });
+          await localParticipant.setMicrophoneEnabled(shouldMicBeEnabled);
+          console.log('[GroupCall] Microphone state synced successfully');
+        }
+      } catch (err: any) {
+        console.warn('[GroupCall] Failed to toggle microphone:', err.message);
+      }
+    };
+
+    syncMicrophone();
+  }, [isMuted, localParticipant, localParticipantState?.isMicrophoneEnabled, isRoomConnected]);
+
+  // Log camera errors if any
+  React.useEffect(() => {
+    if (localParticipantState?.lastCameraError) {
+      console.error('[GroupCall] Camera error:', localParticipantState.lastCameraError);
+    }
+  }, [localParticipantState?.lastCameraError]);
+
+  // Log microphone errors if any
+  React.useEffect(() => {
+    if (localParticipantState?.lastMicrophoneError) {
+      console.error('[GroupCall] Microphone error:', localParticipantState.lastMicrophoneError);
+    }
+  }, [localParticipantState?.lastMicrophoneError]);
 
   // State for auto-end call when alone
   const [isAlone, setIsAlone] = useState(false);
@@ -679,10 +887,10 @@ const RoomContent: React.FC<RoomContentInnerProps> = ({
         });
       }, 1000);
 
-      // Set timer to end call
+      // Set timer to end call with proper cleanup
       autoEndTimerRef.current = setTimeout(() => {
         console.log('[GroupCall] Auto-ending call - all other participants have left');
-        onEndCall();
+        handleEndCallWithCleanup();
       }, AUTO_END_DELAY_MS);
     } else {
       // Clear timer if someone else joins or we haven't had participants yet
@@ -709,7 +917,7 @@ const RoomContent: React.FC<RoomContentInnerProps> = ({
         countdownIntervalRef.current = null;
       }
     };
-  }, [participants.length, onEndCall]);
+  }, [participants.length, handleEndCallWithCleanup]);
 
   const gridSize = Math.ceil(Math.sqrt(Math.max(participants.length, 1)));
   const tileWidth = width / gridSize - 8;
@@ -751,7 +959,7 @@ const RoomContent: React.FC<RoomContentInnerProps> = ({
                 key={track.participant.identity + '-' + index}
                 style={[styles.videoTile, { width: tileWidth, height: tileHeight }]}
               >
-                <VideoView style={styles.videoView} trackRef={track} objectFit="cover" />
+                <VideoTrack style={styles.videoView} trackRef={track} objectFit="cover" />
                 <View style={styles.participantInfo}>
                   <Text style={styles.participantName} numberOfLines={1}>
                     {track.participant.name || track.participant.identity}
@@ -790,7 +998,7 @@ const RoomContent: React.FC<RoomContentInnerProps> = ({
           />
         </TouchableOpacity>
 
-        <TouchableOpacity style={[styles.controlButton, styles.endCallButton]} onPress={onEndCall}>
+        <TouchableOpacity style={[styles.controlButton, styles.endCallButton]} onPress={handleEndCallWithCleanup}>
           <Icon name="call" size={32} color={colors.white} style={styles.endCallIcon} />
         </TouchableOpacity>
 

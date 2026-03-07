@@ -150,6 +150,22 @@ LogBox.ignoreLogs([
   // We handle reconnection via reconnectPolicy in GroupCallScreen
   'ping timeout triggered',
   'last pong received at',
+  // LiveKit SDK internal warnings during track subscription/connection state changes
+  // These are informational and handled internally by LiveKit
+  'could not find local track subscription',
+  'detected connection state mismatch',
+  // LiveKit NegotiationError occurs during cleanup when PeerConnection closes
+  // while track negotiation is still pending - this is expected during call end
+  'NegotiationError',
+  'PC manager is closed',
+  // LiveKit camera/publishing errors - handled gracefully in GroupCallScreen
+  // These occur during track publishing and are expected on some devices
+  'Camera strategy',
+  'engine not connected',
+  'publishing rejected',
+  'PublishTrackError',
+  'OverconstrainedError',
+  'could not find camera',
 ]);
 
 function App(): React.JSX.Element {
@@ -809,6 +825,7 @@ function App(): React.JSX.Element {
                         conversationId,
                         conversationName: 'Group Call',
                         type: callType,
+                        isJoining: true, // Flag to indicate joining existing call, not initiating
                       });
                     } else {
                       console.error('[App] Navigation ref not available');
@@ -887,6 +904,7 @@ function App(): React.JSX.Element {
                       conversationId,
                       conversationName,
                       type: callType,
+                      isJoining: true, // Flag to indicate joining existing call, not initiating
                     });
                   } else {
                     console.error('[App] Navigation ref not available');
