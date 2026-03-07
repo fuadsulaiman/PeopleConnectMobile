@@ -248,12 +248,55 @@ class WebRTCService {
   }
 
   private createPeerConnection(): void {
+    // Filter and sanitize ICE servers to avoid Android native WebRTC errors
+    // Android throws IllegalArgumentException when username is null for ICE servers
+    const validIceServers: IceServer[] = [];
+
+    for (const server of this.iceServers) {
+      const urls = Array.isArray(server.urls) ? server.urls : [server.urls];
+      const isTurnServer = urls.some((url) => url.toLowerCase().startsWith('turn:'));
+      const isStunServer = urls.some((url) => url.toLowerCase().startsWith('stun:'));
+
+      if (isTurnServer) {
+        // TURN servers require both username and credential to be non-null/non-empty
+        // Also skip if credential appears to be encrypted (starts with ENC:)
+        if (!server.username || !server.credential) {
+          console.warn(
+            '[WebRTC] Skipping TURN server with missing credentials:',
+            urls.join(', ')
+          );
+          continue;
+        }
+        if (server.credential.startsWith('ENC:')) {
+          console.warn(
+            '[WebRTC] Skipping TURN server with encrypted credential (not decrypted):',
+            urls.join(', ')
+          );
+          continue;
+        }
+        validIceServers.push(server);
+      } else if (isStunServer) {
+        // STUN servers don't need credentials - remove null values to avoid Android issues
+        validIceServers.push({ urls: server.urls });
+      } else {
+        // Keep other servers as-is
+        validIceServers.push(server);
+      }
+    }
+
+    // Ensure we have at least one ICE server
+    if (validIceServers.length === 0) {
+      console.warn('[WebRTC] No valid ICE servers, using Google STUN as fallback');
+      validIceServers.push({ urls: 'stun:stun.l.google.com:19302' });
+    }
+
     const config = {
-      iceServers: this.iceServers,
+      iceServers: validIceServers,
       iceCandidatePoolSize: 10,
     };
 
-    console.log('[WebRTC] Creating peer connection with', this.iceServers.length, 'ICE servers');
+    console.log('[WebRTC] Creating peer connection with', validIceServers.length, 'valid ICE servers');
+    console.log('[WebRTC] ICE servers config:', JSON.stringify(validIceServers));
     this.peerConnection = new RTCPeerConnection(config);
 
     // Handle ICE candidates

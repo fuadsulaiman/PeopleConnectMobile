@@ -4,11 +4,11 @@
  */
 
 import React, { useEffect, useRef, useCallback } from 'react';
-import { StatusBar, useColorScheme, LogBox, AppState, AppStateStatus } from 'react-native';
+import { StatusBar, useColorScheme, LogBox, AppState, AppStateStatus, Alert } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
-import RootNavigator from './src/navigation/RootNavigator';
+import RootNavigator, { navigationRef } from './src/navigation/RootNavigator';
 import { signalRService } from './src/services/signalr';
 import { pushNotificationService, NotificationData, NotificationMessage } from './src/services';
 import { useAuthStore } from './src/stores/authStore';
@@ -162,6 +162,7 @@ function App(): React.JSX.Element {
   const unsubscribeConversationUpdateRef = useRef<(() => void) | null>(null);
   const unsubscribeOnlineUsersRef = useRef<(() => void) | null>(null);
   const unsubscribeIncomingCallRef = useRef<(() => void) | null>(null);
+  const unsubscribeIncomingGroupCallRef = useRef<(() => void) | null>(null);
   const unsubscribeCallAnsweredRef = useRef<(() => void) | null>(null);
   const unsubscribeCallEndedRef = useRef<(() => void) | null>(null);
   const unsubscribeCallRejectedRef = useRef<(() => void) | null>(null);
@@ -370,6 +371,10 @@ function App(): React.JSX.Element {
     if (unsubscribeIncomingCallRef.current) {
       unsubscribeIncomingCallRef.current();
       unsubscribeIncomingCallRef.current = null;
+    }
+    if (unsubscribeIncomingGroupCallRef.current) {
+      unsubscribeIncomingGroupCallRef.current();
+      unsubscribeIncomingGroupCallRef.current = null;
     }
     if (unsubscribeCallAnsweredRef.current) {
       unsubscribeCallAnsweredRef.current();
@@ -767,6 +772,52 @@ function App(): React.JSX.Element {
             return;
           }
 
+          // Check if this is a GROUP call (isGroupCall flag from backend)
+          // Group calls should be routed to GroupCallScreen (LiveKit), not CallScreen (WebRTC)
+          const isGroupCall = data?.isGroupCall === true;
+          if (isGroupCall) {
+            console.log('[App] Detected GROUP call from IncomingCall notification');
+            const conversationId = data?.conversationId || data?.ConversationId;
+            const callerName = data?.callerName || 'Someone';
+            const callType = (data?.type || 'video').toLowerCase() as 'voice' | 'video';
+
+            if (!conversationId) {
+              console.error('[App] Group call notification missing conversationId');
+              return;
+            }
+
+            // Show an alert to the user about the incoming group call
+            Alert.alert(
+              `Incoming ${callType === 'video' ? 'Video' : 'Voice'} Call`,
+              `${callerName} started a group call`,
+              [
+                {
+                  text: 'Ignore',
+                  style: 'cancel',
+                  onPress: () => console.log('[App] User ignored group call'),
+                },
+                {
+                  text: 'Join',
+                  onPress: () => {
+                    console.log('[App] User joining group call:', conversationId);
+                    if (navigationRef?.current) {
+                      navigationRef.current.navigate('GroupCall', {
+                        conversationId,
+                        conversationName: 'Group Call',
+                        type: callType,
+                      });
+                    } else {
+                      console.error('[App] Navigation ref not available');
+                    }
+                  },
+                },
+              ],
+              { cancelable: true }
+            );
+            return; // Don't process as 1:1 call
+          }
+
+          // Handle 1:1 call normally
           const call = {
             id: data?.callId || data?.id || '',
             callerId: data?.callerId || '',
@@ -783,6 +834,64 @@ function App(): React.JSX.Element {
           };
 
           callStore.setIncomingCall(call);
+        }
+      );
+
+      // Register handler for incoming GROUP calls (LiveKit-based chatroom calls)
+      // Use camelCase - SignalR may convert PascalCase to camelCase
+      unsubscribeIncomingGroupCallRef.current = signalRService.onCallEvent(
+        'incomingGroupCall',
+        (data: any) => {
+          console.log('[App] Incoming GROUP call received:', JSON.stringify(data, null, 2));
+          const currentUser = useAuthStore.getState().user;
+
+          // Don't handle our own calls (if we initiated it)
+          if (data?.callerId === currentUser?.id || data?.initiatorId === currentUser?.id) {
+            console.log('[App] Ignoring own group call notification');
+            return;
+          }
+
+          // Extract call information from the notification
+          const conversationId = data?.conversationId || data?.ConversationId;
+          const conversationName = data?.conversationName || data?.ConversationName || 'Group Call';
+          const callType = (data?.type || data?.callType || 'video').toLowerCase() as 'voice' | 'video';
+          const callerName = data?.callerName || data?.initiatorName || 'Someone';
+
+          if (!conversationId) {
+            console.error('[App] Group call notification missing conversationId');
+            return;
+          }
+
+          // Show an alert to the user about the incoming group call
+          // They can choose to join or ignore
+          Alert.alert(
+            `Incoming ${callType === 'video' ? 'Video' : 'Voice'} Call`,
+            `${callerName} started a group call in ${conversationName}`,
+            [
+              {
+                text: 'Ignore',
+                style: 'cancel',
+                onPress: () => console.log('[App] User ignored group call'),
+              },
+              {
+                text: 'Join',
+                onPress: () => {
+                  console.log('[App] User joining group call:', conversationId);
+                  // Navigate to GroupCall screen using the exported navigationRef
+                  if (navigationRef?.current) {
+                    navigationRef.current.navigate('GroupCall', {
+                      conversationId,
+                      conversationName,
+                      type: callType,
+                    });
+                  } else {
+                    console.error('[App] Navigation ref not available');
+                  }
+                },
+              },
+            ],
+            { cancelable: true }
+          );
         }
       );
 

@@ -66,9 +66,22 @@ class SignalRService {
     const currentConnectionId = this.connectionId;
 
     // Token factory that always gets fresh token
+    // This is called by SignalR during connection and reconnection
     const getToken = () => {
-      const sdkInstance = getSDK();
-      return sdkInstance.getAccessToken() || '';
+      try {
+        const sdkInstance = getSDK();
+        const token = sdkInstance.getAccessToken();
+        if (!token) {
+          console.warn('[SignalR] Token factory called but no token available');
+          return '';
+        }
+        // Log token info for debugging (only first 30 chars for security)
+        console.log('[SignalR] Token factory returning token:', token.substring(0, 30) + '...');
+        return token;
+      } catch (error: any) {
+        console.error('[SignalR] Token factory error:', error?.message);
+        return '';
+      }
     };
 
     try {
@@ -136,9 +149,10 @@ class SignalRService {
         return;
       }
       await this.callConnection.start();
-      console.log('SignalR Call Hub connected');
+      console.log('SignalR Call Hub connected, connectionId:', this.callConnection.connectionId);
 
       console.log('SignalR: All hubs connected successfully');
+      console.log('SignalR: Connection IDs - Chat:', this.chatConnection?.connectionId, 'Call:', this.callConnection?.connectionId);
       this.retryCount = 0; // Reset retry count on success
     } catch (error: any) {
       console.error('SignalR connection error:', error?.message || error);
@@ -276,9 +290,14 @@ class SignalRService {
     await this.connect();
   }
 
-  // Check if connected
+  // Check if connected (checks all hubs)
   isConnected(): boolean {
     return this.chatConnection?.state === signalR.HubConnectionState.Connected;
+  }
+
+  // Check if call hub specifically is connected
+  isCallConnected(): boolean {
+    return this.callConnection?.state === signalR.HubConnectionState.Connected;
   }
 
   // Get connection state
@@ -743,8 +762,11 @@ class SignalRService {
       return;
     }
 
+    // Register both PascalCase and camelCase event names
+    // SignalR .NET sends PascalCase, but JS client may receive as camelCase
     const events = [
       'IncomingCall',
+      'IncomingGroupCall',
       'CallAnswered',
       'CallEnded',
       'CallRejected',
@@ -752,11 +774,26 @@ class SignalRService {
       'SdpOffer',
       'SdpAnswer',
     ];
+
     events.forEach((event) => {
-      this.callConnection!.on(event, (data: any) => {
-        const handlers = this.callHandlers.get(event) || [];
-        handlers.forEach((handler) => handler(data));
-      });
+      // Handler that dispatches to registered callbacks
+      const dispatchHandler = (data: any) => {
+        // Check both PascalCase and camelCase handler registrations
+        const pascalHandlers = this.callHandlers.get(event) || [];
+        const camelEvent = event.charAt(0).toLowerCase() + event.slice(1);
+        const camelHandlers = this.callHandlers.get(camelEvent) || [];
+
+        // Dispatch to all registered handlers
+        pascalHandlers.forEach((handler) => handler(data));
+        camelHandlers.forEach((handler) => handler(data));
+      };
+
+      // Register for PascalCase event name (server sends this)
+      this.callConnection!.on(event, dispatchHandler);
+
+      // Also register for camelCase event name (SignalR may convert)
+      const camelCaseEvent = event.charAt(0).toLowerCase() + event.slice(1);
+      this.callConnection!.on(camelCaseEvent, dispatchHandler);
     });
 
     // Handle presence events that may come through call connection
@@ -1102,6 +1139,54 @@ class SignalRService {
   async initiateCall(targetUserId: string, type: 'voice' | 'video'): Promise<void> {
     if (this.callConnection?.state === signalR.HubConnectionState.Connected) {
       await this.callConnection.invoke('InitiateCall', targetUserId, type);
+    }
+  }
+
+  // Initiate a group call (notifies all participants in the conversation)
+  // Backend CallHub uses InitiateCall(conversationId, callType) for group calls
+  async initiateGroupCall(conversationId: string, type: 'voice' | 'video'): Promise<void> {
+    // Ensure call connection is specifically connected
+    if (this.callConnection?.state !== signalR.HubConnectionState.Connected) {
+      console.warn('[SignalR] Call hub not connected, current state:', this.callConnection?.state);
+      console.log('[SignalR] Attempting to reconnect call hub...');
+
+      // Try to establish connection if not connected
+      if (!this.callConnection || this.callConnection.state === signalR.HubConnectionState.Disconnected) {
+        // Force full reconnection
+        await this.connect();
+
+        // Verify call connection is now connected
+        if (this.callConnection?.state !== signalR.HubConnectionState.Connected) {
+          throw new Error('Failed to establish SignalR call connection');
+        }
+      } else {
+        throw new Error(`SignalR call connection not connected. State: ${this.callConnection?.state}`);
+      }
+    }
+
+    // Log token availability for debugging
+    const sdk = getSDK();
+    const token = sdk.getAccessToken();
+    console.log('[SignalR] Initiating group call:', {
+      conversationId,
+      type,
+      hasToken: !!token,
+      tokenPreview: token ? token.substring(0, 30) + '...' : 'NO TOKEN',
+      callConnectionState: this.callConnection.state,
+    });
+
+    try {
+      // Note: Backend uses 'InitiateCall' (not 'InitiateGroupCall') for conversation-based calls
+      await this.callConnection.invoke('InitiateCall', conversationId, type);
+      console.log('[SignalR] Group call initiated successfully');
+    } catch (error: any) {
+      // Log full error details for debugging
+      console.error('[SignalR] InitiateCall failed:', {
+        message: error?.message,
+        conversationId,
+        type,
+      });
+      throw error;
     }
   }
 
