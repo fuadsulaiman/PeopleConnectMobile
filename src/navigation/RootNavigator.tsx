@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, createRef } from 'react';
 import { ActivityIndicator, View, StyleSheet } from 'react-native';
 import { NavigationContainer, NavigationContainerRef } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -17,6 +17,9 @@ import {
   CallsStackParamList,
   ProfileStackParamList,
 } from './types';
+
+// Export navigation ref for use in App.tsx (for handling group call notifications)
+export const navigationRef = createRef<NavigationContainerRef<RootStackParamList>>();
 
 // Auth Screens - default imports
 import LoginScreen from '../screens/auth/LoginScreen';
@@ -248,7 +251,7 @@ const MainNavigator: React.FC = () => (
 const RootNavigator: React.FC = () => {
   const { isAuthenticated, isLoading, checkAuth } = useAuthStore();
   const { callState, currentCall } = useCallStore();
-  const navigationRef = useRef<NavigationContainerRef<RootStackParamList>>(null);
+  // Use the exported navigationRef for navigation from App.tsx
   const hasNavigatedToCallRef = useRef(false);
 
   useEffect(() => {
@@ -263,18 +266,21 @@ const RootNavigator: React.FC = () => {
 
     if (
       (callState === 'incoming' ||
-        callState === 'ringing' ||
         callState === 'connecting' ||
         callState === 'connected') &&
       currentCall &&
       !hasNavigatedToCallRef.current
     ) {
+      // Determine if this is an incoming call (callee perspective)
+      const isIncoming = callState === 'incoming';
+      
       console.log('Navigating to ActiveCall screen for call:', currentCall.id);
       hasNavigatedToCallRef.current = true;
       navigationRef.current.navigate('ActiveCall', {
         call: currentCall as any,
         user: currentCall.caller as any,
         type: currentCall.type,
+        isIncoming,
       });
     } else if (callState === 'idle' || callState === 'ended') {
       hasNavigatedToCallRef.current = false;

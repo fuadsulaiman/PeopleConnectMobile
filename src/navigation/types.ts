@@ -36,7 +36,7 @@ export type ContactsStackParamList = {
 // Calls Stack
 export type CallsStackParamList = {
   CallHistory: undefined;
-  Call: { call?: Call; user?: User; type?: CallType };
+  Call: { call?: Call; user?: User; type?: CallType; isIncoming?: boolean };
 };
 
 // Profile Stack
@@ -66,7 +66,7 @@ export type MainTabParamList = {
 export type RootStackParamList = {
   Auth: NavigatorScreenParams<AuthStackParamList>;
   Main: NavigatorScreenParams<MainTabParamList>;
-  ActiveCall: { call?: Call; user?: User; type?: CallType };
+  ActiveCall: { call?: Call; user?: User; type?: CallType; isIncoming?: boolean };
   GroupCall: { conversationId: string; conversationName?: string; type: CallType; isJoining?: boolean };
   Notifications: undefined;
 };

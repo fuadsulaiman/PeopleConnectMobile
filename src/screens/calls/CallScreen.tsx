@@ -29,7 +29,12 @@ type CallScreenProps = ActiveCallScreenProps | CallStackScreenProps;
 const CallScreen: React.FC<CallScreenProps> = ({ route }) => {
   const navigation = useNavigation();
   const params = route.params || {};
-  const { call, user, type } = params as { call?: any; user?: any; type?: 'voice' | 'video' };
+  const { call, user, type, isIncoming: isIncomingParam } = params as {
+    call?: any;
+    user?: any;
+    type?: 'voice' | 'video';
+    isIncoming?: boolean;
+  };
 
   // State
   const [callState, setCallState] = useState<CallState | null>(null);
@@ -44,7 +49,8 @@ const CallScreen: React.FC<CallScreenProps> = ({ route }) => {
 
   const durationIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  const isIncoming = call?.direction === 'incoming' && call?.status === 'ringing';
+  // Use route param isIncoming, fallback to checking call object properties
+  const isIncoming = isIncomingParam === true || call?.direction === 'incoming' || call?.status === 'Incoming';
   const isVideo = type === 'video' || callState?.type === 'video';
   const isConnected = callState?.status === 'connected';
 
@@ -52,11 +58,17 @@ const CallScreen: React.FC<CallScreenProps> = ({ route }) => {
   const displayName =
     user?.name ||
     user?.displayName ||
+    user?.username ||
+    call?.caller?.displayName ||
+    call?.caller?.username ||
     call?.participants?.[0]?.user?.name ||
     callState?.remoteUserName ||
     'Unknown';
   const displayAvatar =
-    user?.avatarUrl || call?.participants?.[0]?.user?.avatarUrl || callState?.remoteUserAvatar;
+    user?.avatarUrl ||
+    call?.caller?.avatarUrl ||
+    call?.participants?.[0]?.user?.avatarUrl ||
+    callState?.remoteUserAvatar;
 
   // Setup WebRTC callbacks
   useEffect(() => {
@@ -107,13 +119,21 @@ const CallScreen: React.FC<CallScreenProps> = ({ route }) => {
     const initCall = async () => {
       try {
         const callId = call?.id || `call-${Date.now()}`;
-        const remoteUserId = user?.id || call?.participants?.[0]?.userId || '';
+        // For incoming calls, use callerId; for outgoing, use user.id
+        const remoteUserId = isIncoming
+          ? (call?.callerId || call?.caller?.id || '')
+          : (user?.id || call?.participants?.[0]?.userId || '');
+
+        // isInitiator should be true only when this user is starting the call (caller)
+        // For incoming calls (callee), isInitiator should be false
         const isInitiator = !isIncoming;
 
         console.log('[CallScreen] Initializing call:', {
           callId,
           type,
           isInitiator,
+          isIncoming,
+          isIncomingParam,
           remoteUserId,
         });
 
@@ -126,13 +146,18 @@ const CallScreen: React.FC<CallScreenProps> = ({ route }) => {
           displayAvatar
         );
 
-        // If initiating call, signal via SignalR
+        // CRITICAL: Only call initiateCall if this user is the CALLER (starting the call)
+        // The callee (receiving the call) should NOT call initiateCall - they should wait
+        // for the WebRTC offer/answer exchange to happen
         if (isInitiator && remoteUserId) {
+          console.log('[CallScreen] Caller: Initiating call via SignalR to:', remoteUserId);
           await signalRService.initiateCall(remoteUserId, type || 'voice');
+        } else {
+          console.log('[CallScreen] Callee: Waiting for WebRTC offer/answer (NOT calling initiateCall)');
         }
-      } catch (err) {
+      } catch (err: any) {
         console.error('[CallScreen] Failed to initialize call:', err);
-        setError('Failed to start call');
+        setError(err?.message || 'Failed to start call');
       }
     };
 
@@ -164,10 +189,12 @@ const CallScreen: React.FC<CallScreenProps> = ({ route }) => {
 
   const handleAcceptCall = useCallback(async () => {
     if (!call?.id) {
+      console.error('[CallScreen] Cannot accept call: no call ID');
       return;
     }
 
     try {
+      console.log('[CallScreen] Accepting call:', call.id);
       await signalRService.answerCall(call.id);
     } catch (err) {
       console.error('[CallScreen] Failed to accept call:', err);
@@ -177,10 +204,12 @@ const CallScreen: React.FC<CallScreenProps> = ({ route }) => {
 
   const handleRejectCall = useCallback(async () => {
     if (!call?.id) {
+      navigation.goBack();
       return;
     }
 
     try {
+      console.log('[CallScreen] Rejecting call:', call.id);
       await signalRService.rejectCall(call.id);
       navigation.goBack();
     } catch (err) {
@@ -225,10 +254,13 @@ const CallScreen: React.FC<CallScreenProps> = ({ route }) => {
       return isIncoming ? 'Incoming call...' : 'Ringing...';
     }
     if (isConnecting) {
-      return 'Connecting...';
+      return isIncoming ? 'Incoming call...' : 'Connecting...';
     }
     return 'Call ended';
   };
+
+  // Show incoming call UI if this is an incoming call and not yet connected
+  const showIncomingControls = isIncoming && !isConnected;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -299,7 +331,7 @@ const CallScreen: React.FC<CallScreenProps> = ({ route }) => {
       )}
 
       {/* Controls */}
-      {isIncoming && callState?.status !== 'connected' ? (
+      {showIncomingControls ? (
         // Incoming Call Controls
         <View style={styles.incomingControls}>
           <TouchableOpacity
