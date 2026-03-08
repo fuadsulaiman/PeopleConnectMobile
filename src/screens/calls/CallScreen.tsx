@@ -233,6 +233,19 @@ const CallScreen: React.FC<CallScreenProps> = ({ route }) => {
       webRTCService.endCall();
     };
   }, [isIncoming, hasAcceptedCall]); // Re-run when hasAcceptedCall changes
+  // Safe navigation helper - handles case when CallScreen is presented as modal
+  // with no screen to go back to
+  const safeGoBack = useCallback(() => {
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+    } else {
+      // No screen to go back to, reset to Main screen
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'Main' as never }],
+      });
+    }
+  }, [navigation]);
 
   const handleCallEnded = useCallback(
     (_reason?: string) => {
@@ -242,10 +255,10 @@ const CallScreen: React.FC<CallScreenProps> = ({ route }) => {
 
       // Navigate back after a short delay
       setTimeout(() => {
-        navigation.goBack();
+        safeGoBack();
       }, 500);
     },
-    [navigation]
+    [safeGoBack]
   );
 
   const handleEndCall = useCallback(() => {
@@ -283,19 +296,19 @@ const CallScreen: React.FC<CallScreenProps> = ({ route }) => {
     Vibration.cancel();
 
     if (!call?.id) {
-      navigation.goBack();
+      safeGoBack();
       return;
     }
 
     try {
       console.log('[CallScreen] Rejecting call:', call.id);
       await signalRService.rejectCall(call.id);
-      navigation.goBack();
+      safeGoBack();
     } catch (err) {
       console.error('[CallScreen] Failed to reject call:', err);
-      navigation.goBack();
+      safeGoBack();
     }
-  }, [call?.id, navigation]);
+  }, [call?.id, safeGoBack]);
 
   const handleToggleMute = useCallback(() => {
     const newMuted = webRTCService.toggleMute();
