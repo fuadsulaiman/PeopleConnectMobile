@@ -775,6 +775,7 @@ class SignalRService {
       'IceCandidate',
       'SdpOffer',
       'SdpAnswer',
+      'RecordingStatusChanged',
     ];
 
     events.forEach((event) => {
@@ -1225,6 +1226,17 @@ class SignalRService {
   async sendSdpAnswer(callId: string, sdp: any): Promise<void> {
     if (this.callConnection?.state === signalR.HubConnectionState.Connected) {
       await this.callConnection.invoke('SendSdpAnswer', callId, sdp);
+    }
+  }
+
+  // Notify call recording status change
+  async notifyRecordingStatus(callId: string, isRecording: boolean): Promise<void> {
+    if (this.callConnection?.state === signalR.HubConnectionState.Connected) {
+      console.log('[SignalR] Notifying recording status:', { callId, isRecording });
+      await this.callConnection.invoke('NotifyRecordingStatus', callId, isRecording);
+    } else {
+      console.warn('[SignalR] Cannot notify recording status - call hub not connected');
+      throw new Error('Call connection not available');
     }
   }
 }

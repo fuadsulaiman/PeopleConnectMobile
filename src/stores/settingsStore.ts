@@ -26,6 +26,7 @@ interface PublicCallSettings {
   maxCallDuration: number;
   enableVoiceCalls: boolean;
   enableVideoCalls: boolean;
+  recordingEnabled?: boolean;
 }
 
 interface PublicPrivacySettings {
@@ -76,6 +77,7 @@ interface SettingsState {
   isRegistrationEnabled: () => boolean;
   isVoiceCallsEnabled: () => boolean;
   isVideoCallsEnabled: () => boolean;
+  isRecordingEnabled: () => boolean;
   getMaxMessageLength: () => number;
   getPrivacySettings: () => PublicPrivacySettings;
   isLinkPreviewEnabled: () => boolean;
@@ -181,6 +183,11 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   isVideoCallsEnabled: () => {
     const state = get();
     return state.publicSettings?.calls?.enableVideoCalls ?? true;
+  },
+
+  isRecordingEnabled: () => {
+    const state = get();
+    return state.publicSettings?.calls?.recordingEnabled ?? false;
   },
 
   getMaxMessageLength: () => {

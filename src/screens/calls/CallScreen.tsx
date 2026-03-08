@@ -11,12 +11,14 @@ import {
   StatusBar,
   Vibration,
   Platform,
+  Animated,
 } from 'react-native';
 import { RTCView, MediaStream } from '@livekit/react-native-webrtc';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useNavigation } from '@react-navigation/native';
 import { colors } from '../../constants/colors';
 import { useAuthStore } from '../../stores/authStore';
+import { useSettingsStore } from '../../stores/settingsStore';
 import { webRTCService, CallState } from '../../services/webrtcService';
 import { signalRService } from '../../services/signalr';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -41,6 +43,10 @@ const CallScreen: React.FC<CallScreenProps> = ({ route }) => {
     isIncoming?: boolean;
   };
 
+  // Settings store for recording enabled check
+  const fetchPublicSettings = useSettingsStore((state) => state.fetchPublicSettings);
+  const isRecordingEnabledSetting = useSettingsStore((state) => state.isRecordingEnabled);
+
   // State
   const [callState, setCallState] = useState<CallState | null>(null);
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
@@ -51,6 +57,15 @@ const CallScreen: React.FC<CallScreenProps> = ({ route }) => {
   const [callDuration, setCallDuration] = useState(0);
   const [isConnecting, setIsConnecting] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Recording state
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingEnabled, setRecordingEnabled] = useState(false);
+  const [remoteIsRecording, setRemoteIsRecording] = useState(false);
+  const [remoteRecorderName, setRemoteRecorderName] = useState<string | null>(null);
+
+  // Recording animation
+  const recordingPulse = useRef(new Animated.Value(1)).current;
 
   // CRITICAL: Track whether incoming call has been accepted by the user
   // This prevents auto-initialization of WebRTC before user accepts
@@ -65,14 +80,14 @@ const CallScreen: React.FC<CallScreenProps> = ({ route }) => {
   // 3. call.callerId exists and is NOT our user ID (we're the callee)
   const callerId = call?.callerId || call?.caller?.id;
   const isCalleeByUserId = callerId && currentUser?.id && callerId !== currentUser.id;
-  
-  const isIncoming = 
-    isIncomingParam === true || 
-    call?.direction === 'incoming' || 
+
+  const isIncoming =
+    isIncomingParam === true ||
+    call?.direction === 'incoming' ||
     call?.status === 'Incoming' ||
     call?.status === 'incoming' ||  // Check lowercase too
     isCalleeByUserId === true;
-  
+
   // Debug logging for incoming call detection
   console.log('[CallScreen] Incoming call detection:', {
     isIncomingParam,
@@ -102,6 +117,76 @@ const CallScreen: React.FC<CallScreenProps> = ({ route }) => {
     call?.caller?.avatarUrl ||
     call?.participants?.[0]?.user?.avatarUrl ||
     callState?.remoteUserAvatar;
+
+  // Fetch settings on mount
+  useEffect(() => {
+    const loadSettings = async () => {
+      await fetchPublicSettings();
+      const isEnabled = isRecordingEnabledSetting();
+      console.log('[CallScreen] Recording enabled from settings:', isEnabled);
+      setRecordingEnabled(isEnabled);
+    };
+    loadSettings();
+  }, [fetchPublicSettings, isRecordingEnabledSetting]);
+
+  // Recording pulse animation
+  useEffect(() => {
+    if (isRecording) {
+      const pulse = Animated.loop(
+        Animated.sequence([
+          Animated.timing(recordingPulse, {
+            toValue: 1.2,
+            duration: 500,
+            useNativeDriver: true,
+          }),
+          Animated.timing(recordingPulse, {
+            toValue: 1,
+            duration: 500,
+            useNativeDriver: true,
+          }),
+        ])
+      );
+      pulse.start();
+      return () => pulse.stop();
+    } else {
+      recordingPulse.setValue(1);
+    }
+  }, [isRecording, recordingPulse]);
+
+  // Subscribe to recording status changes
+  useEffect(() => {
+    const unsubscribe = signalRService.onCallEvent('RecordingStatusChanged', (data: any) => {
+      console.log('[CallScreen] RecordingStatusChanged event:', data);
+      const {
+        callId: eventCallId,
+        userId,
+        userName,
+        isRecording: eventIsRecording,
+      } = data;
+
+      // Check if this event is for our call
+      const ourCallId = call?.id;
+      if (eventCallId !== ourCallId) {
+        console.log('[CallScreen] Recording event for different call, ignoring');
+        return;
+      }
+
+      // Check if this is our own recording status or remote
+      if (userId === currentUser?.id) {
+        // This is our own recording status confirmation
+        console.log('[CallScreen] Own recording status confirmed:', eventIsRecording);
+      } else {
+        // Remote user's recording status
+        setRemoteIsRecording(eventIsRecording);
+        setRemoteRecorderName(eventIsRecording ? userName : null);
+        console.log('[CallScreen] Remote user recording:', userName, eventIsRecording);
+      }
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [call?.id, currentUser?.id]);
 
   // Vibration for incoming calls
   useEffect(() => {
@@ -262,8 +347,12 @@ const CallScreen: React.FC<CallScreenProps> = ({ route }) => {
   );
 
   const handleEndCall = useCallback(() => {
+    // Stop recording if active before ending call
+    if (isRecording) {
+      setIsRecording(false);
+    }
     webRTCService.endCall();
-  }, []);
+  }, [isRecording]);
 
   const handleAcceptCall = useCallback(async () => {
     if (!call?.id) {
@@ -329,6 +418,27 @@ const CallScreen: React.FC<CallScreenProps> = ({ route }) => {
     await webRTCService.switchCamera();
   }, []);
 
+  const handleToggleRecording = useCallback(async () => {
+    if (!call?.id) {
+      console.error('[CallScreen] Cannot toggle recording: no call ID');
+      return;
+    }
+
+    const newRecordingState = !isRecording;
+
+    try {
+      console.log('[CallScreen] Toggling recording:', newRecordingState);
+      await signalRService.notifyRecordingStatus(call.id, newRecordingState);
+      setIsRecording(newRecordingState);
+    } catch (err: any) {
+      console.error('[CallScreen] Failed to toggle recording:', err);
+      Alert.alert(
+        'Recording Error',
+        err?.message || 'Failed to toggle recording. Please try again.'
+      );
+    }
+  }, [call?.id, isRecording]);
+
   const formatDuration = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
@@ -358,10 +468,34 @@ const CallScreen: React.FC<CallScreenProps> = ({ route }) => {
   // Show incoming call UI if this is an incoming call and not yet accepted
   // CRITICAL: Use hasAcceptedCall instead of isConnected to determine UI
   const showIncomingControls = isIncoming && !hasAcceptedCall;
+  const isActive = isConnected || (!showIncomingControls && (isConnecting || callState?.status === 'ringing'));
 
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor={colors.gray[900]} />
+
+      {/* Local Recording Indicator */}
+      {isRecording && isActive && (
+        <Animated.View
+          style={[
+            styles.recordingIndicator,
+            { transform: [{ scale: recordingPulse }] },
+          ]}
+        >
+          <Icon name="radio-button-on" size={12} color={colors.white} />
+          <Text style={styles.recordingText}>Recording</Text>
+        </Animated.View>
+      )}
+
+      {/* Remote Recording Indicator */}
+      {remoteIsRecording && isActive && (
+        <View style={styles.remoteRecordingIndicator}>
+          <Icon name="radio-button-on" size={12} color={colors.white} />
+          <Text style={styles.remoteRecordingText}>
+            {remoteRecorderName || displayName} is recording this call
+          </Text>
+        </View>
+      )}
 
       {/* Video Views - only show after call is accepted or for outgoing calls */}
       {isVideo && (hasAcceptedCall || !isIncoming) && (
@@ -476,6 +610,23 @@ const CallScreen: React.FC<CallScreenProps> = ({ route }) => {
                 color={colors.white}
               />
               <Text style={styles.controlLabel}>{isVideoEnabled ? 'Stop' : 'Start'}</Text>
+            </TouchableOpacity>
+          )}
+
+          {/* Recording Button - only show if enabled in settings */}
+          {recordingEnabled && (
+            <TouchableOpacity
+              style={[styles.controlButton, isRecording && styles.recordingButtonActive]}
+              onPress={handleToggleRecording}
+            >
+              <Animated.View style={{ transform: [{ scale: isRecording ? recordingPulse : 1 }] }}>
+                <Icon
+                  name={isRecording ? 'radio-button-on' : 'radio-button-off'}
+                  size={28}
+                  color={isRecording ? colors.white : colors.error}
+                />
+              </Animated.View>
+              <Text style={styles.controlLabel}>{isRecording ? 'Stop' : 'Record'}</Text>
             </TouchableOpacity>
           )}
 
@@ -629,11 +780,51 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     width: 120,
   },
+  recordingButtonActive: {
+    backgroundColor: colors.error,
+  },
+  recordingIndicator: {
+    alignItems: 'center',
+    backgroundColor: colors.error,
+    borderRadius: 8,
+    flexDirection: 'row',
+    left: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    position: 'absolute',
+    top: 60,
+    zIndex: 10,
+  },
+  recordingText: {
+    color: colors.white,
+    fontSize: 12,
+    fontWeight: '600',
+    marginLeft: 6,
+  },
   rejectButton: {
     backgroundColor: colors.error,
     borderRadius: 35,
     height: 70,
     width: 70,
+  },
+  remoteRecordingIndicator: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(239, 68, 68, 0.9)',
+    borderRadius: 8,
+    flexDirection: 'row',
+    left: '50%',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    position: 'absolute',
+    top: 100,
+    transform: [{ translateX: -100 }],
+    zIndex: 10,
+  },
+  remoteRecordingText: {
+    color: colors.white,
+    fontSize: 12,
+    fontWeight: '500',
+    marginLeft: 6,
   },
   remoteVideo: {
     backgroundColor: colors.gray[800],
