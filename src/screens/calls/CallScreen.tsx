@@ -16,6 +16,7 @@ import { RTCView, MediaStream } from '@livekit/react-native-webrtc';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useNavigation } from '@react-navigation/native';
 import { colors } from '../../constants/colors';
+import { useAuthStore } from '../../stores/authStore';
 import { webRTCService, CallState } from '../../services/webrtcService';
 import { signalRService } from '../../services/signalr';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -30,6 +31,8 @@ type CallScreenProps = ActiveCallScreenProps | CallStackScreenProps;
 
 const CallScreen: React.FC<CallScreenProps> = ({ route }) => {
   const navigation = useNavigation();
+  // Get current user to determine if we're the caller or callee
+  const currentUser = useAuthStore((state) => state.user);
   const params = route.params || {};
   const { call, user, type, isIncoming: isIncomingParam } = params as {
     call?: any;
@@ -56,8 +59,31 @@ const CallScreen: React.FC<CallScreenProps> = ({ route }) => {
   const durationIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const hasInitializedRef = useRef(false);
 
-  // Use route param isIncoming, fallback to checking call object properties
-  const isIncoming = isIncomingParam === true || call?.direction === 'incoming' || call?.status === 'Incoming';
+  // ROBUST incoming call detection - check multiple indicators
+  // 1. Route param isIncoming (most reliable when passed from RootNavigator)
+  // 2. call.status === 'Incoming' (set in App.tsx handler)
+  // 3. call.callerId exists and is NOT our user ID (we're the callee)
+  const callerId = call?.callerId || call?.caller?.id;
+  const isCalleeByUserId = callerId && currentUser?.id && callerId !== currentUser.id;
+  
+  const isIncoming = 
+    isIncomingParam === true || 
+    call?.direction === 'incoming' || 
+    call?.status === 'Incoming' ||
+    call?.status === 'incoming' ||  // Check lowercase too
+    isCalleeByUserId === true;
+  
+  // Debug logging for incoming call detection
+  console.log('[CallScreen] Incoming call detection:', {
+    isIncomingParam,
+    callDirection: call?.direction,
+    callStatus: call?.status,
+    callerId,
+    currentUserId: currentUser?.id,
+    isCalleeByUserId,
+    FINAL_isIncoming: isIncoming,
+    hasAcceptedCall: false, // logged before state is available
+  });
   const isVideo = type === 'video' || callState?.type === 'video';
   const isConnected = callState?.status === 'connected';
 
