@@ -9,6 +9,8 @@ import {
   SafeAreaView,
   Alert,
   StatusBar,
+  Vibration,
+  Platform,
 } from 'react-native';
 import { RTCView, MediaStream } from '@livekit/react-native-webrtc';
 import Icon from 'react-native-vector-icons/Ionicons';
@@ -47,7 +49,12 @@ const CallScreen: React.FC<CallScreenProps> = ({ route }) => {
   const [isConnecting, setIsConnecting] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // CRITICAL: Track whether incoming call has been accepted by the user
+  // This prevents auto-initialization of WebRTC before user accepts
+  const [hasAcceptedCall, setHasAcceptedCall] = useState(false);
+
   const durationIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const hasInitializedRef = useRef(false);
 
   // Use route param isIncoming, fallback to checking call object properties
   const isIncoming = isIncomingParam === true || call?.direction === 'incoming' || call?.status === 'Incoming';
@@ -69,6 +76,21 @@ const CallScreen: React.FC<CallScreenProps> = ({ route }) => {
     call?.caller?.avatarUrl ||
     call?.participants?.[0]?.user?.avatarUrl ||
     callState?.remoteUserAvatar;
+
+  // Vibration for incoming calls
+  useEffect(() => {
+    // Only vibrate for incoming calls that haven't been accepted yet
+    if (isIncoming && !hasAcceptedCall) {
+      const vibrationPattern =
+        Platform.OS === 'android' ? [0, 1000, 1000, 1000, 1000, 1000] : [0, 1000];
+      Vibration.vibrate(vibrationPattern, true);
+
+      return () => {
+        Vibration.cancel();
+      };
+    }
+    return undefined;
+  }, [isIncoming, hasAcceptedCall]);
 
   // Setup WebRTC callbacks
   useEffect(() => {
@@ -114,9 +136,24 @@ const CallScreen: React.FC<CallScreenProps> = ({ route }) => {
     };
   }, []);
 
-  // Initialize call
+  // Initialize call - ONLY for outgoing calls or after incoming call is accepted
   useEffect(() => {
+    // Prevent double initialization
+    if (hasInitializedRef.current) {
+      return;
+    }
+
+    // CRITICAL FIX: For incoming calls, do NOT initialize WebRTC until user accepts
+    // The user must tap "Accept" first, which sets hasAcceptedCall to true
+    if (isIncoming && !hasAcceptedCall) {
+      console.log('[CallScreen] Incoming call - waiting for user to accept before initializing WebRTC');
+      return;
+    }
+
     const initCall = async () => {
+      // Mark as initialized to prevent double initialization
+      hasInitializedRef.current = true;
+
       try {
         const callId = call?.id || `call-${Date.now()}`;
         // For incoming calls, use callerId; for outgoing, use user.id
@@ -134,6 +171,7 @@ const CallScreen: React.FC<CallScreenProps> = ({ route }) => {
           isInitiator,
           isIncoming,
           isIncomingParam,
+          hasAcceptedCall,
           remoteUserId,
         });
 
@@ -158,6 +196,7 @@ const CallScreen: React.FC<CallScreenProps> = ({ route }) => {
       } catch (err: any) {
         console.error('[CallScreen] Failed to initialize call:', err);
         setError(err?.message || 'Failed to start call');
+        hasInitializedRef.current = false; // Allow retry
       }
     };
 
@@ -167,7 +206,7 @@ const CallScreen: React.FC<CallScreenProps> = ({ route }) => {
       // Cleanup on unmount
       webRTCService.endCall();
     };
-  }, []);
+  }, [isIncoming, hasAcceptedCall]); // Re-run when hasAcceptedCall changes
 
   const handleCallEnded = useCallback(
     (_reason?: string) => {
@@ -193,9 +232,20 @@ const CallScreen: React.FC<CallScreenProps> = ({ route }) => {
       return;
     }
 
+    // Stop vibration
+    Vibration.cancel();
+
     try {
-      console.log('[CallScreen] Accepting call:', call.id);
+      console.log('[CallScreen] User accepted call:', call.id);
+
+      // First, tell the server we're accepting the call
+      // This must happen BEFORE we initialize WebRTC
       await signalRService.answerCall(call.id);
+      console.log('[CallScreen] Sent answerCall to server');
+
+      // Now mark call as accepted - this will trigger WebRTC initialization
+      setHasAcceptedCall(true);
+
     } catch (err) {
       console.error('[CallScreen] Failed to accept call:', err);
       setError('Failed to accept call');
@@ -203,6 +253,9 @@ const CallScreen: React.FC<CallScreenProps> = ({ route }) => {
   }, [call?.id]);
 
   const handleRejectCall = useCallback(async () => {
+    // Stop vibration
+    Vibration.cancel();
+
     if (!call?.id) {
       navigation.goBack();
       return;
@@ -250,24 +303,29 @@ const CallScreen: React.FC<CallScreenProps> = ({ route }) => {
     if (isConnected) {
       return formatDuration(callDuration);
     }
+    // For incoming calls that haven't been accepted yet
+    if (isIncoming && !hasAcceptedCall) {
+      return 'Incoming call...';
+    }
     if (callState?.status === 'ringing') {
-      return isIncoming ? 'Incoming call...' : 'Ringing...';
+      return isIncoming ? 'Connecting...' : 'Ringing...';
     }
     if (isConnecting) {
-      return isIncoming ? 'Incoming call...' : 'Connecting...';
+      return isIncoming ? 'Connecting...' : 'Connecting...';
     }
     return 'Call ended';
   };
 
-  // Show incoming call UI if this is an incoming call and not yet connected
-  const showIncomingControls = isIncoming && !isConnected;
+  // Show incoming call UI if this is an incoming call and not yet accepted
+  // CRITICAL: Use hasAcceptedCall instead of isConnected to determine UI
+  const showIncomingControls = isIncoming && !hasAcceptedCall;
 
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor={colors.gray[900]} />
 
-      {/* Video Views */}
-      {isVideo && (
+      {/* Video Views - only show after call is accepted or for outgoing calls */}
+      {isVideo && (hasAcceptedCall || !isIncoming) && (
         <View style={styles.videoContainer}>
           {/* Remote Video (Full Screen) */}
           {remoteStream ? (
@@ -307,8 +365,8 @@ const CallScreen: React.FC<CallScreenProps> = ({ route }) => {
         </View>
       )}
 
-      {/* Audio-Only View */}
-      {!isVideo && (
+      {/* Audio-Only View OR Incoming Call View (before acceptance) */}
+      {(!isVideo || (isIncoming && !hasAcceptedCall)) && (
         <View style={styles.audioContainer}>
           {displayAvatar ? (
             <Image source={{ uri: displayAvatar }} style={styles.avatar} />
@@ -319,11 +377,16 @@ const CallScreen: React.FC<CallScreenProps> = ({ route }) => {
           )}
           <Text style={styles.callerName}>{displayName}</Text>
           <Text style={styles.callStatus}>{getStatusText()}</Text>
+          {isIncoming && !hasAcceptedCall && (
+            <Text style={styles.callTypeText}>
+              {isVideo ? 'Video Call' : 'Voice Call'}
+            </Text>
+          )}
         </View>
       )}
 
-      {/* Status Overlay for Video */}
-      {isVideo && (
+      {/* Status Overlay for Video (only when connected) */}
+      {isVideo && hasAcceptedCall && (
         <View style={styles.statusOverlay}>
           <Text style={styles.overlayName}>{displayName}</Text>
           <Text style={styles.overlayStatus}>{getStatusText()}</Text>
@@ -332,7 +395,7 @@ const CallScreen: React.FC<CallScreenProps> = ({ route }) => {
 
       {/* Controls */}
       {showIncomingControls ? (
-        // Incoming Call Controls
+        // Incoming Call Controls - Accept/Decline buttons
         <View style={styles.incomingControls}>
           <TouchableOpacity
             style={[styles.controlButton, styles.rejectButton]}
@@ -437,6 +500,12 @@ const styles = StyleSheet.create({
     color: colors.gray[400],
     fontSize: 16,
     marginTop: 8,
+  },
+  callTypeText: {
+    color: colors.primary,
+    fontSize: 14,
+    fontWeight: '500',
+    marginTop: 16,
   },
   callerName: {
     color: colors.white,
