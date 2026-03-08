@@ -1194,7 +1194,7 @@ class SignalRService {
 
   async answerCall(callId: string): Promise<void> {
     if (this.callConnection?.state === signalR.HubConnectionState.Connected) {
-      await this.callConnection.invoke('AnswerCall', callId);
+      await this.callConnection.invoke('AcceptCall', callId);
     }
   }
 
