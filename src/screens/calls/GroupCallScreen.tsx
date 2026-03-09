@@ -508,8 +508,7 @@ const GroupCallScreen: React.FC<GroupCallScreenProps> = ({ route, navigation }) 
   }, []);
 
   // Handle recording toggle for LiveKit group calls
-  // Note: LiveKit group calls use server-side Egress recording when enabled.
-  // This tracks the recording state and notifies other participants.
+  // Records audio from device microphone during the call
   const handleToggleRecording = useCallback(async () => {
     if (!recordingEnabled) {
       console.warn('[GroupCall] Recording is disabled by settings');
@@ -521,24 +520,42 @@ const GroupCallScreen: React.FC<GroupCallScreenProps> = ({ route, navigation }) 
     try {
       const signalR = getSignalR();
       const callGroupId = 'group-' + conversationId;
+      const callType = type === 'video' ? 'video' : 'voice';
 
       if (newIsRecording) {
-        // Start recording
+        // Start recording with actual audio capture
         console.log('[GroupCall] Starting recording...');
         recordingStartTimeRef.current = Date.now();
         
-        // Initialize recording service metadata
-        const callType = type === 'video' ? 'video' : 'voice';
-        callRecordingService.startRecording(callGroupId, conversationId, callType);
+        // Start actual audio recording
+        await callRecordingService.startRecording(callGroupId, conversationId, callType);
+        console.log('[GroupCall] Recording started successfully');
       } else {
-        // Stop recording
+        // Stop recording and upload
         console.log('[GroupCall] Stopping recording...');
-        const recordingResult = callRecordingService.stopRecording();
+        const recordingResult = await callRecordingService.stopRecording();
         
-        if (recordingResult) {
+        if (recordingResult && recordingResult.filePath) {
           console.log('[GroupCall] Recording stopped, duration:', recordingResult.duration, 'seconds');
-          // Note: For LiveKit group calls, actual recording is handled server-side via Egress
-          // Client-side recording would require additional native module integration
+          console.log('[GroupCall] Recording file path:', recordingResult.filePath);
+          
+          // Upload the recording file
+          try {
+            await callRecordingService.uploadRecording(
+              recordingResult.filePath,
+              callGroupId,
+              conversationId,
+              callType,
+              recordingResult.duration
+            );
+            console.log('[GroupCall] Recording uploaded successfully');
+            Alert.alert('Recording Saved', 'Call recording has been uploaded successfully.');
+          } catch (uploadErr: any) {
+            console.error('[GroupCall] Failed to upload recording:', uploadErr.message);
+            Alert.alert('Upload Failed', 'Recording saved locally but upload failed. Error: ' + uploadErr.message);
+          }
+        } else {
+          console.warn('[GroupCall] No recording file to upload');
         }
         
         recordingStartTimeRef.current = null;
@@ -555,10 +572,12 @@ const GroupCallScreen: React.FC<GroupCallScreenProps> = ({ route, navigation }) 
         callRecordingService.clearCurrentRecording();
         recordingStartTimeRef.current = null;
       }
-      Alert.alert('Recording Error', 'Failed to update recording status. Please try again.');
+      Alert.alert(
+        'Recording Error',
+        err?.message || 'Failed to ' + (newIsRecording ? 'start' : 'stop') + ' recording. Please try again.'
+      );
     }
   }, [isRecording, recordingEnabled, conversationId, type]);
-
 
   // Handle LiveKit connection errors
   // IMPORTANT: This hook MUST be defined before any early returns to comply with Rules of Hooks

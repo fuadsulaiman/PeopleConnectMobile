@@ -432,39 +432,39 @@ const CallScreen: React.FC<CallScreenProps> = ({ route }) => {
 
     try {
       if (newRecordingState) {
-        // Start recording
+        // Start recording with actual audio capture
         console.log('[CallScreen] Starting recording...');
         recordingStartTimeRef.current = Date.now();
         
-        // Initialize recording service metadata
-        callRecordingService.startRecording(call.id, conversationId, callType);
-        
-        // Note: For actual audio/video capture from WebRTC streams,
-        // native module integration is required (e.g., react-native-audio-recorder-player)
-        // The current implementation tracks metadata for server-side or future client-side recording
+        // Start actual audio recording
+        await callRecordingService.startRecording(call.id, conversationId, callType);
+        console.log('[CallScreen] Recording started successfully');
       } else {
-        // Stop recording
+        // Stop recording and upload
         console.log('[CallScreen] Stopping recording...');
-        const recordingResult = callRecordingService.stopRecording();
+        const recordingResult = await callRecordingService.stopRecording();
         
-        if (recordingResult && recordingResult.metadata.filePath) {
+        if (recordingResult && recordingResult.filePath) {
           console.log('[CallScreen] Recording stopped, duration:', recordingResult.duration, 'seconds');
+          console.log('[CallScreen] Recording file path:', recordingResult.filePath);
           
-          // Attempt to upload recording if file exists
-          // Note: Actual file creation requires native audio capture
+          // Upload the recording file
           try {
             await callRecordingService.uploadRecording(
-              recordingResult.metadata.filePath,
+              recordingResult.filePath,
               call.id,
               conversationId,
               callType,
               recordingResult.duration
             );
             console.log('[CallScreen] Recording uploaded successfully');
+            Alert.alert('Recording Saved', 'Call recording has been uploaded successfully.');
           } catch (uploadErr: any) {
-            console.warn('[CallScreen] Failed to upload recording:', uploadErr.message);
-            // Continue anyway - the recording attempt was made
+            console.error('[CallScreen] Failed to upload recording:', uploadErr.message);
+            Alert.alert('Upload Failed', 'Recording saved locally but upload failed. Error: ' + uploadErr.message);
           }
+        } else {
+          console.warn('[CallScreen] No recording file to upload');
         }
         
         recordingStartTimeRef.current = null;
@@ -483,7 +483,7 @@ const CallScreen: React.FC<CallScreenProps> = ({ route }) => {
       }
       Alert.alert(
         'Recording Error',
-        err?.message || 'Failed to toggle recording. Please try again.'
+        err?.message || 'Failed to ' + (newRecordingState ? 'start' : 'stop') + ' recording. Please try again.'
       );
     }
   }, [call?.id, callState?.conversationId, isRecording, isVideo]);
