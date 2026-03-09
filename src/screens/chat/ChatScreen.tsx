@@ -59,6 +59,7 @@ import { LocationPicker } from '../../components/chat/LocationPicker';
 import { LocationMessage } from '../../components/chat/LocationMessage';
 import { locationService, LocationData } from '../../services/locationService';
 import { VoiceRecorder } from '../../components/chat/VoiceRecorder';
+import RNFS from 'react-native-fs';
 
 // Helper to convert relative URLs to absolute URLs
 const toAbsoluteUrl = (url: string | null | undefined): string | undefined => {
@@ -256,9 +257,42 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
     });
   }, []);
 
+  // Start view-once countdown timer
+  const startViewOnceTimer = useCallback(
+    (messageId: string) => {
+      // Don't start if timer is already running
+      if (viewOnceTimerRefs.current[messageId]) {
+        return;
+      }
+
+      // Start countdown timer (10 seconds default)
+      const timerDuration = 10;
+      setViewOnceTimers((prev) => ({ ...prev, [messageId]: timerDuration }));
+
+      // Start countdown
+      viewOnceTimerRefs.current[messageId] = setInterval(() => {
+        setViewOnceTimers((prev) => {
+          const currentTime = prev[messageId];
+          if (currentTime === undefined || currentTime <= 1) {
+            clearInterval(viewOnceTimerRefs.current[messageId]);
+            delete viewOnceTimerRefs.current[messageId];
+            // Update message in store after timer expires
+            updateMessage(conversationId, messageId, {
+              viewOnceViewedAt: new Date().toISOString(),
+            });
+            const { [messageId]: _, ...rest } = prev;
+            return rest;
+          }
+          return { ...prev, [messageId]: currentTime - 1 };
+        });
+      }, 1000);
+    },
+    [conversationId, updateMessage]
+  );
+
   // Handle view-once message reveal
   const handleViewOnceReveal = useCallback(
-    async (messageId: string) => {
+    async (messageId: string, skipTimer: boolean = false) => {
       if (revealingViewOnce || viewOnceRevealedMessages.has(messageId)) {
         return;
       }
@@ -268,32 +302,10 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
         await markViewOnceViewed(conversationId, messageId);
         setViewOnceRevealedMessages((prev) => new Set(prev).add(messageId));
 
-        // Start countdown timer (10 seconds default)
-        const timerDuration = 10;
-        setViewOnceTimers((prev) => ({ ...prev, [messageId]: timerDuration }));
-
-        // Clear any existing timer
-        if (viewOnceTimerRefs.current[messageId]) {
-          clearInterval(viewOnceTimerRefs.current[messageId]);
+        // Start countdown timer immediately (unless skipTimer is true for audio messages)
+        if (!skipTimer) {
+          startViewOnceTimer(messageId);
         }
-
-        // Start countdown
-        viewOnceTimerRefs.current[messageId] = setInterval(() => {
-          setViewOnceTimers((prev) => {
-            const currentTime = prev[messageId];
-            if (currentTime === undefined || currentTime <= 1) {
-              clearInterval(viewOnceTimerRefs.current[messageId]);
-              delete viewOnceTimerRefs.current[messageId];
-              // Update message in store after timer expires
-              updateMessage(conversationId, messageId, {
-                viewOnceViewedAt: new Date().toISOString(),
-              });
-              const { [messageId]: _, ...rest } = prev;
-              return rest;
-            }
-            return { ...prev, [messageId]: currentTime - 1 };
-          });
-        }, 1000);
       } catch (error) {
         console.error('Failed to reveal view-once message:', error);
         Alert.alert('Error', 'Failed to open view-once message');
@@ -301,7 +313,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
         setRevealingViewOnce(null);
       }
     },
-    [conversationId, revealingViewOnce, viewOnceRevealedMessages, markViewOnceViewed, updateMessage]
+    [conversationId, revealingViewOnce, viewOnceRevealedMessages, markViewOnceViewed, startViewOnceTimer]
   );
 
   // Cleanup view-once timers on unmount
@@ -728,7 +740,8 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
       fileSize?: number;
     } | null> => {
       try {
-        // On Android, ensure the URI has proper format
+        // The URI should already have file:// prefix from the caller
+        // But double-check for Android compatibility
         let fileUri = uri;
         if (
           Platform.OS === 'android' &&
@@ -738,7 +751,28 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
           fileUri = `file://${uri}`;
         }
 
-        console.log('Uploading file:', { uri: fileUri, fileName, mimeType });
+        console.log('[uploadFile] Starting upload:', { uri: fileUri, fileName, mimeType });
+
+        // Verify file exists before attempting upload (for local files)
+        if (fileUri.startsWith('file://')) {
+          const pathForCheck = fileUri.substring(7); // Remove 'file://'
+          try {
+            const exists = await RNFS.exists(pathForCheck);
+            if (!exists) {
+              console.error('[uploadFile] File does not exist:', pathForCheck);
+              Alert.alert('Upload Error', 'The file to upload was not found.');
+              return null;
+            }
+            const fileInfo = await RNFS.stat(pathForCheck);
+            console.log('[uploadFile] File verified:', {
+              path: pathForCheck,
+              size: fileInfo.size,
+              isFile: fileInfo.isFile(),
+            });
+          } catch (fsError) {
+            console.error('[uploadFile] File system error:', fsError);
+          }
+        }
 
         const formData = new FormData();
         formData.append('file', {
@@ -752,7 +786,8 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
         const baseUrl = config.API_BASE_URL;
         const uploadUrl = `${baseUrl}/media/upload?conversationId=${conversationId}`;
 
-        console.log('Upload URL:', uploadUrl);
+        console.log('[uploadFile] Upload URL:', uploadUrl);
+        console.log('[uploadFile] Authorization token present:', !!token);
 
         const response = await fetch(uploadUrl, {
           method: 'POST',
@@ -763,32 +798,32 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
           body: formData,
         });
 
-        console.log('Upload response status:', response.status);
+        console.log('[uploadFile] Response status:', response.status);
 
         if (!response.ok) {
           const errorText = await response.text();
-          console.error('Upload failed:', response.status, errorText);
+          console.error('[uploadFile] Upload failed:', response.status, errorText);
           throw new Error(`Upload failed: ${response.status} - ${errorText}`);
         }
 
         const responseText = await response.text();
-        console.log('Upload response text:', responseText);
+        console.log('[uploadFile] Response text:', responseText);
 
         let result;
         try {
           result = JSON.parse(responseText);
         } catch (parseError) {
-          console.error('Failed to parse upload response:', parseError);
+          console.error('[uploadFile] Failed to parse upload response:', parseError);
           return null;
         }
-        console.log('Upload result:', JSON.stringify(result, null, 2));
+        console.log('[uploadFile] Parsed result:', JSON.stringify(result, null, 2));
 
         // Handle wrapped API response format: { success: true, data: {...} }
         const data = result.data || result;
 
         // Return the full upload data including id (attachment ID) and downloadUrl
         if (!data.id) {
-          console.error('No attachment ID in upload response:', result);
+          console.error('[uploadFile] No attachment ID in upload response:', result);
           Alert.alert(
             'Upload Response Error',
             `Server returned: ${JSON.stringify(result).substring(0, 200)}`
@@ -796,7 +831,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
           return null;
         }
 
-        console.log('Uploaded file - ID:', data.id, 'URL:', data.downloadUrl);
+        console.log('[uploadFile] Success - ID:', data.id, 'URL:', data.downloadUrl);
 
         // Return object with both id and url
         return {
@@ -807,7 +842,23 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
           fileSize: data.fileSize,
         };
       } catch (error: any) {
-        console.error('Upload error:', error?.message || error);
+        console.error('[uploadFile] Error:', error?.message || error);
+        console.error('[uploadFile] Error details:', {
+          name: error?.name,
+          message: error?.message,
+          stack: error?.stack?.substring(0, 300),
+        });
+
+        // Provide more specific error messages
+        const errorMessage = error?.message || 'Unknown error';
+        if (errorMessage.includes('Network request failed')) {
+          console.error('[uploadFile] Network request failed - possible causes:');
+          console.error('  1. File path is invalid or file does not exist');
+          console.error('  2. File URI format is incorrect for FormData');
+          console.error('  3. Server is unreachable');
+          console.error('  4. SSL/TLS certificate issue');
+        }
+
         return null;
       }
     },
@@ -1089,22 +1140,53 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
       try {
         // Convert duration from ms to seconds for display
         const durationSec = Math.round(durationMs / 1000);
-        console.log('[ChatScreen] Audio recorded:', { audioUri, durationMs, durationSec, viewOnce });
+        console.log('[ChatScreen] Audio recorded - original URI:', audioUri);
+        console.log('[ChatScreen] Audio duration:', durationMs, 'ms (', durationSec, 's), viewOnce:', viewOnce);
 
         // Normalize the file URI for upload
+        // React Native's fetch/FormData requires proper file:// URI format
         let normalizedUri = audioUri;
-        if (Platform.OS === 'android') {
-          // Ensure Android paths have file:// prefix
-          if (!audioUri.startsWith('file://') && !audioUri.startsWith('content://')) {
-            normalizedUri = `file://${audioUri}`;
-          }
-        } else if (Platform.OS === 'ios') {
-          // Ensure iOS paths have file:// prefix
-          if (!audioUri.startsWith('file://') && audioUri.startsWith('/')) {
-            normalizedUri = `file://${audioUri}`;
-          }
+
+        // First, remove any existing file:// prefix to get the raw path
+        let rawPath = audioUri;
+        if (rawPath.startsWith('file://')) {
+          rawPath = rawPath.substring(7); // Remove 'file://'
         }
-        console.log('[ChatScreen] Normalized audio URI:', normalizedUri);
+
+        // Check if file exists at the raw path
+        console.log('[ChatScreen] Checking file existence at path:', rawPath);
+        const fileExists = await RNFS.exists(rawPath);
+        console.log('[ChatScreen] File exists:', fileExists);
+
+        if (!fileExists) {
+          console.error('[ChatScreen] Recording file not found at:', rawPath);
+          Alert.alert('Error', 'Recording file not found. Please try recording again.');
+          setUploadingMedia(false);
+          return;
+        }
+
+        // Get file info for debugging
+        try {
+          const fileInfo = await RNFS.stat(rawPath);
+          console.log('[ChatScreen] File info:', {
+            size: fileInfo.size,
+            isFile: fileInfo.isFile(),
+            path: fileInfo.path,
+          });
+        } catch (statError) {
+          console.log('[ChatScreen] Could not get file stats:', statError);
+        }
+
+        // Now add file:// prefix for FormData upload
+        if (Platform.OS === 'android') {
+          // Android: use file:// prefix
+          normalizedUri = `file://${rawPath}`;
+        } else if (Platform.OS === 'ios') {
+          // iOS: use file:// prefix
+          normalizedUri = `file://${rawPath}`;
+        }
+
+        console.log('[ChatScreen] Normalized audio URI for upload:', normalizedUri);
 
         // Determine file extension and mime type based on platform
         // Use standard MIME types for better compatibility
@@ -1112,11 +1194,13 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
         const mimeType = Platform.OS === 'ios' ? 'audio/mp4' : 'audio/mpeg';
         const fileName = `voice_${Date.now()}.${extension}`;
 
+        console.log('[ChatScreen] Upload parameters:', { fileName, mimeType, extension });
+
         // Upload the audio file
         const uploadResult = await uploadFile(normalizedUri, fileName, mimeType);
 
         if (uploadResult) {
-          console.log('[ChatScreen] Audio uploaded:', uploadResult);
+          console.log('[ChatScreen] Audio uploaded successfully:', uploadResult);
           // Send message with audio attachment
           // Include duration in the message for display
           // Use viewOnce from VoiceRecorder if provided, otherwise fall back to isViewOnce state
@@ -1126,6 +1210,11 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
         }
       } catch (error: any) {
         console.error('[ChatScreen] Audio upload error:', error);
+        console.error('[ChatScreen] Error details:', {
+          message: error?.message,
+          name: error?.name,
+          stack: error?.stack?.substring(0, 500),
+        });
         Alert.alert('Error', error?.message || 'Failed to send voice message');
       } finally {
         setUploadingMedia(false);
@@ -1591,11 +1680,29 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
         }
       }
 
+      // Check view-once status for this message
+      const msgIsViewOnce =
+        (item as any).isViewOnce || (item as any).IsViewOnce || (item as any).viewOnce;
+      const msgViewOnceViewedAt = (item as any).viewOnceViewedAt || (item as any).ViewOnceViewedAt;
+      const msgIsViewOnceRevealed = viewOnceRevealedMessages.has(item.id);
+      const msgViewOnceTimer = viewOnceTimers[item.id];
+
       return (
         <VoicePlayer
           uri={attachmentUrl}
           duration={audioDuration}
           isOwn={isOwn}
+          isViewOnce={msgIsViewOnce}
+          viewOnceViewedAt={msgViewOnceViewedAt}
+          isViewOnceRevealed={msgIsViewOnceRevealed}
+          viewOnceTimer={msgViewOnceTimer}
+          onViewOncePlaybackComplete={() => {
+            // Start the view-once timer after audio finishes playing
+            // The message is already revealed at this point, just need to start the timer
+            if (msgIsViewOnce && !msgViewOnceViewedAt) {
+              startViewOnceTimer(item.id);
+            }
+          }}
         />
       );
     }
@@ -2230,6 +2337,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
       const hasMedia = !!attachmentUrl;
       const isPhoto = hasMedia && isImageUrl(attachmentUrl);
       const isVid = hasMedia && isVideoUrl(attachmentUrl);
+      const isAudio = hasMedia && isAudioUrl(attachmentUrl);
 
       // Get label based on content type
       let contentLabel = 'message';
@@ -2240,6 +2348,9 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
       } else if (isVid) {
         contentLabel = 'video';
         contentIcon = 'videocam-outline';
+      } else if (isAudio) {
+        contentLabel = 'voice message';
+        contentIcon = 'mic-outline';
       } else if (hasMedia) {
         contentLabel = 'media';
         contentIcon = 'attach-outline';
@@ -2261,17 +2372,20 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
           );
         } else {
           // Recipient sees "Tap to view"
+          // For audio messages, skip timer - it will start after playback completes
           return (
             <TouchableOpacity
               style={styles.viewOnceContainer}
-              onPress={() => handleViewOnceReveal(item.id)}
+              onPress={() => handleViewOnceReveal(item.id, isAudio)}
               disabled={revealingViewOnce === item.id}
             >
               <Icon name={contentIcon} size={32} color={colors.primary} />
               <Text style={styles.viewOnceText}>
                 {revealingViewOnce === item.id ? 'Opening...' : `Tap to view ${contentLabel}`}
               </Text>
-              <Text style={styles.viewOnceSubtext}>Can only be viewed once</Text>
+              <Text style={styles.viewOnceSubtext}>
+                {isAudio ? 'Play to listen once' : 'Can only be viewed once'}
+              </Text>
             </TouchableOpacity>
           );
         }
@@ -2279,7 +2393,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
 
       if (isViewOnceViewed || isViewOnceExpired) {
         // Show "viewed" placeholder with appropriate label
-        const viewedLabel = isPhoto ? 'Photo' : isVid ? 'Video' : hasMedia ? 'Media' : 'Message';
+        const viewedLabel = isPhoto ? 'Photo' : isVid ? 'Video' : isAudio ? 'Voice message' : hasMedia ? 'Media' : 'Message';
         return (
           <View style={styles.viewOnceViewedContainer}>
             <Icon name="eye-off-outline" size={24} color={colors.textSecondary} />

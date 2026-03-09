@@ -64,6 +64,26 @@ export interface VoicePlayerProps {
    * Show playback speed control
    */
   showSpeedControl?: boolean;
+  /**
+   * Whether this is a view-once message
+   */
+  isViewOnce?: boolean;
+  /**
+   * When the view-once message was viewed (ISO string)
+   */
+  viewOnceViewedAt?: string | null;
+  /**
+   * Whether the view-once message is currently revealed (timer active)
+   */
+  isViewOnceRevealed?: boolean;
+  /**
+   * Current countdown timer value (seconds remaining)
+   */
+  viewOnceTimer?: number;
+  /**
+   * Callback when view-once audio playback completes (triggers timer start)
+   */
+  onViewOncePlaybackComplete?: () => void;
 }
 
 const PLAYBACK_SPEEDS = [0.5, 1, 1.5, 2];
@@ -88,9 +108,17 @@ const VoicePlayer: React.FC<VoicePlayerProps> = ({
   onPlayEnd,
   onPause,
   showSpeedControl = false,
+  isViewOnce = false,
+  viewOnceViewedAt,
+  isViewOnceRevealed = false,
+  viewOnceTimer,
+  onViewOncePlaybackComplete,
 }) => {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors, isOwn), [colors, isOwn]);
+
+  // Track if view-once audio has been played (for triggering timer)
+  const [viewOnceHasPlayed, setViewOnceHasPlayed] = useState(false);
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
@@ -174,6 +202,11 @@ const VoicePlayer: React.FC<VoicePlayerProps> = ({
         if (e.currentPosition >= e.duration - 100) {
           stopPlayback();
           onPlayEnd?.();
+          // For view-once messages, trigger the timer when playback completes
+          if (isViewOnce && !viewOnceHasPlayed) {
+            setViewOnceHasPlayed(true);
+            onViewOncePlaybackComplete?.();
+          }
         }
       });
 
@@ -262,6 +295,10 @@ const VoicePlayer: React.FC<VoicePlayerProps> = ({
   const displayCurrentTime = formatTime(currentPosition / 1000);
   const displayTotalTime = formatTime(totalDuration);
 
+  // Determine view-once state
+  const isViewOnceExpired = isViewOnce && (!!viewOnceViewedAt || (isViewOnceRevealed && viewOnceTimer === undefined));
+  const isViewOnceTimerActive = isViewOnce && isViewOnceRevealed && viewOnceTimer !== undefined && viewOnceTimer > 0;
+
   // Show fallback UI if package not installed
   if (!AudioRecorderPlayer) {
     return (
@@ -286,8 +323,33 @@ const VoicePlayer: React.FC<VoicePlayerProps> = ({
     );
   }
 
+  // Render expired/viewed state for view-once messages
+  if (isViewOnceExpired) {
+    return (
+      <View style={styles.viewOnceExpiredContainer}>
+        <Icon name="eye-off-outline" size={20} color={colors.textSecondary} />
+        <Text style={styles.viewOnceExpiredText}>Voice message viewed</Text>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
+      {/* View-once indicator badge */}
+      {isViewOnce && !isViewOnceTimerActive && (
+        <View style={[styles.viewOnceBadge, isOwn && styles.viewOnceBadgeOwn]}>
+          <Icon name="eye-off-outline" size={10} color={isOwn ? colors.white : colors.primary} />
+        </View>
+      )}
+
+      {/* View-once timer overlay */}
+      {isViewOnceTimerActive && (
+        <View style={styles.viewOnceTimerBadge}>
+          <Icon name="time-outline" size={10} color={colors.warning} />
+          <Text style={styles.viewOnceTimerText}>{viewOnceTimer}s</Text>
+        </View>
+      )}
+
       {/* Play/Pause button */}
       <TouchableOpacity
         style={styles.playButton}
@@ -352,8 +414,8 @@ const VoicePlayer: React.FC<VoicePlayerProps> = ({
         </Text>
       </View>
 
-      {/* Speed control (optional) */}
-      {showSpeedControl && (
+      {/* Speed control (optional) - hide for view-once messages */}
+      {showSpeedControl && !isViewOnce && (
         <TouchableOpacity style={styles.speedButton} onPress={cycleSpeed}>
           <Text style={styles.speedText}>{playbackSpeed}x</Text>
         </TouchableOpacity>
@@ -455,6 +517,53 @@ const createStyles = (
       gap: 2,
       height: 24,
       marginHorizontal: 10,
+    },
+    // View-once styles
+    viewOnceBadge: {
+      alignItems: 'center',
+      backgroundColor: 'rgba(0, 0, 0, 0.1)',
+      borderRadius: 8,
+      height: 16,
+      justifyContent: 'center',
+      left: 0,
+      position: 'absolute',
+      top: -4,
+      width: 16,
+      zIndex: 1,
+    },
+    viewOnceBadgeOwn: {
+      backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    },
+    viewOnceTimerBadge: {
+      alignItems: 'center',
+      backgroundColor: colors.surface,
+      borderRadius: 10,
+      flexDirection: 'row',
+      gap: 3,
+      left: 0,
+      paddingHorizontal: 6,
+      paddingVertical: 2,
+      position: 'absolute',
+      top: -6,
+      zIndex: 1,
+    },
+    viewOnceTimerText: {
+      color: colors.warning,
+      fontSize: 10,
+      fontWeight: '600',
+    },
+    viewOnceExpiredContainer: {
+      alignItems: 'center',
+      flexDirection: 'row',
+      gap: 8,
+      minWidth: 160,
+      paddingHorizontal: 8,
+      paddingVertical: 12,
+    },
+    viewOnceExpiredText: {
+      color: colors.textSecondary,
+      fontSize: 13,
+      fontStyle: 'italic',
     },
   });
 

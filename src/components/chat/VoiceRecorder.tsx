@@ -311,10 +311,41 @@ const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
       const result = await audioRecorderRef.current.stopRecorder();
       audioRecorderRef.current.removeRecordBackListener();
 
-      console.log('[VoiceRecorder] Recording stopped, raw path:', result);
+      console.log('[VoiceRecorder] Recording stopped');
+      console.log('[VoiceRecorder] Raw result from stopRecorder:', result);
+      console.log('[VoiceRecorder] Raw result type:', typeof result);
 
       setIsRecording(false);
       isRecordingRef.current = false;
+
+      // Verify the file exists at the returned path
+      let pathToCheck = result;
+      if (pathToCheck.startsWith('file://')) {
+        pathToCheck = pathToCheck.substring(7);
+      }
+
+      try {
+        const fileExists = await RNFS.exists(pathToCheck);
+        console.log('[VoiceRecorder] File exists at', pathToCheck, ':', fileExists);
+
+        if (fileExists) {
+          const fileInfo = await RNFS.stat(pathToCheck);
+          console.log('[VoiceRecorder] File info:', {
+            size: fileInfo.size,
+            isFile: fileInfo.isFile(),
+            path: fileInfo.path,
+            ctime: fileInfo.ctime,
+            mtime: fileInfo.mtime,
+          });
+        } else {
+          console.error('[VoiceRecorder] WARNING: Recording file does not exist at:', pathToCheck);
+          // Try the original path passed to startRecorder
+          const originalPath = `${RNFS.CachesDirectoryPath}/voice_${Date.now()}.mp3`;
+          console.log('[VoiceRecorder] Expected path was:', originalPath);
+        }
+      } catch (fsError) {
+        console.error('[VoiceRecorder] File system check error:', fsError);
+      }
 
       // Normalize the file path for upload
       const normalizedPath = normalizeFilePath(result);

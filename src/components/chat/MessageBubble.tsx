@@ -470,7 +470,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             <Icon name="person" size={16} color={colors.white} />
           </View>
         )}
-        <View>
+        <View style={{ flexShrink: 0 }}>
           <View
             style={[
               styles.messageBubble,
@@ -610,7 +610,7 @@ const createStyles = (colors: ThemeColors) =>
       marginRight: 8,
       width: 28,
     },
-    messageBubble: { borderRadius: 16, maxWidth: MAX_IMAGE_WIDTH, padding: 12 },
+    messageBubble: { borderRadius: 16, maxWidth: MAX_IMAGE_WIDTH, padding: 12, flexShrink: 0 },
     messageBubbleOther: { backgroundColor: colors.messageBubbleOther, borderBottomLeftRadius: 4 },
     messageBubbleOwn: { backgroundColor: colors.messageBubbleOwn, borderBottomRightRadius: 4 },
     messageFooter: {
@@ -627,7 +627,7 @@ const createStyles = (colors: ThemeColors) =>
       marginVertical: 4,
     },
     messageRowOwn: { flexDirection: 'row-reverse' },
-    messageText: { color: colors.messageTextOther, fontSize: 15, lineHeight: 20 },
+    messageText: { color: colors.messageTextOther, fontSize: 15, lineHeight: 20, flexShrink: 0 },
     messageTextOwn: { color: colors.messageTextOwn },
     messageTime: { color: colors.textSecondary, fontSize: 11 },
     messageTimeOwn: { color: 'rgba(255,255,255,0.6)' },
