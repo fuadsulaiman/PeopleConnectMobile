@@ -12,6 +12,7 @@ import {
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useTheme } from '../../hooks';
 import { useAuthStore } from '../../stores/authStore';
+import { useSettingsStore } from '../../stores/settingsStore';
 
 // Simple base64 decode for JWT parsing (debugging)
 const base64Decode = (str: string): string => {
@@ -191,6 +192,11 @@ const GroupCallScreen: React.FC<GroupCallScreenProps> = ({ route, navigation }) 
   const [isSpeakerOn, setIsSpeakerOn] = useState(true);
   const [notificationSent, setNotificationSent] = useState(false);
   const [iceServers, setIceServers] = useState<IceServer[]>(DEFAULT_ICE_SERVERS);
+
+  // Recording state for LiveKit group calls
+  const isRecordingEnabled = useSettingsStore((state) => state.isRecordingEnabled)();
+  const [isRecording, setIsRecording] = useState(false);
+  const [remoteRecording, setRemoteRecording] = useState<{ userName: string; isRecording: boolean } | null>(null);
 
   // Call tracking for sending call message when call ends
   const connectedTimeRef = React.useRef<number | null>(null);
@@ -484,6 +490,29 @@ const GroupCallScreen: React.FC<GroupCallScreenProps> = ({ route, navigation }) 
     setIsSpeakerOn((prev) => !prev);
   }, []);
 
+  // Handle recording toggle for LiveKit group calls
+  const handleToggleRecording = useCallback(async () => {
+    if (!isRecordingEnabled) {
+      console.warn('[GroupCall] Recording is disabled by settings');
+      return;
+    }
+
+    const newIsRecording = !isRecording;
+    setIsRecording(newIsRecording);
+
+    try {
+      const signalR = getSignalR();
+      const callGroupId = `group-${conversationId}`;
+      await signalR.notifyRecordingStatus(callGroupId, newIsRecording);
+      console.log('[GroupCall] Recording status notified:', { callGroupId, isRecording: newIsRecording });
+    } catch (err: any) {
+      console.error('[GroupCall] Failed to notify recording status:', err.message);
+      // Revert the state if notification failed
+      setIsRecording(!newIsRecording);
+      Alert.alert('Recording Error', 'Failed to update recording status. Please try again.');
+    }
+  }, [isRecording, isRecordingEnabled, conversationId]);
+
   // Handle LiveKit connection errors
   // IMPORTANT: This hook MUST be defined before any early returns to comply with Rules of Hooks
   const handleLiveKitError = useCallback((error: Error) => {
@@ -508,7 +537,7 @@ const GroupCallScreen: React.FC<GroupCallScreenProps> = ({ route, navigation }) 
 
   // Handle successful LiveKit connection
   // IMPORTANT: This hook MUST be defined before any early returns to comply with Rules of Hooks
-  const handleLiveKitConnected = useCallback(() => {
+  const handleLiveKitConnected = useCallback(async () => {
     console.log('[GroupCall] LiveKit connected successfully');
     console.log('[GroupCall] Connection established with token:', token?.substring(0, 30) || 'NO TOKEN');
     console.log('[GroupCall] User identity used:', username);
@@ -519,7 +548,16 @@ const GroupCallScreen: React.FC<GroupCallScreenProps> = ({ route, navigation }) 
     if (username && !participantsRef.current.includes(username)) {
       participantsRef.current.push(username);
     }
-  }, [token, username]);
+    // Join SignalR call notification group to receive recording status updates
+    try {
+      const signalR = getSignalR();
+      const callGroupId = `group-${conversationId}`;
+      await signalR.joinCallNotificationGroup(callGroupId);
+      console.log('[GroupCall] Joined call notification group:', callGroupId);
+    } catch (err: any) {
+      console.warn('[GroupCall] Failed to join call notification group:', err.message);
+    }
+  }, [token, username, conversationId]);
 
   // Handle LiveKit disconnection
   // IMPORTANT: This hook MUST be defined before any early returns to comply with Rules of Hooks
@@ -547,6 +585,35 @@ const GroupCallScreen: React.FC<GroupCallScreenProps> = ({ route, navigation }) 
     participantsRef.current = participantNames;
     console.log('[GroupCall] Participants updated:', participantNames);
   }, []);
+
+  // Listen for remote recording status changes
+  useEffect(() => {
+    const signalR = getSignalR();
+    const callGroupId = `group-${conversationId}`;
+
+    const unsubscribe = signalR.onCallEvent('RecordingStatusChanged', (data: {
+      callId: string;
+      userId: string;
+      userName: string;
+      isRecording: boolean;
+    }) => {
+      // Check if this is for our call
+      if (data.callId.includes(conversationId) && data.userId !== user?.id) {
+        console.log('[GroupCall] Remote recording status changed:', data);
+        if (data.isRecording) {
+          setRemoteRecording({ userName: data.userName, isRecording: true });
+        } else {
+          setRemoteRecording(null);
+        }
+      }
+    });
+
+    return () => {
+      unsubscribe();
+      // Leave call notification group on cleanup
+      signalR.leaveCallNotificationGroup(callGroupId).catch(() => {});
+    };
+  }, [conversationId, user?.id]);
 
   if (!LiveKitRoom) {
     return (
@@ -647,9 +714,13 @@ const GroupCallScreen: React.FC<GroupCallScreenProps> = ({ route, navigation }) 
         isMuted={isMuted}
         isVideoEnabled={isVideoEnabled}
         isSpeakerOn={isSpeakerOn}
+        isRecording={isRecording}
+        isRecordingEnabled={isRecordingEnabled}
+        remoteRecording={remoteRecording}
         onToggleMute={handleToggleMute}
         onToggleVideo={handleToggleVideo}
         onToggleSpeaker={handleToggleSpeaker}
+        onToggleRecording={handleToggleRecording}
         onEndCall={handleEndCall}
         onReconnecting={handleLiveKitReconnecting}
         onReconnected={handleLiveKitReconnected}
@@ -666,9 +737,13 @@ interface RoomContentProps {
   isMuted: boolean;
   isVideoEnabled: boolean;
   isSpeakerOn: boolean;
+  isRecording: boolean;
+  isRecordingEnabled: boolean;
+  remoteRecording: { userName: string; isRecording: boolean } | null;
   onToggleMute: () => void;
   onToggleVideo: () => void;
   onToggleSpeaker: () => void;
+  onToggleRecording: () => void;
   onEndCall: () => void;
   onReconnecting: () => void;
   onReconnected: () => void;
@@ -740,11 +815,15 @@ const RoomContent: React.FC<RoomContentInnerProps> = ({
   isMuted,
   isVideoEnabled,
   isSpeakerOn,
+  isRecording,
+  isRecordingEnabled,
+  remoteRecording,
   isReconnecting,
   isRoomConnected,
   onToggleMute,
   onToggleVideo,
   onToggleSpeaker,
+  onToggleRecording,
   onEndCall,
   onParticipantsChanged,
   colors,
@@ -1050,6 +1129,22 @@ const RoomContent: React.FC<RoomContentInnerProps> = ({
         </View>
       )}
 
+      {/* Recording indicator */}
+      {isRecording && (
+        <View style={styles.recordingBanner}>
+          <View style={styles.recordingDot} />
+          <Text style={styles.recordingText}>Recording</Text>
+        </View>
+      )}
+
+      {/* Remote recording indicator */}
+      {remoteRecording && remoteRecording.isRecording && !isRecording && (
+        <View style={styles.remoteRecordingBanner}>
+          <View style={styles.recordingDot} />
+          <Text style={styles.recordingText}>{remoteRecording.userName} is recording</Text>
+        </View>
+      )}
+
       <View style={styles.header}>
         <Text style={styles.roomName}>{roomName}</Text>
         <Text style={styles.participantCount}>
@@ -1124,6 +1219,15 @@ const RoomContent: React.FC<RoomContentInnerProps> = ({
         >
           <Icon name={isSpeakerOn ? 'volume-high' : 'volume-mute'} size={28} color={colors.white} />
         </TouchableOpacity>
+
+        {isRecordingEnabled && (
+          <TouchableOpacity
+            style={[styles.controlButton, isRecording && styles.recordingButtonActive]}
+            onPress={onToggleRecording}
+          >
+            <Icon name={isRecording ? 'stop-circle' : 'radio-button-on'} size={28} color={isRecording ? colors.white : colors.error} />
+          </TouchableOpacity>
+        )}
 
         <TouchableOpacity style={styles.controlButton}>
           <Icon name="camera-reverse" size={28} color={colors.white} />
@@ -1226,6 +1330,37 @@ const createStyles = (colors: any) =>
       fontSize: 14,
       fontWeight: '600',
       marginLeft: 8,
+    },
+    recordingBanner: {
+      alignItems: 'center',
+      backgroundColor: 'rgba(239, 68, 68, 0.9)',
+      flexDirection: 'row',
+      justifyContent: 'center',
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+    },
+    remoteRecordingBanner: {
+      alignItems: 'center',
+      backgroundColor: 'rgba(249, 115, 22, 0.9)',
+      flexDirection: 'row',
+      justifyContent: 'center',
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+    },
+    recordingDot: {
+      width: 12,
+      height: 12,
+      borderRadius: 6,
+      backgroundColor: colors.white,
+      marginRight: 8,
+    },
+    recordingText: {
+      color: colors.white,
+      fontSize: 14,
+      fontWeight: '600',
+    },
+    recordingButtonActive: {
+      backgroundColor: colors.error || '#ef4444',
     },
     retryButton: {
       backgroundColor: colors.primary,

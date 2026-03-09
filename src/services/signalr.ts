@@ -1229,6 +1229,27 @@ class SignalRService {
     }
   }
 
+  // Join a call notification group for LiveKit group calls to receive recording status updates
+  async joinCallNotificationGroup(callId: string): Promise<void> {
+    if (this.callConnection?.state === signalR.HubConnectionState.Connected) {
+      console.log("[SignalR] Joining call notification group:", callId);
+      await this.callConnection.invoke("JoinCallNotificationGroup", callId);
+    } else {
+      console.warn("[SignalR] Cannot join call notification group - call hub not connected");
+      throw new Error("Call connection not available");
+    }
+  }
+
+  // Leave a call notification group (used when ending LiveKit group calls)
+  async leaveCallNotificationGroup(callId: string): Promise<void> {
+    if (this.callConnection?.state === signalR.HubConnectionState.Connected) {
+      console.log("[SignalR] Leaving call notification group:", callId);
+      await this.callConnection.invoke("LeaveCallNotificationGroup", callId);
+    } else {
+      console.warn("[SignalR] Cannot leave call notification group - call hub not connected");
+    }
+  }
+
   // Notify call recording status change
   async notifyRecordingStatus(callId: string, isRecording: boolean): Promise<void> {
     if (this.callConnection?.state === signalR.HubConnectionState.Connected) {
