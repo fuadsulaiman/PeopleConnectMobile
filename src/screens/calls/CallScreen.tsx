@@ -21,6 +21,7 @@ import { useAuthStore } from '../../stores/authStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { webRTCService, CallState } from '../../services/webrtcService';
 import { signalRService } from '../../services/signalr';
+import { callRecordingService } from '../../services/callRecordingService';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList, CallsStackParamList } from '../../navigation/types';
 
@@ -72,6 +73,7 @@ const CallScreen: React.FC<CallScreenProps> = ({ route }) => {
   const [hasAcceptedCall, setHasAcceptedCall] = useState(false);
 
   const durationIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const recordingStartTimeRef = useRef<number | null>(null);
   const hasInitializedRef = useRef(false);
 
   // ROBUST incoming call detection - check multiple indicators
@@ -425,19 +427,67 @@ const CallScreen: React.FC<CallScreenProps> = ({ route }) => {
     }
 
     const newRecordingState = !isRecording;
+    const conversationId = callState?.conversationId || '';
+    const callType = isVideo ? 'video' : 'voice';
 
     try {
-      console.log('[CallScreen] Toggling recording:', newRecordingState);
+      if (newRecordingState) {
+        // Start recording
+        console.log('[CallScreen] Starting recording...');
+        recordingStartTimeRef.current = Date.now();
+        
+        // Initialize recording service metadata
+        callRecordingService.startRecording(call.id, conversationId, callType);
+        
+        // Note: For actual audio/video capture from WebRTC streams,
+        // native module integration is required (e.g., react-native-audio-recorder-player)
+        // The current implementation tracks metadata for server-side or future client-side recording
+      } else {
+        // Stop recording
+        console.log('[CallScreen] Stopping recording...');
+        const recordingResult = callRecordingService.stopRecording();
+        
+        if (recordingResult && recordingResult.metadata.filePath) {
+          console.log('[CallScreen] Recording stopped, duration:', recordingResult.duration, 'seconds');
+          
+          // Attempt to upload recording if file exists
+          // Note: Actual file creation requires native audio capture
+          try {
+            await callRecordingService.uploadRecording(
+              recordingResult.metadata.filePath,
+              call.id,
+              conversationId,
+              callType,
+              recordingResult.duration
+            );
+            console.log('[CallScreen] Recording uploaded successfully');
+          } catch (uploadErr: any) {
+            console.warn('[CallScreen] Failed to upload recording:', uploadErr.message);
+            // Continue anyway - the recording attempt was made
+          }
+        }
+        
+        recordingStartTimeRef.current = null;
+      }
+
+      // Notify other party about recording status
       await signalRService.notifyRecordingStatus(call.id, newRecordingState);
       setIsRecording(newRecordingState);
+      console.log('[CallScreen] Recording status notified:', { callId: call.id, isRecording: newRecordingState });
     } catch (err: any) {
       console.error('[CallScreen] Failed to toggle recording:', err);
+      // Clean up if we were trying to start
+      if (newRecordingState) {
+        callRecordingService.clearCurrentRecording();
+        recordingStartTimeRef.current = null;
+      }
       Alert.alert(
         'Recording Error',
         err?.message || 'Failed to toggle recording. Please try again.'
       );
     }
-  }, [call?.id, isRecording]);
+  }, [call?.id, callState?.conversationId, isRecording, isVideo]);
+
 
   const formatDuration = (seconds: number) => {
     const mins = Math.floor(seconds / 60);

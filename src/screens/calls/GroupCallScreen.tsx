@@ -13,6 +13,7 @@ import Icon from 'react-native-vector-icons/Ionicons';
 import { useTheme } from '../../hooks';
 import { useAuthStore } from '../../stores/authStore';
 import { useSettingsStore } from '../../stores/settingsStore';
+import { callRecordingService } from '../../services/callRecordingService';
 
 // Simple base64 decode for JWT parsing (debugging)
 const base64Decode = (str: string): string => {
@@ -194,9 +195,25 @@ const GroupCallScreen: React.FC<GroupCallScreenProps> = ({ route, navigation }) 
   const [iceServers, setIceServers] = useState<IceServer[]>(DEFAULT_ICE_SERVERS);
 
   // Recording state for LiveKit group calls
-  const isRecordingEnabled = useSettingsStore((state) => state.isRecordingEnabled)();
+  const fetchPublicSettings = useSettingsStore((state) => state.fetchPublicSettings);
+  const isRecordingEnabledSetting = useSettingsStore((state) => state.isRecordingEnabled);
+  const [recordingEnabled, setRecordingEnabled] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [remoteRecording, setRemoteRecording] = useState<{ userName: string; isRecording: boolean } | null>(null);
+
+  // Recording refs for tracking recording metadata
+  const recordingStartTimeRef = React.useRef<number | null>(null);
+
+  // Fetch settings on mount to ensure recordingEnabled is properly set
+  useEffect(() => {
+    const loadSettings = async () => {
+      await fetchPublicSettings();
+      const isEnabled = isRecordingEnabledSetting();
+      console.log('[GroupCall] Recording enabled from settings:', isEnabled);
+      setRecordingEnabled(isEnabled);
+    };
+    loadSettings();
+  }, [fetchPublicSettings, isRecordingEnabledSetting]);
 
   // Call tracking for sending call message when call ends
   const connectedTimeRef = React.useRef<number | null>(null);
@@ -491,27 +508,57 @@ const GroupCallScreen: React.FC<GroupCallScreenProps> = ({ route, navigation }) 
   }, []);
 
   // Handle recording toggle for LiveKit group calls
+  // Note: LiveKit group calls use server-side Egress recording when enabled.
+  // This tracks the recording state and notifies other participants.
   const handleToggleRecording = useCallback(async () => {
-    if (!isRecordingEnabled) {
+    if (!recordingEnabled) {
       console.warn('[GroupCall] Recording is disabled by settings');
       return;
     }
 
     const newIsRecording = !isRecording;
-    setIsRecording(newIsRecording);
 
     try {
       const signalR = getSignalR();
-      const callGroupId = `group-${conversationId}`;
+      const callGroupId = 'group-' + conversationId;
+
+      if (newIsRecording) {
+        // Start recording
+        console.log('[GroupCall] Starting recording...');
+        recordingStartTimeRef.current = Date.now();
+        
+        // Initialize recording service metadata
+        const callType = type === 'video' ? 'video' : 'voice';
+        callRecordingService.startRecording(callGroupId, conversationId, callType);
+      } else {
+        // Stop recording
+        console.log('[GroupCall] Stopping recording...');
+        const recordingResult = callRecordingService.stopRecording();
+        
+        if (recordingResult) {
+          console.log('[GroupCall] Recording stopped, duration:', recordingResult.duration, 'seconds');
+          // Note: For LiveKit group calls, actual recording is handled server-side via Egress
+          // Client-side recording would require additional native module integration
+        }
+        
+        recordingStartTimeRef.current = null;
+      }
+
+      // Notify other participants about recording status
       await signalR.notifyRecordingStatus(callGroupId, newIsRecording);
+      setIsRecording(newIsRecording);
       console.log('[GroupCall] Recording status notified:', { callGroupId, isRecording: newIsRecording });
     } catch (err: any) {
-      console.error('[GroupCall] Failed to notify recording status:', err.message);
-      // Revert the state if notification failed
-      setIsRecording(!newIsRecording);
+      console.error('[GroupCall] Failed to toggle recording:', err.message);
+      // Clean up if we were trying to start
+      if (newIsRecording) {
+        callRecordingService.clearCurrentRecording();
+        recordingStartTimeRef.current = null;
+      }
       Alert.alert('Recording Error', 'Failed to update recording status. Please try again.');
     }
-  }, [isRecording, isRecordingEnabled, conversationId]);
+  }, [isRecording, recordingEnabled, conversationId, type]);
+
 
   // Handle LiveKit connection errors
   // IMPORTANT: This hook MUST be defined before any early returns to comply with Rules of Hooks
@@ -715,7 +762,7 @@ const GroupCallScreen: React.FC<GroupCallScreenProps> = ({ route, navigation }) 
         isVideoEnabled={isVideoEnabled}
         isSpeakerOn={isSpeakerOn}
         isRecording={isRecording}
-        isRecordingEnabled={isRecordingEnabled}
+        isRecordingEnabled={recordingEnabled}
         remoteRecording={remoteRecording}
         onToggleMute={handleToggleMute}
         onToggleVideo={handleToggleVideo}
