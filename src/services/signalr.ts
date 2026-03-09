@@ -1139,9 +1139,35 @@ class SignalRService {
   }
 
   // Call methods
-  async initiateCall(targetUserId: string, type: 'voice' | 'video'): Promise<void> {
+
+  // StartCall - For 1:1 DM calls (uses targetUserId)
+  // Backend: StartCall(StartCallRequest { TargetUserId, Type, ConversationId? })
+  async startCall(targetUserId: string, type: 'voice' | 'video', conversationId?: string): Promise<string> {
     if (this.callConnection?.state === signalR.HubConnectionState.Connected) {
-      await this.callConnection.invoke('InitiateCall', targetUserId, type);
+      console.log('[SignalR] Starting 1:1 call:', { targetUserId, type, conversationId });
+      const request = {
+        TargetUserId: targetUserId,
+        Type: type,
+        ConversationId: conversationId || null,
+      };
+      const callId = await this.callConnection.invoke('StartCall', request);
+      console.log('[SignalR] 1:1 call started, callId:', callId);
+      return callId;
+    } else {
+      console.error('[SignalR] Call connection not connected, state:', this.callConnection?.state);
+      throw new Error('Call connection not established');
+    }
+  }
+
+  // InitiateCall - For group/conversation-based calls (uses conversationId)
+  // Backend: InitiateCall(Guid conversationId, string callType)
+  async initiateCall(conversationId: string, type: 'voice' | 'video'): Promise<void> {
+    if (this.callConnection?.state === signalR.HubConnectionState.Connected) {
+      console.log('[SignalR] Initiating group call with conversationId:', conversationId, 'type:', type);
+      await this.callConnection.invoke('InitiateCall', conversationId, type);
+    } else {
+      console.error('[SignalR] Call connection not connected, state:', this.callConnection?.state);
+      throw new Error('Call connection not established');
     }
   }
 

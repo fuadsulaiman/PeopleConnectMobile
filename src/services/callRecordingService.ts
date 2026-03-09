@@ -15,6 +15,9 @@ import AudioRecorderPlayer from "react-native-audio-recorder-player";
 import { config } from "../constants";
 
 // Lazy load SDK to avoid initialization issues
+// Create a singleton instance of AudioRecorderPlayer (v3.x API)
+const audioRecorderPlayer = new AudioRecorderPlayer();
+
 const getAccessToken = () => {
   const sdk = require("./sdk");
   return sdk.getAccessToken();
@@ -45,7 +48,6 @@ class CallRecordingService {
   private isRecording: boolean = false;
 
   constructor() {
-    // AudioRecorderPlayer is a singleton, no need to instantiate
     // Use cache directory for recordings (auto-cleaned by OS)
     this.recordingsDir = Platform.OS === "android"
       ? RNFS.CachesDirectoryPath + "/call_recordings"
@@ -139,7 +141,7 @@ class CallRecordingService {
 
       console.log("[CallRecording] Starting audio recording at:", audioPath);
 
-      const result = await AudioRecorderPlayer.startRecorder(audioPath);
+      const result = await audioRecorderPlayer.startRecorder(audioPath);
       this.isRecording = true;
 
       console.log("[CallRecording] Recording started successfully:", {
@@ -150,7 +152,7 @@ class CallRecordingService {
       });
 
       // Add recording progress listener
-      AudioRecorderPlayer.addRecordBackListener((e) => {
+      audioRecorderPlayer.addRecordBackListener((e) => {
         // Log progress every 5 seconds
         if (Math.floor(e.currentPosition / 1000) % 5 === 0) {
           console.log("[CallRecording] Recording progress:", {
@@ -181,8 +183,8 @@ class CallRecordingService {
 
     try {
       // Stop the audio recorder
-      const result = await AudioRecorderPlayer.stopRecorder();
-      AudioRecorderPlayer.removeRecordBackListener();
+      const result = await audioRecorderPlayer.stopRecorder();
+      audioRecorderPlayer.removeRecordBackListener();
       this.isRecording = false;
 
       console.log("[CallRecording] Stopped recording, file saved at:", result);

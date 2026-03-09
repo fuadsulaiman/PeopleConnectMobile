@@ -37,11 +37,12 @@ const CallScreen: React.FC<CallScreenProps> = ({ route }) => {
   // Get current user to determine if we're the caller or callee
   const currentUser = useAuthStore((state) => state.user);
   const params = route.params || {};
-  const { call, user, type, isIncoming: isIncomingParam } = params as {
+  const { call, user, type, isIncoming: isIncomingParam, conversationId: routeConversationId } = params as {
     call?: any;
     user?: any;
     type?: 'voice' | 'video';
     isIncoming?: boolean;
+    conversationId?: string; // Added for DM calls - backend InitiateCall expects conversationId
   };
 
   // Settings store for recording enabled check
@@ -64,6 +65,9 @@ const CallScreen: React.FC<CallScreenProps> = ({ route }) => {
   const [recordingEnabled, setRecordingEnabled] = useState(false);
   const [remoteIsRecording, setRemoteIsRecording] = useState(false);
   const [remoteRecorderName, setRemoteRecorderName] = useState<string | null>(null);
+
+  // Store callId returned from startCall (for outgoing calls)
+  const [activeCallId, setActiveCallId] = useState<string | null>(null);
 
   // Recording animation
   const recordingPulse = useRef(new Animated.Value(1)).current;
@@ -297,14 +301,22 @@ const CallScreen: React.FC<CallScreenProps> = ({ route }) => {
           displayAvatar
         );
 
-        // CRITICAL: Only call initiateCall if this user is the CALLER (starting the call)
-        // The callee (receiving the call) should NOT call initiateCall - they should wait
+        // CRITICAL: Only call startCall if this user is the CALLER (starting the call)
+        // The callee (receiving the call) should NOT call startCall - they should wait
         // for the WebRTC offer/answer exchange to happen
+        // NOTE: For 1:1 DM calls, use StartCall(targetUserId, type, conversationId?)
+        //       For group calls, use InitiateCall(conversationId, type) - handled in GroupCallScreen
+        const callConversationId = routeConversationId || call?.conversationId;
         if (isInitiator && remoteUserId) {
-          console.log('[CallScreen] Caller: Initiating call via SignalR to:', remoteUserId);
-          await signalRService.initiateCall(remoteUserId, type || 'voice');
+          console.log('[CallScreen] Caller: Starting 1:1 call via SignalR:', { remoteUserId, callConversationId, type });
+          const returnedCallId = await signalRService.startCall(remoteUserId, type || 'voice', callConversationId);
+          console.log('[CallScreen] Call started, received callId:', returnedCallId);
+          setActiveCallId(returnedCallId);
+        } else if (isInitiator && !remoteUserId) {
+          console.error('[CallScreen] Cannot start call: missing remoteUserId');
+          setError('Cannot start call: missing target user');
         } else {
-          console.log('[CallScreen] Callee: Waiting for WebRTC offer/answer (NOT calling initiateCall)');
+          console.log('[CallScreen] Callee: Waiting for WebRTC offer/answer (NOT calling startCall)');
         }
       } catch (err: any) {
         console.error('[CallScreen] Failed to initialize call:', err);
@@ -421,13 +433,15 @@ const CallScreen: React.FC<CallScreenProps> = ({ route }) => {
   }, []);
 
   const handleToggleRecording = useCallback(async () => {
-    if (!call?.id) {
-      console.error('[CallScreen] Cannot toggle recording: no call ID');
+    // Use call.id from route params (incoming calls) or activeCallId from startCall response (outgoing calls)
+    const currentCallId = call?.id || activeCallId;
+    if (!currentCallId) {
+      console.error('[CallScreen] Cannot toggle recording: no call ID available');
       return;
     }
 
     const newRecordingState = !isRecording;
-    const conversationId = callState?.conversationId || '';
+    const conversationId = callState?.conversationId || routeConversationId || '';
     const callType = isVideo ? 'video' : 'voice';
 
     try {
@@ -437,7 +451,7 @@ const CallScreen: React.FC<CallScreenProps> = ({ route }) => {
         recordingStartTimeRef.current = Date.now();
         
         // Start actual audio recording
-        await callRecordingService.startRecording(call.id, conversationId, callType);
+        await callRecordingService.startRecording(currentCallId, conversationId, callType);
         console.log('[CallScreen] Recording started successfully');
       } else {
         // Stop recording and upload
@@ -452,7 +466,7 @@ const CallScreen: React.FC<CallScreenProps> = ({ route }) => {
           try {
             await callRecordingService.uploadRecording(
               recordingResult.filePath,
-              call.id,
+              currentCallId,
               conversationId,
               callType,
               recordingResult.duration
@@ -471,9 +485,9 @@ const CallScreen: React.FC<CallScreenProps> = ({ route }) => {
       }
 
       // Notify other party about recording status
-      await signalRService.notifyRecordingStatus(call.id, newRecordingState);
+      await signalRService.notifyRecordingStatus(currentCallId, newRecordingState);
       setIsRecording(newRecordingState);
-      console.log('[CallScreen] Recording status notified:', { callId: call.id, isRecording: newRecordingState });
+      console.log('[CallScreen] Recording status notified:', { callId: currentCallId, isRecording: newRecordingState });
     } catch (err: any) {
       console.error('[CallScreen] Failed to toggle recording:', err);
       // Clean up if we were trying to start
@@ -486,7 +500,7 @@ const CallScreen: React.FC<CallScreenProps> = ({ route }) => {
         err?.message || 'Failed to ' + (newRecordingState ? 'start' : 'stop') + ' recording. Please try again.'
       );
     }
-  }, [call?.id, callState?.conversationId, isRecording, isVideo]);
+  }, [call?.id, activeCallId, callState?.conversationId, routeConversationId, isRecording, isVideo]);
 
 
   const formatDuration = (seconds: number) => {

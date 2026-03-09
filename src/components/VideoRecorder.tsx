@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
   Alert,
   SafeAreaView,
   StatusBar,
+  Linking,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import {
@@ -17,7 +18,9 @@ import {
   useCameraDevice,
   useCameraPermission,
   useMicrophonePermission,
+  CameraPermissionStatus,
 } from 'react-native-vision-camera';
+import { launchImageLibrary } from 'react-native-image-picker';
 import { colors } from '../constants/colors';
 
 interface VideoRecorderProps {
@@ -28,6 +31,9 @@ interface VideoRecorderProps {
   onRecordingStop?: () => void;
   maxDuration?: number;
 }
+
+// Timeout for camera initialization (10 seconds)
+const CAMERA_INIT_TIMEOUT = 10000;
 
 export const VideoRecorder: React.FC<VideoRecorderProps> = ({
   visible,
@@ -42,10 +48,14 @@ export const VideoRecorder: React.FC<VideoRecorderProps> = ({
   const [recordingDuration, setRecordingDuration] = useState(0);
   const [cameraPosition, setCameraPosition] = useState<'front' | 'back'>('back');
   const [isInitializing, setIsInitializing] = useState(true);
+  const [permissionsGranted, setPermissionsGranted] = useState(false);
+  const [cameraReady, setCameraReady] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [recordedVideo, setRecordedVideo] = useState<{ path: string; duration: number } | null>(
     null
   );
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const initTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const finalDurationRef = useRef(0);
 
   const device = useCameraDevice(cameraPosition);
@@ -60,43 +70,174 @@ export const VideoRecorder: React.FC<VideoRecorderProps> = ({
       setRecordedVideo(null);
       setRecordingDuration(0);
       setIsRecording(false);
+      setCameraReady(false);
+      setError(null);
     } else {
       // Clean up when closing
       cleanup();
     }
+
+    return () => {
+      // Cleanup timeout on unmount
+      if (initTimeoutRef.current) {
+        clearTimeout(initTimeoutRef.current);
+        initTimeoutRef.current = null;
+      }
+    };
   }, [visible]);
+
+  // Monitor device availability after permissions are granted
+  useEffect(() => {
+    if (permissionsGranted && visible && !device) {
+      // Set a timeout to detect if camera device never becomes available
+      initTimeoutRef.current = setTimeout(() => {
+        if (!device) {
+          console.error('Camera device not available after timeout');
+          setError('Camera not available. Please ensure your device has a working camera.');
+          setIsInitializing(false);
+        }
+      }, CAMERA_INIT_TIMEOUT);
+    }
+
+    // Clear timeout if device becomes available
+    if (device && initTimeoutRef.current) {
+      clearTimeout(initTimeoutRef.current);
+      initTimeoutRef.current = null;
+    }
+
+    return () => {
+      if (initTimeoutRef.current) {
+        clearTimeout(initTimeoutRef.current);
+        initTimeoutRef.current = null;
+      }
+    };
+  }, [permissionsGranted, device, visible]);
 
   const cleanup = () => {
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = null;
     }
+    if (initTimeoutRef.current) {
+      clearTimeout(initTimeoutRef.current);
+      initTimeoutRef.current = null;
+    }
     setIsRecording(false);
     setRecordingDuration(0);
     setRecordedVideo(null);
+    setPermissionsGranted(false);
+    setCameraReady(false);
+    setError(null);
     finalDurationRef.current = 0;
   };
 
+  const openSettings = useCallback(() => {
+    Linking.openSettings();
+  }, []);
+
+  const pickVideoFromGallery = useCallback(async () => {
+    try {
+      const result = await launchImageLibrary({
+        mediaType: 'video',
+        videoQuality: 'medium',
+      });
+
+      if (result.didCancel) {
+        return;
+      }
+
+      if (result.errorCode) {
+        console.error('Image picker error:', result.errorMessage);
+        Alert.alert('Error', result.errorMessage || 'Failed to pick video from gallery');
+        return;
+      }
+
+      if (result.assets && result.assets[0]) {
+        const video = result.assets[0];
+        if (video.uri) {
+          // Duration is in seconds from image-picker
+          const durationInSeconds = video.duration ? Math.round(video.duration) : 0;
+          onVideoRecorded(video.uri, durationInSeconds);
+          cleanup();
+          onClose();
+        }
+      }
+    } catch (err: any) {
+      console.error('Gallery picker error:', err);
+      Alert.alert('Error', err.message || 'Failed to pick video from gallery');
+    }
+  }, [onVideoRecorded, onClose]);
+
   const initializeCamera = async () => {
     setIsInitializing(true);
+    setError(null);
+    setPermissionsGranted(false);
+
     try {
+      // Request camera permission
+      let cameraStatus: CameraPermissionStatus;
       if (!hasCameraPermission) {
-        const cameraGranted = await requestCameraPermission();
-        if (!cameraGranted) {
-          Alert.alert('Permission Required', 'Camera permission is required to record video.');
-          onClose();
+        cameraStatus = await requestCameraPermission();
+        console.log('Camera permission status:', cameraStatus);
+
+        if (cameraStatus === 'denied') {
+          setError('Camera permission was denied. Please grant camera access to record videos.');
+          setIsInitializing(false);
+          return;
+        }
+
+        if (cameraStatus !== 'granted') {
+          // Permission might be 'restricted' or 'not-determined' on iOS
+          Alert.alert(
+            'Permission Required',
+            'Camera permission is required to record video. Please enable it in Settings.',
+            [
+              { text: 'Cancel', onPress: onClose, style: 'cancel' },
+              { text: 'Open Settings', onPress: openSettings },
+            ]
+          );
+          setIsInitializing(false);
           return;
         }
       }
+
+      // Request microphone permission (optional but recommended)
       if (!hasMicPermission) {
-        await requestMicPermission();
+        const micStatus = await requestMicPermission();
+        console.log('Microphone permission status:', micStatus);
+        // Don't block if mic permission is denied, just continue without audio
+        if (micStatus !== 'granted') {
+          console.warn('Microphone permission not granted. Video will be recorded without audio.');
+        }
       }
-    } catch (error) {
-      console.error('Camera initialization error:', error);
-    } finally {
+
+      // Permissions granted, mark as ready to show camera
+      setPermissionsGranted(true);
+
+      // Check if device is immediately available
+      if (device) {
+        setIsInitializing(false);
+      }
+      // If device is not available yet, the useEffect above will handle the timeout
+
+    } catch (err: any) {
+      console.error('Camera initialization error:', err);
+      setError(`Failed to initialize camera: ${err.message || 'Unknown error'}`);
       setIsInitializing(false);
     }
   };
+
+  const handleCameraInitialized = useCallback(() => {
+    console.log('Camera initialized successfully');
+    setCameraReady(true);
+    setIsInitializing(false);
+  }, []);
+
+  const handleCameraError = useCallback((err: any) => {
+    console.error('Camera error:', err);
+    setError(`Camera error: ${err.message || err.code || 'Unknown error'}`);
+    setIsInitializing(false);
+  }, []);
 
   const startRecording = async () => {
     if (!cameraRef.current || isRecording) {
@@ -216,20 +357,69 @@ export const VideoRecorder: React.FC<VideoRecorderProps> = ({
     onClose();
   };
 
-  if (!device) {
-    return (
-      <Modal visible={visible} animationType="slide" onRequestClose={handleCancel}>
-        <SafeAreaView style={styles.container}>
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={colors.primary} />
-            <Text style={styles.loadingText}>Loading camera...</Text>
-            <TouchableOpacity style={styles.cancelLoadingButton} onPress={handleCancel}>
-              <Text style={styles.cancelLoadingText}>Cancel</Text>
+  // Render error state
+  const renderError = () => (
+    <Modal visible={visible} animationType="slide" onRequestClose={handleCancel}>
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <Icon name="alert-circle" size={64} color={colors.error || '#FF4444'} />
+          <Text style={styles.errorTitle}>Camera Error</Text>
+          <Text style={styles.errorText}>{error}</Text>
+          <Text style={styles.errorSubtext}>
+            You can pick a video from your gallery instead.
+          </Text>
+
+          {/* Primary action - Gallery picker */}
+          <TouchableOpacity style={styles.galleryButton} onPress={pickVideoFromGallery}>
+            <Icon name="images" size={24} color={colors.white} />
+            <Text style={styles.galleryButtonText}>Choose from Gallery</Text>
+          </TouchableOpacity>
+
+          {/* Secondary actions */}
+          <View style={styles.errorButtons}>
+            <TouchableOpacity style={styles.retryButton} onPress={() => initializeCamera()}>
+              <Icon name="refresh" size={20} color={colors.white} />
+              <Text style={styles.retryButtonText}>Retry</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.settingsButton} onPress={openSettings}>
+              <Icon name="settings" size={20} color={colors.white} />
+              <Text style={styles.settingsButtonText}>Settings</Text>
             </TouchableOpacity>
           </View>
-        </SafeAreaView>
-      </Modal>
-    );
+
+          <TouchableOpacity style={styles.cancelLoadingButton} onPress={handleCancel}>
+            <Text style={styles.cancelLoadingText}>Cancel</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    </Modal>
+  );
+
+  // Render loading state (permissions granted but waiting for device)
+  const renderLoading = () => (
+    <Modal visible={visible} animationType="slide" onRequestClose={handleCancel}>
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={styles.loadingText}>
+            {!permissionsGranted ? 'Requesting permissions...' : 'Initializing camera...'}
+          </Text>
+          <TouchableOpacity style={styles.cancelLoadingButton} onPress={handleCancel}>
+            <Text style={styles.cancelLoadingText}>Cancel</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    </Modal>
+  );
+
+  // Show error screen if there's an error
+  if (error) {
+    return renderError();
+  }
+
+  // Show loading screen if initializing or device not ready
+  if (isInitializing || !device || !permissionsGranted) {
+    return renderLoading();
   }
 
   return (
@@ -252,9 +442,9 @@ export const VideoRecorder: React.FC<VideoRecorderProps> = ({
               </Text>
             </View>
             <View style={styles.previewButtons}>
-              <TouchableOpacity style={styles.retakeButton} onPress={handleRetake}>
+              <TouchableOpacity style={styles.previewRetakeButton} onPress={handleRetake}>
                 <Icon name="refresh" size={24} color={colors.white} />
-                <Text style={styles.retakeButtonText}>Retake</Text>
+                <Text style={styles.previewRetakeButtonText}>Retake</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.sendButton} onPress={handleSendVideo}>
                 <Icon name="send" size={24} color={colors.white} />
@@ -275,6 +465,8 @@ export const VideoRecorder: React.FC<VideoRecorderProps> = ({
               isActive={visible && !recordedVideo}
               video={true}
               audio={hasMicPermission}
+              onInitialized={handleCameraInitialized}
+              onError={handleCameraError}
             />
 
             {/* Top controls */}
@@ -310,14 +502,28 @@ export const VideoRecorder: React.FC<VideoRecorderProps> = ({
             {/* Bottom controls */}
             <View style={styles.bottomControls}>
               {!isRecording ? (
-                // Not recording - show start button
+                // Not recording - show start button and gallery option
                 <>
-                  <TouchableOpacity style={styles.recordButton} onPress={startRecording}>
-                    <View style={styles.recordButtonInner}>
-                      <View style={styles.recordIcon} />
-                    </View>
-                  </TouchableOpacity>
-                  <Text style={styles.hintText}>Tap to start recording</Text>
+                  <View style={styles.recordControlsRow}>
+                    {/* Gallery button */}
+                    <TouchableOpacity
+                      style={styles.galleryIconButton}
+                      onPress={pickVideoFromGallery}
+                    >
+                      <Icon name="images" size={28} color={colors.white} />
+                    </TouchableOpacity>
+
+                    {/* Record button */}
+                    <TouchableOpacity style={styles.recordButton} onPress={startRecording}>
+                      <View style={styles.recordButtonInner}>
+                        <View style={styles.recordIcon} />
+                      </View>
+                    </TouchableOpacity>
+
+                    {/* Placeholder for symmetry */}
+                    <View style={styles.galleryIconButton} />
+                  </View>
+                  <Text style={styles.hintText}>Tap to record or choose from gallery</Text>
                 </>
               ) : (
                 // Recording - show stop button
@@ -361,6 +567,73 @@ const styles = StyleSheet.create({
   cancelLoadingText: {
     color: colors.primary,
     fontSize: 16,
+  },
+  errorTitle: {
+    color: colors.white,
+    fontSize: 20,
+    fontWeight: '600',
+    marginTop: 16,
+  },
+  errorText: {
+    color: '#aaa',
+    fontSize: 14,
+    marginTop: 8,
+    paddingHorizontal: 32,
+    textAlign: 'center',
+  },
+  errorSubtext: {
+    color: '#888',
+    fontSize: 14,
+    marginTop: 16,
+    textAlign: 'center',
+  },
+  galleryButton: {
+    alignItems: 'center',
+    backgroundColor: colors.primary,
+    borderRadius: 12,
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 24,
+    paddingHorizontal: 32,
+    paddingVertical: 16,
+  },
+  galleryButtonText: {
+    color: colors.white,
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  errorButtons: {
+    flexDirection: 'row',
+    gap: 16,
+    marginTop: 16,
+  },
+  retryButton: {
+    alignItems: 'center',
+    backgroundColor: colors.primary,
+    borderRadius: 8,
+    flexDirection: 'row',
+    gap: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+  },
+  retryButtonText: {
+    color: colors.white,
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  settingsButton: {
+    alignItems: 'center',
+    backgroundColor: '#333',
+    borderRadius: 8,
+    flexDirection: 'row',
+    gap: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+  },
+  settingsButtonText: {
+    color: colors.white,
+    fontSize: 16,
+    fontWeight: '600',
   },
   topControlsContainer: {
     left: 0,
@@ -419,6 +692,20 @@ const styles = StyleSheet.create({
     paddingTop: 20,
     position: 'absolute',
     right: 0,
+  },
+  recordControlsRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 40,
+  },
+  galleryIconButton: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    borderRadius: 28,
+    height: 56,
+    justifyContent: 'center',
+    width: 56,
   },
   recordButton: {
     alignItems: 'center',
@@ -484,7 +771,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 20,
   },
-  retakeButton: {
+  previewRetakeButton: {
     alignItems: 'center',
     backgroundColor: '#333',
     borderRadius: 12,
@@ -493,7 +780,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingVertical: 14,
   },
-  retakeButtonText: {
+  previewRetakeButtonText: {
     color: colors.white,
     fontSize: 16,
     fontWeight: '600',

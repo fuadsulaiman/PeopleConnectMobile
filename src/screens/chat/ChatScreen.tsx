@@ -54,10 +54,11 @@ const getSignalRService = () => {
   const signalrModule = require('../../services/signalr');
   return signalrModule.signalRService;
 };
-import { LinkPreview, extractFirstUrl } from '../../components/chat';
+import { LinkPreview, extractFirstUrl, VoicePlayer } from '../../components/chat';
 import { LocationPicker } from '../../components/chat/LocationPicker';
 import { LocationMessage } from '../../components/chat/LocationMessage';
 import { locationService, LocationData } from '../../services/locationService';
+import { VoiceRecorder } from '../../components/chat/VoiceRecorder';
 
 // Helper to convert relative URLs to absolute URLs
 const toAbsoluteUrl = (url: string | null | undefined): string | undefined => {
@@ -164,6 +165,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
   const [recordingDuration, setRecordingDuration] = useState(0);
   const [emojiPickerVisible, setEmojiPickerVisible] = useState(false);
   const [videoRecorderVisible, setVideoRecorderVisible] = useState(false);
+  const [voiceRecorderVisible, setVoiceRecorderVisible] = useState(false);
   const [infoSheetVisible, setInfoSheetVisible] = useState(false);
   const [locationPickerVisible, setLocationPickerVisible] = useState(false);
   const [typingUsers, setTypingUsers] = useState<{ userId: string; userName?: string }[]>([]);
@@ -529,11 +531,13 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
         console.log('Initiating call to user:', targetUser);
 
         // Navigate to the CallsTab -> Call screen
+        // Pass conversationId for backend InitiateCall which expects conversationId, not userId
         navigation.getParent()?.navigate('CallsTab', {
           screen: 'Call',
           params: {
             user: targetUser,
             type: callType,
+            conversationId: conversationId, // Required for InitiateCall
           },
         });
       } else if (isChatroom) {
@@ -1075,42 +1079,129 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
 
   // Process video asset (shared between record and pick)
 
-  // Start audio recording
-  const startAudioRecording = useCallback(async () => {
-    // Audio recording requires native module - show alternative
-    Alert.alert(
-      'Voice Message',
-      'Voice message recording requires additional setup. You can record a video instead and the audio will be captured.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Record Video',
-          onPress: () => {
-            handleRecordVideo();
-          },
-        },
-      ]
-    );
-  }, [handleRecordVideo]);
+  // Handle completed audio recording - upload and send
+  const handleAudioRecorded = useCallback(
+    async (audioUri: string, durationMs: number, viewOnce?: boolean) => {
+      setVoiceRecorderVisible(false);
+      setIsRecording(false);
+      setUploadingMedia(true);
 
-  // Stop and send audio recording (placeholder - not used without native module)
+      try {
+        // Convert duration from ms to seconds for display
+        const durationSec = Math.round(durationMs / 1000);
+        console.log('[ChatScreen] Audio recorded:', { audioUri, durationMs, durationSec, viewOnce });
+
+        // Normalize the file URI for upload
+        let normalizedUri = audioUri;
+        if (Platform.OS === 'android') {
+          // Ensure Android paths have file:// prefix
+          if (!audioUri.startsWith('file://') && !audioUri.startsWith('content://')) {
+            normalizedUri = `file://${audioUri}`;
+          }
+        } else if (Platform.OS === 'ios') {
+          // Ensure iOS paths have file:// prefix
+          if (!audioUri.startsWith('file://') && audioUri.startsWith('/')) {
+            normalizedUri = `file://${audioUri}`;
+          }
+        }
+        console.log('[ChatScreen] Normalized audio URI:', normalizedUri);
+
+        // Determine file extension and mime type based on platform
+        // Use standard MIME types for better compatibility
+        const extension = Platform.OS === 'ios' ? 'm4a' : 'mp3';
+        const mimeType = Platform.OS === 'ios' ? 'audio/mp4' : 'audio/mpeg';
+        const fileName = `voice_${Date.now()}.${extension}`;
+
+        // Upload the audio file
+        const uploadResult = await uploadFile(normalizedUri, fileName, mimeType);
+
+        if (uploadResult) {
+          console.log('[ChatScreen] Audio uploaded:', uploadResult);
+          // Send message with audio attachment
+          // Include duration in the message for display
+          // Use viewOnce from VoiceRecorder if provided, otherwise fall back to isViewOnce state
+          sendWithAttachment(uploadResult, 'audio', `Voice message (${durationSec}s)`, viewOnce ?? false);
+        } else {
+          Alert.alert('Upload Failed', 'Failed to upload voice message. Please try again.');
+        }
+      } catch (error: any) {
+        console.error('[ChatScreen] Audio upload error:', error);
+        Alert.alert('Error', error?.message || 'Failed to send voice message');
+      } finally {
+        setUploadingMedia(false);
+      }
+    },
+    [uploadFile, sendWithAttachment]
+  );
+
+  // Start audio recording - show VoiceRecorder modal
+  const startAudioRecording = useCallback(async () => {
+    // Check microphone permission on Android
+    if (Platform.OS === 'android') {
+      try {
+        const granted = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
+          {
+            title: 'Microphone Permission',
+            message: 'This app needs access to your microphone to record voice messages.',
+            buttonNeutral: 'Ask Me Later',
+            buttonNegative: 'Cancel',
+            buttonPositive: 'OK',
+          }
+        );
+        if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
+          Alert.alert('Permission Denied', 'Microphone permission is required to record voice messages.');
+          return;
+        }
+      } catch (err) {
+        console.error('[ChatScreen] Permission error:', err);
+        return;
+      }
+    }
+
+    // Show VoiceRecorder modal
+    setVoiceRecorderVisible(true);
+    setIsRecording(true);
+
+    // Send recording indicator to other users
+    const signalRService = getSignalRService();
+    if (signalRService && conversationId) {
+      signalRService.sendRecording(conversationId);
+    }
+  }, [conversationId]);
+
+  // Stop and send audio recording
   const stopAudioRecording = useCallback(async () => {
     setIsRecording(false);
+    setVoiceRecorderVisible(false);
     if (recordingTimerRef.current) {
       clearInterval(recordingTimerRef.current);
       recordingTimerRef.current = null;
     }
-  }, []);
 
-  // Cancel audio recording (placeholder - not used without native module)
+    // Stop recording indicator
+    const signalRService = getSignalRService();
+    if (signalRService && conversationId) {
+      signalRService.sendStoppedRecording(conversationId);
+    }
+  }, [conversationId]);
+
+  // Cancel audio recording
   const cancelAudioRecording = useCallback(async () => {
     setIsRecording(false);
+    setVoiceRecorderVisible(false);
     setRecordingDuration(0);
     if (recordingTimerRef.current) {
       clearInterval(recordingTimerRef.current);
       recordingTimerRef.current = null;
     }
-  }, []);
+
+    // Stop recording indicator
+    const signalRService = getSignalRService();
+    if (signalRService && conversationId) {
+      signalRService.sendStoppedRecording(conversationId);
+    }
+  }, [conversationId]);
 
   // Format recording duration
   const formatRecordingDuration = (seconds: number) => {
@@ -1489,18 +1580,23 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
       );
     }
 
-    // Render audio/voice message
+    // Render audio/voice message with VoicePlayer
     if (attachmentUrl && actualMediaType === 'audio') {
-      const audioFileName = getAttachmentFileName(item);
+      // Extract duration from attachment or message content (e.g., "Voice message (5s)")
+      let audioDuration = item.attachments?.[0]?.duration;
+      if (!audioDuration && item.content) {
+        const durationMatch = item.content.match(/\((\d+)s?\)/);
+        if (durationMatch) {
+          audioDuration = parseInt(durationMatch[1], 10);
+        }
+      }
+
       return (
-        <TouchableOpacity
-          style={styles.audioContainer}
-          onPress={() => openMedia(attachmentUrl, 'audio', audioFileName)}
-        >
-          <Icon name="musical-notes" size={24} color={isOwn ? colors.white : colors.primary} />
-          <Text style={[styles.audioLabel, isOwn && { color: colors.white }]}>Voice Message</Text>
-          <Icon name="play" size={20} color={isOwn ? colors.white : colors.primary} />
-        </TouchableOpacity>
+        <VoicePlayer
+          uri={attachmentUrl}
+          duration={audioDuration}
+          isOwn={isOwn}
+        />
       );
     }
 
@@ -2639,6 +2735,21 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
           });
         }}
         maxDuration={60}
+      />
+
+      {/* Voice Recorder Modal */}
+      <VoiceRecorder
+        visible={voiceRecorderVisible}
+        onRecordComplete={handleAudioRecorded}
+        onRecordStart={() => {
+          setIsRecording(true);
+          const signalRService = getSignalRService();
+          signalRService.sendRecording(conversationId).catch((err: any) => {
+            console.log('Failed to send recording indicator:', err);
+          });
+        }}
+        onRecordCancel={cancelAudioRecording}
+        maxDuration={120}
       />
 
       {/* Emoji Picker Modal */}
