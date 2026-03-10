@@ -8,6 +8,7 @@ import {
   RefreshControl,
   Alert,
   Animated,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -39,6 +40,9 @@ export const ConversationsScreen: React.FC<Props> = ({ navigation }) => {
     conversations,
     isLoading,
     fetchConversations,
+    fetchMoreConversations,
+    hasMoreConversations,
+    isLoadingMoreConversations,
     updateConversation,
     typingUsers,
     recordingUsers,
@@ -506,6 +510,19 @@ export const ConversationsScreen: React.FC<Props> = ({ navigation }) => {
             tintColor={colors.primary}
           />
         }
+        onEndReached={() => {
+          if (hasMoreConversations && !isLoadingMoreConversations) {
+            fetchMoreConversations();
+          }
+        }}
+        onEndReachedThreshold={0.3}
+        ListFooterComponent={
+          isLoadingMoreConversations ? (
+            <View style={styles.loadMoreContainer}>
+              <ActivityIndicator size="small" color={colors.primary} />
+            </View>
+          ) : null
+        }
         ListEmptyComponent={
           !isLoading ? (
             <EmptyState
@@ -599,6 +616,10 @@ const createStyles = (colors: ReturnType<typeof import('../../hooks').useTheme>[
     },
     emptyContainer: {
       flex: 1,
+    },
+    loadMoreContainer: {
+      alignItems: 'center',
+      paddingVertical: 16,
     },
     header: {
       alignItems: 'center',

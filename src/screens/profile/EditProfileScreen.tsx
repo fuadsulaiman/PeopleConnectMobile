@@ -34,8 +34,8 @@ type Props = NativeStackScreenProps<ProfileStackParamList, 'EditProfile'>;
 
 export const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
   const { user, setUser } = useAuthStore();
-  const [displayName, setDisplayName] = useState(user?.displayName || '');
-  const [bio, setBio] = useState(user?.bio || '');
+  const [displayName, setDisplayName] = useState(user?.displayName || user?.name || '');
+  const [bio, setBio] = useState(user?.bio || user?.statusMessage || '');
   const [isLoading, setIsLoading] = useState(false);
   const [avatarUri, setAvatarUri] = useState(user?.avatarUrl);
 
@@ -141,11 +141,30 @@ export const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
 
     setIsLoading(true);
     try {
-      const updatedUser = await users.updateProfile({
-        name: displayName.trim(),
-        bio: bio.trim(),
+      const token = getAccessToken();
+      const response = await fetch(config.API_BASE_URL + '/auth/profile', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer ' + token,
+        },
+        body: JSON.stringify({
+          Name: displayName.trim(),
+          StatusMessage: bio.trim(),
+        }),
       });
-      setUser(updatedUser as any);
+      const json = await response.json();
+      if (!response.ok || !json.success) {
+        throw new Error(json.message || 'Failed to update profile');
+      }
+      const updatedData = json.data || {};
+      setUser({
+        ...user,
+        displayName: updatedData.name || displayName.trim(),
+        name: updatedData.name || displayName.trim(),
+        bio: updatedData.statusMessage || bio.trim(),
+        statusMessage: updatedData.statusMessage || bio.trim(),
+      } as any);
       Alert.alert('Success', 'Profile updated successfully');
       navigation.goBack();
     } catch (error: any) {

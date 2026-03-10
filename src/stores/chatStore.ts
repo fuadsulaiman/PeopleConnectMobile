@@ -4,7 +4,7 @@ import { config } from '../constants';
 // CRITICAL: Do NOT import SDK at top level - it causes module initialization failures on Windows
 // Use lazy loading pattern instead - SDK is loaded only when needed
 type SDKConversations = {
-  list: () => Promise<any>;
+  list: (params?: { page?: number; pageSize?: number }) => Promise<any>;
   createDM: (params: { userId: string }) => Promise<any>;
   createChatroom: (params: { name: string; participantIds: string[] }) => Promise<any>;
   markAsRead: (conversationId: string, messageId: string) => Promise<void>;
@@ -147,8 +147,12 @@ interface ChatState {
   platformChannelSeenCount: number;
   typingUsers: TypingUser[];
   recordingUsers: RecordingUser[];
+  conversationsPage: number;
+  hasMoreConversations: boolean;
+  isLoadingMoreConversations: boolean;
 
   fetchConversations: () => Promise<void>;
+  fetchMoreConversations: () => Promise<void>;
   fetchArchivedConversations: () => Promise<void>;
   fetchMessages: (conversationId: string, refresh?: boolean) => Promise<void>;
   fetchMoreMessages: (conversationId: string) => Promise<void>;
@@ -203,13 +207,18 @@ export const useChatStore = create<ChatState>((set, get) => ({
   platformChannelSeenCount: 0,
   typingUsers: [],
   recordingUsers: [],
+  conversationsPage: 1,
+  hasMoreConversations: true,
+  isLoadingMoreConversations: false,
 
   fetchConversations: async () => {
-    set({ isLoading: true, error: null });
+    set({ isLoading: true, error: null, conversationsPage: 1, hasMoreConversations: true });
     try {
       const conversations = getConversationsService();
-      const result = await conversations.list();
+      const result = await conversations.list({ page: 1, pageSize: 20 });
       const rawList = Array.isArray(result) ? result : (result as any).items || [];
+      const totalCount = (result as any).totalCount || rawList.length;
+      const hasMore = rawList.length >= 20 && rawList.length < totalCount;
 
       const formatPreview = (lastMessage: any): string => {
         if (!lastMessage) {
@@ -405,10 +414,73 @@ export const useChatStore = create<ChatState>((set, get) => ({
         conversations: finalConversations,
         archivedConversations: archivedList,
         isLoading: false,
+        conversationsPage: 1,
+        hasMoreConversations: hasMore,
       });
     } catch (error: any) {
       console.error('Failed to fetch conversations:', error);
       set({ error: error.message || 'Failed to fetch conversations', isLoading: false });
+    }
+  },
+
+  fetchMoreConversations: async () => {
+    const state = get();
+    if (state.isLoadingMoreConversations || !state.hasMoreConversations || state.isLoading) {
+      return;
+    }
+
+    const nextPage = state.conversationsPage + 1;
+    set({ isLoadingMoreConversations: true });
+
+    try {
+      const conversations = getConversationsService();
+      const result = await conversations.list({ page: nextPage, pageSize: 20 });
+      const rawList = Array.isArray(result) ? result : (result as any).items || [];
+      const totalCount = (result as any).totalCount || 0;
+
+      if (rawList.length === 0) {
+        set({ isLoadingMoreConversations: false, hasMoreConversations: false });
+        return;
+      }
+
+      const currentState = get();
+      const currentMessages = currentState.messages;
+      const existingIds = new Set(currentState.conversations.map((c) => c.id));
+
+      const newConversations = rawList
+        .filter((conv: any) => !existingIds.has(conv.id))
+        .filter((conv: any) => !(conv.isArchived === true || conv.IsArchived === true))
+        .map((conv: any) => {
+          const localMessages = currentMessages[conv.id] || [];
+          const localLastMessage =
+            localMessages.length > 0 ? localMessages[localMessages.length - 1] : null;
+
+          let lastMessagePreview = '';
+          if (localLastMessage) {
+            lastMessagePreview = localLastMessage.content || '';
+          } else if (conv.lastMessage) {
+            lastMessagePreview = conv.lastMessage.content || '';
+          }
+
+          return {
+            ...conv,
+            avatarUrl: toAbsoluteUrl(conv.avatarUrl),
+            lastMessagePreview,
+            lastMessageAt: localLastMessage?.createdAt || conv.lastMessage?.createdAt || conv.lastMessageAt,
+          };
+        });
+
+      const allLoaded = (currentState.conversations.length + newConversations.length) >= totalCount;
+
+      set({
+        conversations: [...currentState.conversations, ...newConversations],
+        conversationsPage: nextPage,
+        hasMoreConversations: newConversations.length > 0 && !allLoaded,
+        isLoadingMoreConversations: false,
+      });
+    } catch (error: any) {
+      console.error('Failed to fetch more conversations:', error);
+      set({ isLoadingMoreConversations: false });
     }
   },
 

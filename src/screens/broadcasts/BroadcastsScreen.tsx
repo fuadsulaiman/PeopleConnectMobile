@@ -68,13 +68,32 @@ const BroadcastsScreen: React.FC = () => {
 
   const fetchData = useCallback(async () => {
     try {
-      const [channelsData, feedData] = await Promise.all([
-        broadcasts.getChannels(),
-        broadcasts.getFeed(), // Fixed: was getMessageFeed
-      ]);
-      setChannels(Array.isArray(channelsData) ? channelsData : (channelsData as any).items || []);
-      const feedItems = (feedData as any)?.items || [];
-      setMessages(Array.isArray(feedItems) ? feedItems : []);
+      const channelsData = await broadcasts.getChannels();
+      const channelList = Array.isArray(channelsData) ? channelsData : (channelsData as any).items || [];
+      setChannels(channelList);
+
+      // Fetch recent messages from subscribed channels as feed
+      const subscribedChannels = channelList.filter((c: BroadcastChannel) => c.isSubscribed);
+      const allMessages: BroadcastMessage[] = [];
+      for (const channel of subscribedChannels.slice(0, 5)) {
+        try {
+          const msgsResponse = await broadcasts.getMessages(channel.id);
+          const msgs = (msgsResponse as any)?.items || msgsResponse || [];
+          const msgList = Array.isArray(msgs) ? msgs : [];
+          allMessages.push(
+            ...msgList.slice(0, 10).map((m: any) => ({
+              ...m,
+              channelName: channel.name,
+              channelId: channel.id,
+            }))
+          );
+        } catch {
+          // Skip channels that fail
+        }
+      }
+      // Sort by date descending
+      allMessages.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      setMessages(allMessages);
     } catch (error) {
       console.error('Failed to fetch broadcasts:', error);
     } finally {
@@ -273,7 +292,7 @@ const BroadcastsScreen: React.FC = () => {
           }
           ListEmptyComponent={
             <EmptyState
-              icon="megaphone-outline"
+              icon={<Icon name="megaphone-outline" size={64} color={colors.textSecondary} />}
               title="No broadcasts yet"
               message="Subscribe to channels to see their broadcasts here"
             />
@@ -294,7 +313,7 @@ const BroadcastsScreen: React.FC = () => {
           }
           ListEmptyComponent={
             <EmptyState
-              icon="megaphone-outline"
+              icon={<Icon name="megaphone-outline" size={64} color={colors.textSecondary} />}
               title="No channels available"
               message="There are no broadcast channels to subscribe to"
             />
