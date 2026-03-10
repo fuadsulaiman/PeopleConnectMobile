@@ -27,7 +27,7 @@ const getConversations = () => {
   const sdkModule = require('../../services/sdk');
   return sdkModule.conversations;
 };
-const conversationsApi = { pin: (id: string) => getConversations().pin(id), unpin: (id: string) => getConversations().unpin(id), archive: (id: string) => getConversations().archive(id), unarchive: (id: string) => getConversations().unarchive(id), delete: (id: string) => getConversations().delete(id), mute: (id: string) => getConversations().mute(id), unmute: (id: string) => getConversations().unmute(id) };
+const conversationsApi = { pin: (id: string) => getConversations().pin(id), unpin: (id: string) => getConversations().unpin(id), archive: (id: string) => getConversations().archive(id), unarchive: (id: string) => getConversations().unarchive(id), delete: (id: string) => getConversations().delete(id), leave: (id: string) => getConversations().leave(id), mute: (id: string) => getConversations().mute(id), unmute: (id: string) => getConversations().unmute(id) };
 import { Conversation } from '../../types';
 import { Avatar } from '../../components/common/Avatar';
 import { EmptyState } from '../../components/common/EmptyState';
@@ -146,12 +146,16 @@ export const ConversationsScreen: React.FC<Props> = ({ navigation }) => {
           style: 'destructive',
           onPress: async () => {
             try {
-              await conversationsApi.delete(item.id);
+              if (isDM) {
+                await conversationsApi.delete(item.id);
+              } else {
+                await conversationsApi.leave(item.id);
+              }
               // Remove from local state using store's method
               chatStoreModule.useChatStore.getState().removeConversation(item.id);
             } catch (error) {
-              console.error('Failed to delete conversation:', error);
-              Alert.alert('Error', 'Failed to delete conversation');
+              console.error(isDM ? 'Failed to delete conversation:' : 'Failed to leave group:', error);
+              Alert.alert('Error', isDM ? 'Failed to delete conversation' : 'Failed to leave group');
             }
           },
         },
@@ -239,11 +243,11 @@ export const ConversationsScreen: React.FC<Props> = ({ navigation }) => {
             <Text style={styles.swipeActionText}>{item.isArchived ? 'Unarchive' : 'Archive'}</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.swipeAction, styles.deleteAction]}
+            style={[styles.swipeAction, item.type === 'DirectMessage' ? styles.deleteAction : styles.leaveAction]}
             onPress={() => handleDelete(item)}
           >
-            <Icon name="trash-outline" size={22} color="#fff" />
-            <Text style={styles.swipeActionText}>Delete</Text>
+            <Icon name={item.type === 'DirectMessage' ? 'trash-outline' : 'exit-outline'} size={22} color="#fff" />
+            <Text style={styles.swipeActionText}>{item.type === 'DirectMessage' ? 'Delete' : 'Leave'}</Text>
           </TouchableOpacity>
         </Animated.View>
       );
@@ -589,6 +593,9 @@ const createStyles = (colors: ReturnType<typeof import('../../hooks').useTheme>[
     },
     deleteAction: {
       backgroundColor: colors.error,
+    },
+    leaveAction: {
+      backgroundColor: colors.warning,
     },
     emptyContainer: {
       flex: 1,

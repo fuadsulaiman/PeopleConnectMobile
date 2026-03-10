@@ -33,6 +33,8 @@ import VerifyEmailScreen from '../screens/auth/VerifyEmailScreen';
 import ConversationsScreen from '../screens/chat/ConversationsScreen';
 import ChatScreen from '../screens/chat/ChatScreen';
 import NewChatScreen from '../screens/chat/NewChatScreen';
+import CreateGroupScreen from '../screens/chat/CreateGroupScreen';
+import AddMembersScreen from '../screens/chat/AddMembersScreen';
 import ArchivedConversationsScreen from '../screens/chat/ArchivedConversationsScreen';
 import UserProfileScreen from '../screens/chat/UserProfileScreen';
 
@@ -114,6 +116,28 @@ const ChatTabNavigator: React.FC = () => (
       options={{
         headerShown: true,
         title: 'New Chat',
+        headerBackTitle: 'Back',
+        headerStyle: { backgroundColor: colors.background },
+        headerTintColor: colors.text,
+      }}
+    />
+    <ChatStack.Screen
+      name="CreateGroup"
+      component={CreateGroupScreen}
+      options={{
+        headerShown: true,
+        title: 'Create Group',
+        headerBackTitle: 'Back',
+        headerStyle: { backgroundColor: colors.background },
+        headerTintColor: colors.text,
+      }}
+    />
+    <ChatStack.Screen
+      name="AddMembers"
+      component={AddMembersScreen}
+      options={{
+        headerShown: true,
+        title: 'Add Members',
         headerBackTitle: 'Back',
         headerStyle: { backgroundColor: colors.background },
         headerTintColor: colors.text,
@@ -266,21 +290,18 @@ const RootNavigator: React.FC = () => {
 
     if (
       (callState === 'incoming' ||
+        callState === 'ringing' ||
         callState === 'connecting' ||
         callState === 'connected') &&
       currentCall &&
       !hasNavigatedToCallRef.current
     ) {
-      // Determine if this is an incoming call (callee perspective)
-      const isIncoming = callState === 'incoming';
-      
       console.log('Navigating to ActiveCall screen for call:', currentCall.id);
       hasNavigatedToCallRef.current = true;
       navigationRef.current.navigate('ActiveCall', {
         call: currentCall as any,
         user: currentCall.caller as any,
         type: currentCall.type,
-        isIncoming,
       });
     } else if (callState === 'idle' || callState === 'ended') {
       hasNavigatedToCallRef.current = false;

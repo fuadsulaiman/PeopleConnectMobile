@@ -115,6 +115,7 @@ export const ConversationInfoSheet: React.FC<ConversationInfoSheetProps> = ({
   const [showMediaGallery, setShowMediaGallery] = useState(false);
   const [selectedMediaIndex, setSelectedMediaIndex] = useState(0);
   const [showMemberActions, setShowMemberActions] = useState<string | null>(null);
+  const [selectedMember, setSelectedMember] = useState<Participant | null>(null);
   const [showEditGroup, setShowEditGroup] = useState(false);
   const [editGroupName, setEditGroupName] = useState('');
   const [editGroupDescription, setEditGroupDescription] = useState('');
@@ -764,60 +765,13 @@ export const ConversationInfoSheet: React.FC<ConversationInfoSheetProps> = ({
         {canManage && (
           <TouchableOpacity
             style={styles.memberMenuButton}
-            onPress={() => setShowMemberActions(item.userId)}
+            onPress={() => {
+              setSelectedMember(item);
+              setShowMemberActions(item.userId);
+            }}
           >
             <Icon name="ellipsis-vertical" size={20} color={colors.textSecondary} />
           </TouchableOpacity>
-        )}
-
-        {/* Member Actions Menu */}
-        {showMemberActions === item.userId && (
-          <View style={styles.memberActionsMenu}>
-            <TouchableOpacity
-              style={styles.memberActionItem}
-              onPress={() =>
-                handleViewProfile(item.userId, item.name, item.avatarUrl, item.username)
-              }
-            >
-              <Icon name="person-outline" size={18} color={colors.text} />
-              <Text style={styles.memberActionText}>View Profile</Text>
-            </TouchableOpacity>
-            {item.role === 'Member' && isOwner && (
-              <TouchableOpacity
-                style={styles.memberActionItem}
-                onPress={() => handleMakeAdmin(item)}
-              >
-                <Icon name="shield-outline" size={18} color={colors.primary} />
-                <Text style={[styles.memberActionText, { color: colors.primary }]}>Make Admin</Text>
-              </TouchableOpacity>
-            )}
-            {item.role === 'Admin' && isOwner && (
-              <TouchableOpacity
-                style={styles.memberActionItem}
-                onPress={() => handleRemoveAdmin(item)}
-              >
-                <Icon name="shield-outline" size={18} color={colors.warning} />
-                <Text style={[styles.memberActionText, { color: colors.warning }]}>
-                  Remove Admin
-                </Text>
-              </TouchableOpacity>
-            )}
-            <TouchableOpacity
-              style={styles.memberActionItem}
-              onPress={() => handleRemoveMember(item)}
-            >
-              <Icon name="person-remove-outline" size={18} color={colors.error} />
-              <Text style={[styles.memberActionText, { color: colors.error }]}>
-                Remove from Group
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.memberActionItem, styles.memberActionCancel]}
-              onPress={() => setShowMemberActions(null)}
-            >
-              <Text style={styles.memberActionText}>Cancel</Text>
-            </TouchableOpacity>
-          </View>
         )}
       </TouchableOpacity>
     );
@@ -1687,6 +1641,104 @@ export const ConversationInfoSheet: React.FC<ConversationInfoSheetProps> = ({
           </View>
         </View>
       </Modal>
+
+      {/* Member Actions Modal */}
+      <Modal
+        visible={showMemberActions !== null && selectedMember !== null}
+        animationType="fade"
+        transparent
+        onRequestClose={() => {
+          setShowMemberActions(null);
+          setSelectedMember(null);
+        }}
+      >
+        <TouchableOpacity
+          style={styles.memberActionsOverlay}
+          activeOpacity={1}
+          onPress={() => {
+            setShowMemberActions(null);
+            setSelectedMember(null);
+          }}
+        >
+          <View style={styles.memberActionsModal}>
+            {selectedMember && (
+              <>
+                <View style={styles.memberActionsHeader}>
+                  <Avatar
+                    uri={selectedMember.avatarUrl}
+                    name={selectedMember.name}
+                    size={40}
+                  />
+                  <View style={{ marginLeft: 12, flex: 1 }}>
+                    <Text style={styles.memberName} numberOfLines={1}>{selectedMember.name}</Text>
+                    <Text style={styles.memberUsername}>@{selectedMember.username}</Text>
+                  </View>
+                </View>
+                <TouchableOpacity
+                  style={styles.memberActionItem}
+                  onPress={() => {
+                    setShowMemberActions(null);
+                    setSelectedMember(null);
+                    handleViewProfile(selectedMember.userId, selectedMember.name, selectedMember.avatarUrl, selectedMember.username);
+                  }}
+                >
+                  <Icon name="person-outline" size={18} color={colors.text} />
+                  <Text style={styles.memberActionText}>View Profile</Text>
+                </TouchableOpacity>
+                {selectedMember.role === 'Member' && isOwner && (
+                  <TouchableOpacity
+                    style={styles.memberActionItem}
+                    onPress={() => {
+                      const member = selectedMember;
+                      setShowMemberActions(null);
+                      setSelectedMember(null);
+                      handleMakeAdmin(member);
+                    }}
+                  >
+                    <Icon name="shield-outline" size={18} color={colors.primary} />
+                    <Text style={[styles.memberActionText, { color: colors.primary }]}>Make Admin</Text>
+                  </TouchableOpacity>
+                )}
+                {selectedMember.role === 'Admin' && isOwner && (
+                  <TouchableOpacity
+                    style={styles.memberActionItem}
+                    onPress={() => {
+                      const member = selectedMember;
+                      setShowMemberActions(null);
+                      setSelectedMember(null);
+                      handleRemoveAdmin(member);
+                    }}
+                  >
+                    <Icon name="shield-outline" size={18} color={colors.warning} />
+                    <Text style={[styles.memberActionText, { color: colors.warning }]}>Remove Admin</Text>
+                  </TouchableOpacity>
+                )}
+                <TouchableOpacity
+                  style={styles.memberActionItem}
+                  onPress={() => {
+                    const member = selectedMember;
+                    setShowMemberActions(null);
+                    setSelectedMember(null);
+                    handleRemoveMember(member);
+                  }}
+                >
+                  <Icon name="person-remove-outline" size={18} color={colors.error} />
+                  <Text style={[styles.memberActionText, { color: colors.error }]}>Remove from Group</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.memberActionItem, styles.memberActionCancel]}
+                  onPress={() => {
+                    setShowMemberActions(null);
+                    setSelectedMember(null);
+                  }}
+                >
+                  <Text style={[styles.memberActionText, { marginLeft: 0, textAlign: 'center', flex: 1 }]}>Cancel</Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </Modal>
   );
 };
@@ -2069,19 +2121,30 @@ const styles = StyleSheet.create({
   memberMenuButton: {
     padding: 8,
   },
-  memberActionsMenu: {
+  memberActionsOverlay: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    flex: 1,
+    justifyContent: 'center',
+  },
+  memberActionsModal: {
     backgroundColor: colors.white,
-    borderRadius: 8,
-    elevation: 5,
-    minWidth: 180,
-    position: 'absolute',
-    right: 40,
+    borderRadius: 12,
+    elevation: 10,
+    marginHorizontal: 40,
+    maxWidth: 320,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    top: 0,
-    zIndex: 10,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    width: '80%',
+  },
+  memberActionsHeader: {
+    alignItems: 'center',
+    borderBottomColor: colors.border,
+    borderBottomWidth: 1,
+    flexDirection: 'row',
+    padding: 16,
   },
   memberActionItem: {
     alignItems: 'center',

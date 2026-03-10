@@ -2934,6 +2934,10 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
           setInfoSheetVisible(false);
           navigation.navigate('UserProfile', { userId, userName, userAvatar, username });
         }}
+        onAddMembers={() => {
+          setInfoSheetVisible(false);
+          navigation.navigate('AddMembers', { conversationId });
+        }}
         onLeaveGroup={async () => {
           try {
             const sdk = getSDK();

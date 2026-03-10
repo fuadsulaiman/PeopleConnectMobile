@@ -116,6 +116,16 @@ interface ParticipantRoleChangedData {
   Role?: string;
 }
 
+interface ParticipantChangeData {
+  conversationId?: string;
+  ConversationId?: string;
+  userId?: string;
+  UserId?: string;
+  userName?: string;
+  UserName?: string;
+  action?: 'added' | 'removed' | 'left';
+}
+
 interface DisappearingMessagesChangedData {
   conversationId?: string;
   ConversationId?: string;
@@ -169,6 +179,24 @@ LogBox.ignoreLogs([
   'PublishTrackError',
   'OverconstrainedError',
   'could not find camera',
+  // LiveKit track/participant race condition warnings
+  // These occur when track events arrive before participant events (race condition)
+  // or when a participant leaves but track events are still being processed
+  // This is informational and handled internally by LiveKit
+  'Tried to add a track for a participant',
+  "that's not present",
+  // LiveKit quality update race condition warnings
+  // These occur when quality updates are received for tracks that haven't been fully registered yet
+  // This is informational and handled internally by LiveKit
+  'received subscribed quality update for unknown track',
+  'unknown track',
+  // LiveKit negotiation timeout/disconnect errors
+  // These occur on mobile emulators or poor network conditions when
+  // DTLS handshake times out - handled by reconnectPolicy in GroupCallScreen
+  'negotiation timed out',
+  'negotiation disconnected',
+  'Microphone enable failed',
+  'dtls timeout',
 ]);
 
 function App(): React.JSX.Element {
@@ -194,6 +222,7 @@ function App(): React.JSX.Element {
   const unsubscribeConversationMutedRef = useRef<(() => void) | null>(null);
   const unsubscribeConversationDeletedRef = useRef<(() => void) | null>(null);
   const unsubscribeParticipantRoleChangedRef = useRef<(() => void) | null>(null);
+  const unsubscribeParticipantChangeRef = useRef<(() => void) | null>(null);
   const unsubscribeDisappearingMessagesChangedRef = useRef<(() => void) | null>(null);
   const isConnectedRef = useRef<boolean>(false);
   const backgroundTimestampRef = useRef<number | null>(null);
@@ -431,6 +460,10 @@ function App(): React.JSX.Element {
       unsubscribeParticipantRoleChangedRef.current();
       unsubscribeParticipantRoleChangedRef.current = null;
     }
+    if (unsubscribeParticipantChangeRef.current) {
+      unsubscribeParticipantChangeRef.current();
+      unsubscribeParticipantChangeRef.current = null;
+    }
     if (unsubscribeDisappearingMessagesChangedRef.current) {
       unsubscribeDisappearingMessagesChangedRef.current();
       unsubscribeDisappearingMessagesChangedRef.current = null;
@@ -638,6 +671,23 @@ function App(): React.JSX.Element {
             message.replyToMessageId ||
             message.ReplyToMessageId,
         } as Message);
+
+        // Handle system messages about participants leaving/being removed
+        // This refreshes the conversation list so other users see updated group state
+        if (isSystemMessage && message.content) {
+          const content = message.content.toLowerCase();
+          if (
+            content.includes('left the group') ||
+            content.includes('removed') ||
+            content.includes('is now the owner')
+          ) {
+            console.log('Participant change detected, refreshing conversations');
+            // Refresh conversations list to update participant counts and group state
+            setTimeout(() => {
+              chatStoreModule.useChatStore.getState().fetchConversations();
+            }, 500);
+          }
+        }
 
         // Acknowledge delivery to the sender (this triggers MessageDelivered on their end)
         // Don't acknowledge system messages
@@ -1030,6 +1080,36 @@ function App(): React.JSX.Element {
           if (conversationId && userId && newRole) {
             const chatStore = chatStoreModule.useChatStore.getState();
             chatStore.updateParticipantRole(conversationId, userId, newRole);
+          }
+        }
+      );
+
+      // Register handler for participant changes (added/removed/left)
+      // Backend may send these via dedicated ParticipantLeft/ParticipantRemoved events
+      unsubscribeParticipantChangeRef.current = signalRService.onParticipantChange(
+        (rawData: unknown) => {
+          const data = rawData as ParticipantChangeData;
+          console.log('[App] Participant change:', data);
+          const conversationId = data?.conversationId || data?.ConversationId;
+          const userId = data?.userId || data?.UserId;
+          const action = data?.action;
+          const currentUser = useAuthStore.getState().user;
+
+          if (conversationId) {
+            const chatStore = chatStoreModule.useChatStore.getState();
+
+            // If the current user was removed, remove the conversation from their list
+            if ((action === 'removed' || action === 'left') && userId === currentUser?.id) {
+              chatStore.removeConversation(conversationId);
+              Alert.alert(
+                'Removed from Group',
+                'You have been removed from this group.',
+                [{ text: 'OK' }]
+              );
+            } else {
+              // Another participant changed - refresh conversations to update participant list
+              chatStore.fetchConversations();
+            }
           }
         }
       );

@@ -240,7 +240,7 @@ const NewChatScreen: React.FC<NewChatScreenProps> = ({ navigation }) => {
           </TouchableOpacity>
         )}
       </View>
-      <TouchableOpacity style={styles.createGroupButton} onPress={() => {}}>
+      <TouchableOpacity style={styles.createGroupButton} onPress={() => navigation.navigate('CreateGroup')}>
         <View style={styles.createGroupIcon}>
           <Icon name="people" size={24} color={colors.primary} />
         </View>

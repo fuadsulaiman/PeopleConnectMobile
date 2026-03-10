@@ -18,6 +18,8 @@ export type ChatStackParamList = {
   Conversations: undefined;
   Chat: { conversationId: string; conversation?: Conversation };
   NewChat: undefined;
+  CreateGroup: undefined;
+  AddMembers: { conversationId: string };
   ArchivedConversations: undefined;
   UserProfile: {
     userId: string;
@@ -36,7 +38,7 @@ export type ContactsStackParamList = {
 // Calls Stack
 export type CallsStackParamList = {
   CallHistory: undefined;
-  Call: { call?: Call; user?: User; type?: CallType; isIncoming?: boolean };
+  Call: { call?: Call; user?: User; type?: CallType };
 };
 
 // Profile Stack
@@ -66,7 +68,7 @@ export type MainTabParamList = {
 export type RootStackParamList = {
   Auth: NavigatorScreenParams<AuthStackParamList>;
   Main: NavigatorScreenParams<MainTabParamList>;
-  ActiveCall: { call?: Call; user?: User; type?: CallType; isIncoming?: boolean };
+  ActiveCall: { call?: Call; user?: User; type?: CallType };
   GroupCall: { conversationId: string; conversationName?: string; type: CallType; isJoining?: boolean };
   Notifications: undefined;
 };
@@ -89,6 +91,8 @@ export type ConversationsScreenProps = CompositeScreenProps<
 
 export type ChatScreenProps = NativeStackScreenProps<ChatStackParamList, 'Chat'>;
 export type NewChatScreenProps = NativeStackScreenProps<ChatStackParamList, 'NewChat'>;
+export type CreateGroupScreenProps = NativeStackScreenProps<ChatStackParamList, 'CreateGroup'>;
+export type AddMembersScreenProps = NativeStackScreenProps<ChatStackParamList, 'AddMembers'>;
 export type UserProfileScreenProps = NativeStackScreenProps<ChatStackParamList, 'UserProfile'>;
 
 export type ContactsScreenProps = CompositeScreenProps<
