@@ -48,7 +48,21 @@ export async function exportUserData(): Promise<DataExportResult> {
 
   if (!response.ok) {
     if (response.status === 403) {
-      throw new Error('Data export is currently disabled by the administrator');
+      const errorBody = await response.text().catch(() => '');
+      if (errorBody) {
+        try {
+          const errorJson = JSON.parse(errorBody);
+          throw new Error(errorJson.message || 'Data export is currently disabled by the administrator');
+        } catch (e) {
+          if (e instanceof SyntaxError) {
+            // Non-JSON body, treat as permission denied
+            throw new Error('You don\'t have permission to export data. Please contact your administrator.');
+          }
+          throw e;
+        }
+      }
+      // Empty body means ASP.NET Core authorization denied the request
+      throw new Error('You don\'t have permission to export data. Please contact your administrator.');
     }
     if (response.status === 404) {
       throw new Error('User not found');
