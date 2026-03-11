@@ -20,11 +20,57 @@ import { ProfileStackParamList } from '../../navigation/types';
 import { useTheme } from '../../hooks';
 import { useAuthStore } from '../../stores/authStore';
 // CRITICAL: Do NOT import SDK at top level - it causes module initialization failures on Windows
-const getSDK = () => {
+const getAccessTokenFn = () => {
   const sdkModule = require('../../services/sdk');
-  return sdkModule.sdk || sdkModule.default;
+  return sdkModule.getAccessToken();
 };
-const sdk = { get twoFactor() { return getSDK().twoFactor; } };
+import { config } from '../../constants';
+
+// Direct API calls to correct 2FA endpoints (/auth/2fa/*)
+const twoFactorApi = {
+  async setup(): Promise<any> {
+    const token = getAccessTokenFn();
+    const res = await fetch(config.API_BASE_URL + '/auth/2fa/setup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+    });
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.message || 'Failed to setup 2FA');
+    return json.data || json;
+  },
+  async enable(code: string): Promise<any> {
+    const token = getAccessTokenFn();
+    const res = await fetch(config.API_BASE_URL + '/auth/2fa/enable', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ code }),
+    });
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.message || 'Failed to enable 2FA');
+    return json.data || json;
+  },
+  async disable(password: string, code: string): Promise<void> {
+    const token = getAccessTokenFn();
+    const res = await fetch(config.API_BASE_URL + '/auth/2fa/disable', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ password, code }),
+    });
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.message || 'Failed to disable 2FA');
+  },
+  async regenerateBackupCodes(code: string): Promise<any> {
+    const token = getAccessTokenFn();
+    const res = await fetch(config.API_BASE_URL + '/auth/2fa/backup-codes/regenerate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ code }),
+    });
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.message || 'Failed to regenerate backup codes');
+    return json.data || json;
+  },
+};
 
 type Props = NativeStackScreenProps<ProfileStackParamList, 'TwoFactorSettings'>;
 
@@ -54,29 +100,42 @@ const TwoFactorSettingsScreen: React.FC<Props> = ({ navigation }) => {
   const [showBackupCodesModal, setShowBackupCodesModal] = useState(false);
 
   useEffect(() => {
-    // Check current 2FA status from user object
-    setIs2FAEnabled(user?.twoFactorEnabled || false);
-  }, [user?.twoFactorEnabled]);
+    // Fetch actual 2FA status from backend since /auth/me doesn't include twoFactorEnabled
+    const fetch2FAStatus = async () => {
+      try {
+        const token = getAccessTokenFn();
+        if (!token) return;
+        const res = await fetch(config.API_BASE_URL + '/auth/2fa/status', {
+          method: 'GET',
+          headers: { Authorization: 'Bearer ' + token },
+        });
+        const json = await res.json();
+        if (res.ok) {
+          const data = json.data || json;
+          setIs2FAEnabled(data.isEnabled || false);
+        }
+      } catch (error) {
+        console.error('Failed to fetch 2FA status:', error);
+        // Fallback to user object
+        setIs2FAEnabled(user?.twoFactorEnabled || false);
+      }
+    };
+    fetch2FAStatus();
+  }, []);
 
   const handleEnable2FA = async () => {
-    if (!password) {
-      Alert.alert('Error', 'Please enter your password');
-      return;
-    }
-
     setIsLoading(true);
     try {
-      const response = await sdk.twoFactor.enable(password);
+      const response = await twoFactorApi.setup();
       setSetupData({
-        secret: response.secret,
-        qrCodeUrl: response.qrCodeUrl,
-        backupCodes: response.backupCodes || [],
+        secret: response.secretKey || response.secret,
+        qrCodeUrl: response.qrCodeUri || response.qrCodeUrl,
+        backupCodes: [],
       });
       setShowSetupModal(true);
-      setPassword('');
     } catch (error: any) {
       console.error('Failed to setup 2FA:', error);
-      Alert.alert('Error', error?.message || 'Failed to setup 2FA. Please check your password.');
+      Alert.alert('Error', error?.message || 'Failed to setup 2FA.');
     } finally {
       setIsLoading(false);
     }
@@ -90,24 +149,27 @@ const TwoFactorSettingsScreen: React.FC<Props> = ({ navigation }) => {
 
     setIsLoading(true);
     try {
-      await sdk.twoFactor.verify(verificationCode);
+      const response = await twoFactorApi.enable(verificationCode);
+      if (response.success === false) {
+        Alert.alert('Error', 'Invalid verification code. Please try again.');
+        return;
+      }
       setIs2FAEnabled(true);
       updateUser({ ...user, twoFactorEnabled: true } as any);
       setShowSetupModal(false);
       setSetupData(null);
       setVerificationCode('');
 
-      // Show backup codes after enabling
-      try {
-        const codes = await sdk.twoFactor.getBackupCodes();
-        setBackupCodes(codes.codes);
+      // Show backup codes returned from enable
+      const codes = response.backupCodes || response.BackupCodes || [];
+      if (codes.length > 0) {
+        setBackupCodes(codes);
         setShowBackupCodesModal(true);
-      } catch {
-        // Backup codes may require regeneration
-        Alert.alert('Success', '2FA has been enabled. You can view backup codes in settings.');
+      } else {
+        Alert.alert('Success', '2FA has been enabled successfully.');
       }
     } catch (error: any) {
-      console.error('Failed to verify 2FA:', error);
+      console.error('Failed to enable 2FA:', error);
       Alert.alert('Error', error?.message || 'Invalid verification code. Please try again.');
     } finally {
       setIsLoading(false);
@@ -115,14 +177,14 @@ const TwoFactorSettingsScreen: React.FC<Props> = ({ navigation }) => {
   };
 
   const handleDisable2FA = async () => {
-    if (!password || !disableCode) {
-      Alert.alert('Error', 'Please enter your password and verification code');
+    if (!disableCode) {
+      Alert.alert('Error', 'Please enter your verification code');
       return;
     }
 
     setIsLoading(true);
     try {
-      await sdk.twoFactor.disable(password, disableCode);
+      await twoFactorApi.disable(password, disableCode);
       setIs2FAEnabled(false);
       updateUser({ ...user, twoFactorEnabled: false } as any);
       setShowDisableModal(false);
@@ -141,21 +203,33 @@ const TwoFactorSettingsScreen: React.FC<Props> = ({ navigation }) => {
   };
 
   const handleViewBackupCodes = async () => {
+    // Backend doesn't support viewing existing codes - must regenerate
+    Alert.alert(
+      'Regenerate Backup Codes',
+      'To view your backup codes, you need to regenerate them. This will invalidate your existing codes. Enter a verification code from your authenticator app.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Regenerate', onPress: () => {
+          setPassword('');
+          setShowDisableModal(false);
+          // Prompt for code
+          Alert.prompt ? Alert.prompt('Enter Code', 'Enter your 2FA verification code', async (code: string) => {
+            if (code) await doRegenerateBackupCodes(code);
+          }) : Alert.alert('Info', 'Please use the password field below and tap Regenerate Backup Codes.');
+        }},
+      ]
+    );
+  };
+
+  const doRegenerateBackupCodes = async (code: string) => {
     setIsLoading(true);
     try {
-      const codes = await sdk.twoFactor.getBackupCodes();
-      setBackupCodes(codes.codes);
+      const response = await twoFactorApi.regenerateBackupCodes(code);
+      const codes = response.backupCodes || response.BackupCodes || [];
+      setBackupCodes(codes);
       setShowBackupCodesModal(true);
     } catch (error: any) {
-      // If viewing is not supported, prompt to regenerate
-      Alert.alert(
-        'Regenerate Backup Codes',
-        'To view your backup codes, you need to regenerate them. This will invalidate your existing codes.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Regenerate', onPress: handleRegenerateBackupCodes },
-        ]
-      );
+      Alert.alert('Error', error?.message || 'Failed to regenerate backup codes.');
     } finally {
       setIsLoading(false);
     }
@@ -163,7 +237,7 @@ const TwoFactorSettingsScreen: React.FC<Props> = ({ navigation }) => {
 
   const handleRegenerateBackupCodes = async () => {
     if (!password) {
-      Alert.alert('Enter Password', 'Please enter your password to regenerate backup codes.', [
+      Alert.alert('Enter Code', 'Please enter your 2FA verification code to regenerate backup codes.', [
         { text: 'OK' },
       ]);
       return;
@@ -171,8 +245,8 @@ const TwoFactorSettingsScreen: React.FC<Props> = ({ navigation }) => {
 
     setIsLoading(true);
     try {
-      const codes = await sdk.twoFactor.regenerateBackupCodes(password);
-      setBackupCodes(codes.codes);
+      const response = await twoFactorApi.regenerateBackupCodes(password);
+      setBackupCodes(response.backupCodes || response.BackupCodes || []);
       setShowBackupCodesModal(true);
     } catch (error: any) {
       console.error('Failed to regenerate backup codes:', error);
@@ -230,29 +304,12 @@ const TwoFactorSettingsScreen: React.FC<Props> = ({ navigation }) => {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Enable 2FA</Text>
             <Text style={styles.sectionDescription}>
-              Enter your password to set up two-factor authentication using an authenticator app.
+              Set up two-factor authentication using an authenticator app like Google Authenticator or Authy.
             </Text>
-            <View style={styles.inputWrapper}>
-              <Icon
-                name="lock-closed-outline"
-                size={20}
-                color={colors.textSecondary}
-                style={styles.inputIcon}
-              />
-              <TextInput
-                style={styles.input}
-                placeholder="Enter your password"
-                placeholderTextColor={colors.textSecondary}
-                secureTextEntry
-                value={password}
-                onChangeText={setPassword}
-                autoCapitalize="none"
-              />
-            </View>
             <TouchableOpacity
-              style={[styles.primaryButton, (!password || isLoading) && styles.buttonDisabled]}
+              style={[styles.primaryButton, isLoading && styles.buttonDisabled]}
               onPress={handleEnable2FA}
-              disabled={!password || isLoading}
+              disabled={isLoading}
             >
               {isLoading ? (
                 <ActivityIndicator color={colors.white} />
