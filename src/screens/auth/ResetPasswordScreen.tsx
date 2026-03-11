@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -21,7 +21,7 @@ const getAuth = () => {
 };
 const auth = { resetPassword: (data: { token: string; newPassword: string }) => getAuth().resetPassword(data) };
 import { LoadingScreen } from '../../components/common/LoadingScreen';
-import { colors } from '../../constants';
+import { useTheme } from '../../hooks';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'ResetPassword'>;
 
@@ -33,6 +33,9 @@ interface PasswordValidation {
 }
 
 export const ResetPasswordScreen: React.FC<Props> = ({ navigation, route }) => {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -106,7 +109,7 @@ export const ResetPasswordScreen: React.FC<Props> = ({ navigation, route }) => {
         <View style={styles.content}>
           <View style={styles.centerContainer}>
             <View style={styles.successIconContainer}>
-              <Icon name="checkmark-circle" size={80} color="#22c55e" />
+              <Icon name="checkmark-circle" size={80} color={colors.success} />
             </View>
             <Text style={styles.successTitle}>Password Reset!</Text>
             <Text style={styles.successText}>
@@ -131,7 +134,7 @@ export const ResetPasswordScreen: React.FC<Props> = ({ navigation, route }) => {
         <View style={styles.content}>
           <View style={styles.centerContainer}>
             <View style={styles.errorIconContainer}>
-              <Icon name="alert-circle" size={80} color="#ef4444" />
+              <Icon name="alert-circle" size={80} color={colors.error} />
             </View>
             <Text style={styles.errorTitle}>Invalid Link</Text>
             <Text style={styles.errorText}>{error}</Text>
@@ -186,7 +189,7 @@ export const ResetPasswordScreen: React.FC<Props> = ({ navigation, route }) => {
                 value={password}
                 onChangeText={setPassword}
                 placeholder="Enter new password"
-                placeholderTextColor="#999"
+                placeholderTextColor={colors.textSecondary}
                 secureTextEntry={!showPassword}
                 autoCapitalize="none"
               />
@@ -210,7 +213,7 @@ export const ResetPasswordScreen: React.FC<Props> = ({ navigation, route }) => {
                 value={confirmPassword}
                 onChangeText={setConfirmPassword}
                 placeholder="Confirm new password"
-                placeholderTextColor="#999"
+                placeholderTextColor={colors.textSecondary}
                 secureTextEntry={!showConfirmPassword}
                 autoCapitalize="none"
               />
@@ -232,9 +235,9 @@ export const ResetPasswordScreen: React.FC<Props> = ({ navigation, route }) => {
                 <Icon
                   name={passwordsMatch ? 'checkmark-circle' : 'close-circle'}
                   size={16}
-                  color={passwordsMatch ? '#22c55e' : '#ef4444'}
+                  color={passwordsMatch ? colors.success : colors.error}
                 />
-                <Text style={[styles.matchText, { color: passwordsMatch ? '#22c55e' : '#ef4444' }]}>
+                <Text style={[styles.matchText, { color: passwordsMatch ? colors.success : colors.error }]}>
                   {passwordsMatch ? 'Passwords match' : 'Passwords do not match'}
                 </Text>
               </View>
@@ -247,7 +250,7 @@ export const ResetPasswordScreen: React.FC<Props> = ({ navigation, route }) => {
                 <Icon
                   name={validation.minLength ? 'checkmark-circle' : 'ellipse-outline'}
                   size={16}
-                  color={validation.minLength ? '#22c55e' : '#999'}
+                  color={validation.minLength ? colors.success : colors.textSecondary}
                 />
                 <Text
                   style={[styles.requirementText, validation.minLength && styles.requirementMet]}
@@ -259,7 +262,7 @@ export const ResetPasswordScreen: React.FC<Props> = ({ navigation, route }) => {
                 <Icon
                   name={validation.hasUppercase ? 'checkmark-circle' : 'ellipse-outline'}
                   size={16}
-                  color={validation.hasUppercase ? '#22c55e' : '#999'}
+                  color={validation.hasUppercase ? colors.success : colors.textSecondary}
                 />
                 <Text
                   style={[styles.requirementText, validation.hasUppercase && styles.requirementMet]}
@@ -271,7 +274,7 @@ export const ResetPasswordScreen: React.FC<Props> = ({ navigation, route }) => {
                 <Icon
                   name={validation.hasLowercase ? 'checkmark-circle' : 'ellipse-outline'}
                   size={16}
-                  color={validation.hasLowercase ? '#22c55e' : '#999'}
+                  color={validation.hasLowercase ? colors.success : colors.textSecondary}
                 />
                 <Text
                   style={[styles.requirementText, validation.hasLowercase && styles.requirementMet]}
@@ -283,7 +286,7 @@ export const ResetPasswordScreen: React.FC<Props> = ({ navigation, route }) => {
                 <Icon
                   name={validation.hasNumber ? 'checkmark-circle' : 'ellipse-outline'}
                   size={16}
-                  color={validation.hasNumber ? '#22c55e' : '#999'}
+                  color={validation.hasNumber ? colors.success : colors.textSecondary}
                 />
                 <Text
                   style={[styles.requirementText, validation.hasNumber && styles.requirementMet]}
@@ -296,7 +299,7 @@ export const ResetPasswordScreen: React.FC<Props> = ({ navigation, route }) => {
             {/* Error message */}
             {error && (
               <View style={styles.errorContainer}>
-                <Icon name="alert-circle" size={16} color="#ef4444" />
+                <Icon name="alert-circle" size={16} color={colors.error} />
                 <Text style={styles.errorMessage}>{error}</Text>
               </View>
             )}
@@ -319,204 +322,205 @@ export const ResetPasswordScreen: React.FC<Props> = ({ navigation, route }) => {
   );
 };
 
-const styles = StyleSheet.create({
-  backNav: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    marginBottom: 24,
-  },
-  backNavText: {
-    color: colors.primary,
-    fontSize: 16,
-    marginLeft: 4,
-  },
-  centerContainer: {
-    alignItems: 'center',
-    flex: 1,
-    justifyContent: 'center',
-    paddingHorizontal: 24,
-  },
-  container: {
-    backgroundColor: '#fff',
-    flex: 1,
-  },
-  content: {
-    flex: 1,
-  },
-  errorContainer: {
-    alignItems: 'center',
-    backgroundColor: '#fef2f2',
-    borderRadius: 8,
-    flexDirection: 'row',
-    marginBottom: 16,
-    padding: 12,
-  },
-  errorIconContainer: {
-    marginBottom: 24,
-  },
-  errorMessage: {
-    color: '#ef4444',
-    flex: 1,
-    fontSize: 14,
-    marginLeft: 8,
-  },
-  errorText: {
-    color: '#666',
-    fontSize: 14,
-    lineHeight: 20,
-    marginBottom: 32,
-    textAlign: 'center',
-  },
-  errorTitle: {
-    color: '#1a1a1a',
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 12,
-  },
-  eyeButton: {
-    padding: 16,
-  },
-  form: {
-    flex: 1,
-  },
-  header: {
-    alignItems: 'center',
-    marginBottom: 32,
-  },
-  iconContainer: {
-    alignItems: 'center',
-    backgroundColor: colors.primary + '15',
-    borderRadius: 40,
-    height: 80,
-    justifyContent: 'center',
-    marginBottom: 16,
-    width: 80,
-  },
-  input: {
-    color: '#1a1a1a',
-    flex: 1,
-    fontSize: 16,
-    padding: 16,
-  },
-  inputContainer: {
-    alignItems: 'center',
-    borderColor: '#e0e0e0',
-    borderRadius: 12,
-    borderWidth: 1,
-    flexDirection: 'row',
-    marginBottom: 16,
-  },
-  label: {
-    color: '#1a1a1a',
-    fontSize: 14,
-    fontWeight: '600',
-    marginBottom: 8,
-  },
-  matchIndicator: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    marginBottom: 16,
-  },
-  matchText: {
-    fontSize: 12,
-    marginLeft: 6,
-  },
-  primaryButton: {
-    alignItems: 'center',
-    backgroundColor: colors.primary,
-    borderRadius: 12,
-    marginBottom: 16,
-    paddingHorizontal: 48,
-    paddingVertical: 16,
-    width: '100%',
-  },
-  primaryButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  requirementMet: {
-    color: '#22c55e',
-  },
-  requirementRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    marginBottom: 8,
-  },
-  requirementText: {
-    color: '#666',
-    fontSize: 13,
-    marginLeft: 8,
-  },
-  requirementsContainer: {
-    backgroundColor: '#f5f5f5',
-    borderRadius: 12,
-    marginBottom: 24,
-    padding: 16,
-  },
-  requirementsTitle: {
-    color: '#1a1a1a',
-    fontSize: 14,
-    fontWeight: '600',
-    marginBottom: 12,
-  },
-  scrollContent: {
-    flexGrow: 1,
-    padding: 24,
-  },
-  secondaryButton: {
-    alignItems: 'center',
-    borderRadius: 12,
-    paddingHorizontal: 48,
-    paddingVertical: 16,
-    width: '100%',
-  },
-  secondaryButtonText: {
-    color: colors.primary,
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  submitButton: {
-    alignItems: 'center',
-    backgroundColor: colors.primary,
-    borderRadius: 12,
-    padding: 16,
-  },
-  submitButtonDisabled: {
-    opacity: 0.5,
-  },
-  submitButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  subtitle: {
-    color: '#666',
-    fontSize: 14,
-    textAlign: 'center',
-  },
-  successIconContainer: {
-    marginBottom: 24,
-  },
-  successText: {
-    color: '#666',
-    fontSize: 14,
-    lineHeight: 20,
-    marginBottom: 32,
-    textAlign: 'center',
-  },
-  successTitle: {
-    color: '#1a1a1a',
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 12,
-  },
-  title: {
-    color: '#1a1a1a',
-    fontSize: 28,
-    fontWeight: 'bold',
-    marginBottom: 8,
-  },
-});
+const createStyles = (colors: ReturnType<typeof import('../../hooks').useTheme>['colors']) =>
+  StyleSheet.create({
+    backNav: {
+      alignItems: 'center',
+      flexDirection: 'row',
+      marginBottom: 24,
+    },
+    backNavText: {
+      color: colors.primary,
+      fontSize: 16,
+      marginLeft: 4,
+    },
+    centerContainer: {
+      alignItems: 'center',
+      flex: 1,
+      justifyContent: 'center',
+      paddingHorizontal: 24,
+    },
+    container: {
+      backgroundColor: colors.background,
+      flex: 1,
+    },
+    content: {
+      flex: 1,
+    },
+    errorContainer: {
+      alignItems: 'center',
+      backgroundColor: colors.error + '15',
+      borderRadius: 8,
+      flexDirection: 'row',
+      marginBottom: 16,
+      padding: 12,
+    },
+    errorIconContainer: {
+      marginBottom: 24,
+    },
+    errorMessage: {
+      color: colors.error,
+      flex: 1,
+      fontSize: 14,
+      marginLeft: 8,
+    },
+    errorText: {
+      color: colors.textSecondary,
+      fontSize: 14,
+      lineHeight: 20,
+      marginBottom: 32,
+      textAlign: 'center',
+    },
+    errorTitle: {
+      color: colors.text,
+      fontSize: 24,
+      fontWeight: 'bold',
+      marginBottom: 12,
+    },
+    eyeButton: {
+      padding: 16,
+    },
+    form: {
+      flex: 1,
+    },
+    header: {
+      alignItems: 'center',
+      marginBottom: 32,
+    },
+    iconContainer: {
+      alignItems: 'center',
+      backgroundColor: colors.primary + '15',
+      borderRadius: 40,
+      height: 80,
+      justifyContent: 'center',
+      marginBottom: 16,
+      width: 80,
+    },
+    input: {
+      color: colors.text,
+      flex: 1,
+      fontSize: 16,
+      padding: 16,
+    },
+    inputContainer: {
+      alignItems: 'center',
+      borderColor: colors.border,
+      borderRadius: 12,
+      borderWidth: 1,
+      flexDirection: 'row',
+      marginBottom: 16,
+    },
+    label: {
+      color: colors.text,
+      fontSize: 14,
+      fontWeight: '600',
+      marginBottom: 8,
+    },
+    matchIndicator: {
+      alignItems: 'center',
+      flexDirection: 'row',
+      marginBottom: 16,
+    },
+    matchText: {
+      fontSize: 12,
+      marginLeft: 6,
+    },
+    primaryButton: {
+      alignItems: 'center',
+      backgroundColor: colors.primary,
+      borderRadius: 12,
+      marginBottom: 16,
+      paddingHorizontal: 48,
+      paddingVertical: 16,
+      width: '100%',
+    },
+    primaryButtonText: {
+      color: colors.white,
+      fontSize: 16,
+      fontWeight: '600',
+    },
+    requirementMet: {
+      color: colors.success,
+    },
+    requirementRow: {
+      alignItems: 'center',
+      flexDirection: 'row',
+      marginBottom: 8,
+    },
+    requirementText: {
+      color: colors.textSecondary,
+      fontSize: 13,
+      marginLeft: 8,
+    },
+    requirementsContainer: {
+      backgroundColor: colors.surface,
+      borderRadius: 12,
+      marginBottom: 24,
+      padding: 16,
+    },
+    requirementsTitle: {
+      color: colors.text,
+      fontSize: 14,
+      fontWeight: '600',
+      marginBottom: 12,
+    },
+    scrollContent: {
+      flexGrow: 1,
+      padding: 24,
+    },
+    secondaryButton: {
+      alignItems: 'center',
+      borderRadius: 12,
+      paddingHorizontal: 48,
+      paddingVertical: 16,
+      width: '100%',
+    },
+    secondaryButtonText: {
+      color: colors.primary,
+      fontSize: 16,
+      fontWeight: '600',
+    },
+    submitButton: {
+      alignItems: 'center',
+      backgroundColor: colors.primary,
+      borderRadius: 12,
+      padding: 16,
+    },
+    submitButtonDisabled: {
+      opacity: 0.5,
+    },
+    submitButtonText: {
+      color: colors.white,
+      fontSize: 16,
+      fontWeight: '600',
+    },
+    subtitle: {
+      color: colors.textSecondary,
+      fontSize: 14,
+      textAlign: 'center',
+    },
+    successIconContainer: {
+      marginBottom: 24,
+    },
+    successText: {
+      color: colors.textSecondary,
+      fontSize: 14,
+      lineHeight: 20,
+      marginBottom: 32,
+      textAlign: 'center',
+    },
+    successTitle: {
+      color: colors.text,
+      fontSize: 24,
+      fontWeight: 'bold',
+      marginBottom: 12,
+    },
+    title: {
+      color: colors.text,
+      fontSize: 28,
+      fontWeight: 'bold',
+      marginBottom: 8,
+    },
+  });
 
 export default ResetPasswordScreen;

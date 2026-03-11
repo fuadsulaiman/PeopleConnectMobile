@@ -53,6 +53,12 @@ export type ProfileStackParamList = {
   Devices: undefined;
   DataExport: undefined;
   Notifications: undefined;
+  HelpSupport: undefined;
+  About: undefined;
+  BlockedUsers: undefined;
+  StorageUsage: undefined;
+  AutoDownload: undefined;
+  DeleteAccount: undefined;
 };
 
 // Main Tab Navigator

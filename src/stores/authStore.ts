@@ -101,11 +101,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
       // Check if 2FA is required
       if (response.requiresTwoFactor) {
-        // For 2FA, we need a way to get the temp token
-        // The userId from the response is used as identifier
+        // The user ID for 2FA verification comes from response.user.id
+        const userId = response.user?.id || (response as any).userId || username;
         set({
           requiresTwoFactor: true,
-          tempToken: (response as any).userId || username,
+          tempToken: userId,
           isLoading: false,
         });
         return false;
@@ -201,40 +201,65 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   verify2FA: async (userId: string, code: string) => {
     set({ isLoading: true, error: null });
     try {
-      const auth = getAuthService();
       const storeTokens = getStoreTokens();
       const signalRService = getSignalRService();
-      const response = await auth.verifyTwoFactor({ userId, code });
+      const auth = getAuthService();
 
-      if (response.user && response.accessToken && response.refreshToken) {
-        await storeTokens(response.accessToken, response.refreshToken);
+      // Bypass SDK - call backend directly because SDK uses wrong endpoint
+      // Backend endpoint: POST /api/auth/2fa/verify
+      const { config } = require('../constants');
+      const verifyResponse = await fetch(config.API_BASE_URL + '/auth/2fa/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, code, isBackupCode: false }),
+      });
 
-        // Normalize user object
-        const user: User = {
-          id: response.user.id,
-          username: response.user.username,
-          email: response.user.email || '',
-          displayName: response.user.name,
-          name: response.user.name,
-          avatarUrl: response.user.avatarUrl,
-          bio: response.user.description,
-          statusMessage: response.user.statusMessage,
-          isOnline: true,
-        };
+      const verifyJson = await verifyResponse.json();
 
-        set({
-          user,
-          isAuthenticated: true,
-          isLoading: false,
-          requiresTwoFactor: false,
-          tempToken: null,
-        });
-        await signalRService.connect();
-        return true;
+      if (!verifyResponse.ok || !verifyJson.success) {
+        throw new Error(verifyJson.message || 'Invalid verification code');
       }
 
-      set({ isLoading: false });
-      return false;
+      const data = verifyJson.data || verifyJson;
+      const accessToken = data.accessToken;
+      const refreshToken = data.refreshToken;
+
+      if (!accessToken || !refreshToken) {
+        throw new Error('No tokens received from 2FA verification');
+      }
+
+      await storeTokens(accessToken, refreshToken);
+
+      // Fetch current user profile with the new token
+      const userResponse = await fetch(config.API_BASE_URL + '/auth/me', {
+        method: 'GET',
+        headers: { Authorization: 'Bearer ' + accessToken },
+      });
+
+      const userJson = await userResponse.json();
+      const userData = userJson.data || userJson;
+
+      const user: User = {
+        id: userData.id,
+        username: userData.username,
+        email: userData.email || '',
+        displayName: userData.name,
+        name: userData.name,
+        avatarUrl: userData.avatarUrl,
+        bio: userData.description,
+        statusMessage: userData.statusMessage,
+        isOnline: true,
+      };
+
+      set({
+        user,
+        isAuthenticated: true,
+        isLoading: false,
+        requiresTwoFactor: false,
+        tempToken: null,
+      });
+      await signalRService.connect();
+      return true;
     } catch (error: any) {
       set({ error: error.message || '2FA verification failed', isLoading: false });
       return false;

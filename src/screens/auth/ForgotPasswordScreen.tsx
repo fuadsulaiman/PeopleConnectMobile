@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -19,10 +19,13 @@ const getAuth = () => {
 };
 const auth = { forgotPassword: (email: string) => getAuth().forgotPassword(email) };
 import { LoadingScreen } from '../../components/common/LoadingScreen';
+import { useTheme } from '../../hooks';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'ForgotPassword'>;
 
 export const ForgotPasswordScreen: React.FC<Props> = ({ navigation }) => {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [email, setEmail] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isEmailSent, setIsEmailSent] = useState(false);
@@ -95,7 +98,7 @@ export const ForgotPasswordScreen: React.FC<Props> = ({ navigation }) => {
             value={email}
             onChangeText={setEmail}
             placeholder="Enter your email"
-            placeholderTextColor="#999"
+            placeholderTextColor={colors.textSecondary}
             keyboardType="email-address"
             autoCapitalize="none"
             autoCorrect={false}
@@ -110,15 +113,15 @@ export const ForgotPasswordScreen: React.FC<Props> = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof import('../../hooks').useTheme>['colors']) => StyleSheet.create({
   backButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: colors.primary,
     borderRadius: 12,
     paddingHorizontal: 48,
     paddingVertical: 16,
   },
   backButtonText: {
-    color: '#fff',
+    color: colors.white,
     fontSize: 16,
     fontWeight: '600',
   },
@@ -126,11 +129,11 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   backNavText: {
-    color: '#007AFF',
+    color: colors.primary,
     fontSize: 16,
   },
   container: {
-    backgroundColor: '#fff',
+    backgroundColor: colors.background,
     flex: 1,
   },
   content: {
@@ -144,33 +147,33 @@ const styles = StyleSheet.create({
     marginBottom: 32,
   },
   input: {
-    borderColor: '#e0e0e0',
+    borderColor: colors.border,
     borderRadius: 12,
     borderWidth: 1,
-    color: '#1a1a1a',
+    color: colors.text,
     fontSize: 16,
     marginBottom: 24,
     padding: 16,
   },
   label: {
-    color: '#1a1a1a',
+    color: colors.text,
     fontSize: 14,
     fontWeight: '600',
     marginBottom: 8,
   },
   submitButton: {
     alignItems: 'center',
-    backgroundColor: '#007AFF',
+    backgroundColor: colors.primary,
     borderRadius: 12,
     padding: 16,
   },
   submitButtonText: {
-    color: '#fff',
+    color: colors.white,
     fontSize: 16,
     fontWeight: '600',
   },
   subtitle: {
-    color: '#666',
+    color: colors.textSecondary,
     fontSize: 14,
     lineHeight: 20,
   },
@@ -184,7 +187,7 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   successText: {
-    color: '#666',
+    color: colors.textSecondary,
     fontSize: 14,
     lineHeight: 20,
     marginBottom: 32,
@@ -192,13 +195,13 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   successTitle: {
-    color: '#1a1a1a',
+    color: colors.text,
     fontSize: 24,
     fontWeight: 'bold',
     marginBottom: 12,
   },
   title: {
-    color: '#1a1a1a',
+    color: colors.text,
     fontSize: 28,
     fontWeight: 'bold',
     marginBottom: 8,

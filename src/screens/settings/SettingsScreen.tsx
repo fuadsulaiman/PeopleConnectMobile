@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Ionicons';
@@ -6,6 +6,7 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { ProfileStackParamList } from '../../navigation/types';
 import { useTheme } from '../../hooks';
 import { useAuthStore } from '../../stores/authStore';
+import { useThemeStore } from '../../stores/themeStore';
 
 type Props = NativeStackScreenProps<ProfileStackParamList, 'Settings'>;
 
@@ -23,25 +24,7 @@ const SettingsScreen: React.FC<Props> = ({ navigation }) => {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { logout: _logout } = useAuthStore();
-
-  const [darkMode, setDarkMode] = useState(false);
-
-  const handleDeleteAccount = () => {
-    Alert.alert(
-      'Delete Account',
-      'Are you sure you want to delete your account? This action cannot be undone.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: () => {
-            Alert.alert('Info', 'Account deletion is not available in this version.');
-          },
-        },
-      ]
-    );
-  };
+  const { isDarkMode, setDarkMode } = useThemeStore();
 
   const sections: { title: string; items: SettingItem[] }[] = [
     {
@@ -97,8 +80,7 @@ const SettingsScreen: React.FC<Props> = ({ navigation }) => {
           title: 'Blocked Users',
           type: 'navigation',
           iconColor: colors.error,
-          onPress: () =>
-            Alert.alert('Coming Soon', 'Blocked users management will be available soon.'),
+          onPress: () => navigation.navigate('BlockedUsers'),
         },
       ],
     },
@@ -109,9 +91,9 @@ const SettingsScreen: React.FC<Props> = ({ navigation }) => {
           icon: 'moon-outline',
           title: 'Dark Mode',
           type: 'toggle',
-          value: darkMode,
+          value: isDarkMode,
           iconColor: colors.textSecondary,
-          onToggle: setDarkMode,
+          onToggle: (value: boolean) => setDarkMode(value),
         },
       ],
     },
@@ -123,15 +105,14 @@ const SettingsScreen: React.FC<Props> = ({ navigation }) => {
           title: 'Storage Usage',
           type: 'navigation',
           iconColor: colors.primary,
-          onPress: () => Alert.alert('Coming Soon', 'Storage management will be available soon.'),
+          onPress: () => navigation.navigate('StorageUsage'),
         },
         {
           icon: 'download-outline',
           title: 'Auto-Download Media',
           type: 'navigation',
           iconColor: colors.success,
-          onPress: () =>
-            Alert.alert('Coming Soon', 'Auto-download settings will be available soon.'),
+          onPress: () => navigation.navigate('AutoDownload'),
         },
         {
           icon: 'trash-outline',
@@ -155,14 +136,14 @@ const SettingsScreen: React.FC<Props> = ({ navigation }) => {
           title: 'Help & Support',
           type: 'navigation',
           iconColor: colors.primary,
-          onPress: () => Alert.alert('Help', 'For support, please contact support@example.com'),
+          onPress: () => navigation.navigate('HelpSupport'),
         },
         {
           icon: 'information-circle-outline',
           title: 'About',
           type: 'navigation',
           iconColor: colors.textSecondary,
-          onPress: () => Alert.alert('About', 'PeopleConnect Mobile v1.0.0'),
+          onPress: () => navigation.navigate('About'),
         },
       ],
     },
@@ -174,14 +155,14 @@ const SettingsScreen: React.FC<Props> = ({ navigation }) => {
           title: 'Export My Data',
           type: 'action',
           iconColor: colors.primary,
-          onPress: () => Alert.alert('Coming Soon', 'Data export will be available soon.'),
+          onPress: () => navigation.navigate('DataExport'),
         },
         {
           icon: 'close-circle-outline',
           title: 'Delete Account',
           type: 'action',
           iconColor: colors.error,
-          onPress: handleDeleteAccount,
+          onPress: () => navigation.navigate('DeleteAccount'),
         },
       ],
     },

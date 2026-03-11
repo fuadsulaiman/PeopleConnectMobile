@@ -1,4 +1,4 @@
-import React, { useEffect, useCallback } from 'react';
+import React, { useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -23,10 +23,13 @@ const conversationsApi = { unarchive: (id: string) => getConversations().unarchi
 import { Conversation } from '../../types';
 import { Avatar } from '../../components/common/Avatar';
 import { EmptyState } from '../../components/common/EmptyState';
+import { useTheme } from '../../hooks';
 
 type Props = NativeStackScreenProps<ChatStackParamList, 'ArchivedConversations'>;
 
 export const ArchivedConversationsScreen: React.FC<Props> = ({ navigation }) => {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const { archivedConversations, isLoading, fetchArchivedConversations, updateConversation } =
     chatStoreModule.useChatStore();
 
@@ -133,13 +136,13 @@ export const ArchivedConversationsScreen: React.FC<Props> = ({ navigation }) => 
             style={[styles.actionButton, styles.unarchiveButton]}
             onPress={() => handleUnarchive(item)}
           >
-            <Icon name="arrow-undo-outline" size={20} color="#6366f1" />
+            <Icon name="arrow-undo-outline" size={20} color={colors.primary} />
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.actionButton, styles.deleteButton]}
             onPress={() => handleDelete(item)}
           >
-            <Icon name="trash-outline" size={20} color="#ef4444" />
+            <Icon name="trash-outline" size={20} color={colors.error} />
           </TouchableOpacity>
         </View>
       </View>
@@ -150,7 +153,7 @@ export const ArchivedConversationsScreen: React.FC<Props> = ({ navigation }) => 
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-          <Icon name="arrow-back" size={24} color="#1a1a1a" />
+          <Icon name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Archived</Text>
         <View style={styles.placeholder} />
@@ -167,13 +170,13 @@ export const ArchivedConversationsScreen: React.FC<Props> = ({ navigation }) => 
           <RefreshControl
             refreshing={isLoading}
             onRefresh={fetchArchivedConversations}
-            tintColor="#007AFF"
+            tintColor={colors.primary}
           />
         }
         ListEmptyComponent={
           !isLoading ? (
             <EmptyState
-              icon={<Icon name="archive-outline" size={64} color="#ccc" />}
+              icon={<Icon name="archive-outline" size={64} color={colors.textTertiary} />}
               title="No Archived Conversations"
               message="Archived conversations will appear here"
             />
@@ -184,93 +187,94 @@ export const ArchivedConversationsScreen: React.FC<Props> = ({ navigation }) => 
   );
 };
 
-const styles = StyleSheet.create({
-  actionButton: {
-    alignItems: 'center',
-    borderRadius: 18,
-    height: 36,
-    justifyContent: 'center',
-    width: 36,
-  },
-  actionButtons: {
-    flexDirection: 'row',
-    gap: 8,
-    paddingRight: 12,
-  },
-  backButton: {
-    alignItems: 'center',
-    height: 40,
-    justifyContent: 'center',
-    width: 40,
-  },
-  container: {
-    backgroundColor: '#fff',
-    flex: 1,
-  },
-  conversationContent: {
-    flex: 1,
-    marginLeft: 12,
-  },
-  conversationHeader: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 4,
-  },
-  conversationItem: {
-    alignItems: 'center',
-    flex: 1,
-    flexDirection: 'row',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  conversationName: {
-    color: '#1a1a1a',
-    flex: 1,
-    fontSize: 16,
-    fontWeight: '600',
-    marginRight: 8,
-  },
-  conversationRow: {
-    alignItems: 'center',
-    borderBottomColor: '#f5f5f5',
-    borderBottomWidth: 1,
-    flexDirection: 'row',
-  },
-  conversationTime: {
-    color: '#999',
-    fontSize: 12,
-  },
-  deleteButton: {
-    backgroundColor: '#fef2f2',
-  },
-  emptyContainer: {
-    flex: 1,
-  },
-  header: {
-    alignItems: 'center',
-    borderBottomColor: '#f0f0f0',
-    borderBottomWidth: 1,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  headerTitle: {
-    color: '#1a1a1a',
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  lastMessage: {
-    color: '#666',
-    fontSize: 14,
-  },
-  placeholder: {
-    width: 40,
-  },
-  unarchiveButton: {
-    backgroundColor: '#eef2ff',
-  },
-});
+const createStyles = (colors: ReturnType<typeof import('../../hooks').useTheme>['colors']) =>
+  StyleSheet.create({
+    actionButton: {
+      alignItems: 'center',
+      borderRadius: 18,
+      height: 36,
+      justifyContent: 'center',
+      width: 36,
+    },
+    actionButtons: {
+      flexDirection: 'row',
+      gap: 8,
+      paddingRight: 12,
+    },
+    backButton: {
+      alignItems: 'center',
+      height: 40,
+      justifyContent: 'center',
+      width: 40,
+    },
+    container: {
+      backgroundColor: colors.background,
+      flex: 1,
+    },
+    conversationContent: {
+      flex: 1,
+      marginLeft: 12,
+    },
+    conversationHeader: {
+      alignItems: 'center',
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      marginBottom: 4,
+    },
+    conversationItem: {
+      alignItems: 'center',
+      flex: 1,
+      flexDirection: 'row',
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+    },
+    conversationName: {
+      color: colors.text,
+      flex: 1,
+      fontSize: 16,
+      fontWeight: '600',
+      marginRight: 8,
+    },
+    conversationRow: {
+      alignItems: 'center',
+      borderBottomColor: colors.border,
+      borderBottomWidth: 1,
+      flexDirection: 'row',
+    },
+    conversationTime: {
+      color: colors.textSecondary,
+      fontSize: 12,
+    },
+    deleteButton: {
+      backgroundColor: colors.error + '15',
+    },
+    emptyContainer: {
+      flex: 1,
+    },
+    header: {
+      alignItems: 'center',
+      borderBottomColor: colors.border,
+      borderBottomWidth: 1,
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+    },
+    headerTitle: {
+      color: colors.text,
+      fontSize: 18,
+      fontWeight: '600',
+    },
+    lastMessage: {
+      color: colors.textSecondary,
+      fontSize: 14,
+    },
+    placeholder: {
+      width: 40,
+    },
+    unarchiveButton: {
+      backgroundColor: colors.primary + '15',
+    },
+  });
 
 export default ArchivedConversationsScreen;

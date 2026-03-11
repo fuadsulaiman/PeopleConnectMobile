@@ -62,6 +62,17 @@ import NotificationSettingsScreen from '../screens/settings/NotificationSettings
 // Devices Screen - default import
 import DevicesScreen from '../screens/devices/DevicesScreen';
 
+// Help & About Screens - default imports
+import HelpSupportScreen from '../screens/settings/HelpSupportScreen';
+import AboutScreen from '../screens/settings/AboutScreen';
+
+// Additional Settings Screens
+import BlockedUsersScreen from '../screens/settings/BlockedUsersScreen';
+import StorageUsageScreen from '../screens/settings/StorageUsageScreen';
+import AutoDownloadScreen from '../screens/settings/AutoDownloadScreen';
+import DeleteAccountScreen from '../screens/settings/DeleteAccountScreen';
+import DataExportScreen from '../screens/settings/DataExportScreen';
+
 // Notifications Screen - default import
 import NotificationsScreen from '../screens/notifications/NotificationsScreen';
 
@@ -199,6 +210,13 @@ const ProfileTabNavigator: React.FC = () => (
     <ProfileStack.Screen name="PrivacySettings" component={PrivacySettingsScreen} />
     <ProfileStack.Screen name="NotificationSettings" component={NotificationSettingsScreen} />
     <ProfileStack.Screen name="Devices" component={DevicesScreen} />
+    <ProfileStack.Screen name="HelpSupport" component={HelpSupportScreen} />
+    <ProfileStack.Screen name="About" component={AboutScreen} />
+    <ProfileStack.Screen name="BlockedUsers" component={BlockedUsersScreen} />
+    <ProfileStack.Screen name="StorageUsage" component={StorageUsageScreen} />
+    <ProfileStack.Screen name="AutoDownload" component={AutoDownloadScreen} />
+    <ProfileStack.Screen name="DeleteAccount" component={DeleteAccountScreen} />
+    <ProfileStack.Screen name="DataExport" component={DataExportScreen} />
   </ProfileStack.Navigator>
 );
 

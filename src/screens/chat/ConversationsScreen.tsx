@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { Swipeable } from 'react-native-gesture-handler';
+import { Swipeable, TouchableOpacity as GHTouchableOpacity } from 'react-native-gesture-handler';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { ChatStackParamList } from '../../navigation/types';
 import { useNavigation } from '@react-navigation/native';
@@ -78,6 +78,16 @@ export const ConversationsScreen: React.FC<Props> = ({ navigation }) => {
   useEffect(() => {
     fetchConversations();
   }, [fetchConversations]);
+
+  // Close all swipeables when conversations reload to prevent stuck gesture states
+  const closeAllSwipeables = useCallback(() => {
+    swipeableRefs.current.forEach((ref) => ref?.close());
+  }, []);
+
+  const handleRefresh = useCallback(() => {
+    closeAllSwipeables();
+    fetchConversations();
+  }, [closeAllSwipeables, fetchConversations]);
 
   const handleConversationPress = useCallback(
     (conversation: Conversation) => {
@@ -342,8 +352,12 @@ export const ConversationsScreen: React.FC<Props> = ({ navigation }) => {
       }
     }
 
+    // Use GHTouchableOpacity inside Swipeable to avoid gesture conflicts
+    // that cause items to become unclickable after pull-to-refresh
+    const ItemTouchable = isPlatform ? TouchableOpacity : GHTouchableOpacity;
+
     const conversationContent = (
-      <TouchableOpacity
+      <ItemTouchable
         style={[
           styles.conversationItem,
           isBroadcast && styles.broadcastItem,
@@ -447,7 +461,7 @@ export const ConversationsScreen: React.FC<Props> = ({ navigation }) => {
             )}
           </View>
         </View>
-      </TouchableOpacity>
+      </ItemTouchable>
     );
 
     // Platform channels don't have swipe actions
@@ -506,7 +520,7 @@ export const ConversationsScreen: React.FC<Props> = ({ navigation }) => {
         refreshControl={
           <RefreshControl
             refreshing={isLoading}
-            onRefresh={fetchConversations}
+            onRefresh={handleRefresh}
             tintColor={colors.primary}
           />
         }

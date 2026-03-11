@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -13,6 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { AuthStackParamList } from '../../navigation/types';
 import { useAuthStore } from '../../stores/authStore';
+import { useTheme } from '../../hooks';
 import { LoadingScreen } from '../../components/common/LoadingScreen';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'TwoFactor'>;
@@ -23,6 +24,8 @@ export const TwoFactorScreen: React.FC<Props> = ({ route }) => {
   const [isLoading, setIsLoading] = useState(false);
   const inputRefs = useRef<(TextInput | null)[]>([]);
   const verify2FA = useAuthStore((state) => state.verify2FA);
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const handleCodeChange = (text: string, index: number) => {
     const newCode = [...code];
@@ -61,10 +64,6 @@ export const TwoFactorScreen: React.FC<Props> = ({ route }) => {
     }
   };
 
-  const handleResendCode = () => {
-    Alert.alert('Code Sent', 'A new verification code has been sent to your device');
-  };
-
   if (isLoading) {
     return <LoadingScreen message="Verifying..." />;
   }
@@ -92,6 +91,7 @@ export const TwoFactorScreen: React.FC<Props> = ({ route }) => {
               keyboardType="number-pad"
               maxLength={1}
               autoFocus={index === 0}
+              placeholderTextColor={colors.textTertiary}
             />
           ))}
         </View>
@@ -99,76 +99,65 @@ export const TwoFactorScreen: React.FC<Props> = ({ route }) => {
         <TouchableOpacity style={styles.verifyButton} onPress={handleVerify}>
           <Text style={styles.verifyButtonText}>Verify</Text>
         </TouchableOpacity>
-
-        <TouchableOpacity style={styles.resendButton} onPress={handleResendCode}>
-          <Text style={styles.resendButtonText}>Resend Code</Text>
-        </TouchableOpacity>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
 };
 
-const styles = StyleSheet.create({
-  codeContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 32,
-  },
-  codeInput: {
-    borderColor: '#e0e0e0',
-    borderRadius: 12,
-    borderWidth: 2,
-    color: '#1a1a1a',
-    fontSize: 24,
-    fontWeight: 'bold',
-    height: 56,
-    textAlign: 'center',
-    width: 48,
-  },
-  container: {
-    backgroundColor: '#fff',
-    flex: 1,
-  },
-  content: {
-    flex: 1,
-    justifyContent: 'center',
-    padding: 24,
-  },
-  header: {
-    alignItems: 'center',
-    marginBottom: 40,
-  },
-  resendButton: {
-    alignItems: 'center',
-    padding: 16,
-  },
-  resendButtonText: {
-    color: '#007AFF',
-    fontSize: 14,
-  },
-  subtitle: {
-    color: '#666',
-    fontSize: 14,
-    textAlign: 'center',
-  },
-  title: {
-    color: '#1a1a1a',
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 8,
-  },
-  verifyButton: {
-    alignItems: 'center',
-    backgroundColor: '#007AFF',
-    borderRadius: 12,
-    marginBottom: 16,
-    padding: 16,
-  },
-  verifyButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-});
+const createStyles = (colors: ReturnType<typeof import('../../hooks').useTheme>['colors']) =>
+  StyleSheet.create({
+    codeContainer: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      marginBottom: 32,
+    },
+    codeInput: {
+      borderColor: colors.border,
+      borderRadius: 12,
+      borderWidth: 2,
+      color: colors.text,
+      fontSize: 24,
+      fontWeight: 'bold',
+      height: 56,
+      textAlign: 'center',
+      width: 48,
+    },
+    container: {
+      backgroundColor: colors.background,
+      flex: 1,
+    },
+    content: {
+      flex: 1,
+      justifyContent: 'center',
+      padding: 24,
+    },
+    header: {
+      alignItems: 'center',
+      marginBottom: 40,
+    },
+    subtitle: {
+      color: colors.textSecondary,
+      fontSize: 14,
+      textAlign: 'center',
+    },
+    title: {
+      color: colors.text,
+      fontSize: 24,
+      fontWeight: 'bold',
+      marginBottom: 8,
+    },
+    verifyButton: {
+      alignItems: 'center',
+      backgroundColor: colors.primary,
+      borderRadius: 12,
+      marginBottom: 16,
+      padding: 16,
+    },
+    verifyButtonText: {
+      color: colors.white,
+      fontSize: 16,
+      fontWeight: '600',
+    },
+  });
 
 export default TwoFactorScreen;

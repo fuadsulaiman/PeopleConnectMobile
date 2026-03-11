@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -11,7 +11,7 @@ const getAuth = () => {
 };
 const auth = { verifyEmail: (token: string) => getAuth().verifyEmail(token), resendVerification: (email: string) => getAuth().resendVerification(email) };
 import { LoadingScreen } from '../../components/common/LoadingScreen';
-import { colors } from '../../constants';
+import { useTheme } from '../../hooks';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'VerifyEmail'>;
 
@@ -22,6 +22,8 @@ export const VerifyEmailScreen: React.FC<Props> = ({ navigation, route }) => {
   const [error, setError] = useState<string | null>(null);
   const [isResending, setIsResending] = useState(false);
   const [resendSuccess, setResendSuccess] = useState(false);
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const token = route.params?.token;
   const email = route.params?.email;
@@ -89,7 +91,7 @@ export const VerifyEmailScreen: React.FC<Props> = ({ navigation, route }) => {
         <View style={styles.content}>
           <View style={styles.centerContainer}>
             <View style={styles.successIconContainer}>
-              <Icon name="checkmark-circle" size={96} color="#22c55e" />
+              <Icon name="checkmark-circle" size={96} color={colors.success} />
             </View>
             <Text style={styles.successTitle}>Email Verified!</Text>
             <Text style={styles.successText}>
@@ -128,15 +130,15 @@ export const VerifyEmailScreen: React.FC<Props> = ({ navigation, route }) => {
             <View style={styles.tipsContainer}>
               <Text style={styles.tipsTitle}>Did not receive the email?</Text>
               <View style={styles.tipRow}>
-                <Icon name="ellipse" size={6} color="#3b82f6" style={styles.tipBullet} />
+                <Icon name="ellipse" size={6} color={colors.info} style={styles.tipBullet} />
                 <Text style={styles.tipText}>Check your spam or junk folder</Text>
               </View>
               <View style={styles.tipRow}>
-                <Icon name="ellipse" size={6} color="#3b82f6" style={styles.tipBullet} />
+                <Icon name="ellipse" size={6} color={colors.info} style={styles.tipBullet} />
                 <Text style={styles.tipText}>Make sure you entered the correct email</Text>
               </View>
               <View style={styles.tipRow}>
-                <Icon name="ellipse" size={6} color="#3b82f6" style={styles.tipBullet} />
+                <Icon name="ellipse" size={6} color={colors.info} style={styles.tipBullet} />
                 <Text style={styles.tipText}>Wait a few minutes for delivery</Text>
               </View>
             </View>
@@ -144,7 +146,7 @@ export const VerifyEmailScreen: React.FC<Props> = ({ navigation, route }) => {
             {/* Resend Success Message */}
             {resendSuccess && (
               <View style={styles.successMessageContainer}>
-                <Icon name="checkmark-circle" size={16} color="#22c55e" />
+                <Icon name="checkmark-circle" size={16} color={colors.success} />
                 <Text style={styles.successMessage}>Verification email sent successfully!</Text>
               </View>
             )}
@@ -187,7 +189,7 @@ export const VerifyEmailScreen: React.FC<Props> = ({ navigation, route }) => {
       <View style={styles.content}>
         <View style={styles.centerContainer}>
           <View style={styles.errorIconContainer}>
-            <Icon name="alert-circle" size={96} color="#ef4444" />
+            <Icon name="alert-circle" size={96} color={colors.error} />
           </View>
           <Text style={styles.errorTitle}>Verification Failed</Text>
           <Text style={styles.errorText}>
@@ -197,7 +199,7 @@ export const VerifyEmailScreen: React.FC<Props> = ({ navigation, route }) => {
           {/* Resend Success Message */}
           {resendSuccess && (
             <View style={styles.successMessageContainer}>
-              <Icon name="checkmark-circle" size={16} color="#22c55e" />
+              <Icon name="checkmark-circle" size={16} color={colors.success} />
               <Text style={styles.successMessage}>
                 Verification email sent successfully! Please check your inbox.
               </Text>
@@ -229,9 +231,9 @@ export const VerifyEmailScreen: React.FC<Props> = ({ navigation, route }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   container: {
-    backgroundColor: '#fff',
+    backgroundColor: colors.background,
     flex: 1,
   },
   content: {
@@ -258,13 +260,13 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   successTitle: {
-    color: '#1a1a1a',
+    color: colors.text,
     fontSize: 28,
     fontWeight: 'bold',
     marginBottom: 12,
   },
   successText: {
-    color: '#666',
+    color: colors.textSecondary,
     fontSize: 16,
     lineHeight: 24,
     marginBottom: 16,
@@ -272,7 +274,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   redirectText: {
-    color: '#999',
+    color: colors.textSecondary,
     fontSize: 14,
     marginBottom: 24,
   },
@@ -281,13 +283,13 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   errorTitle: {
-    color: '#1a1a1a',
+    color: colors.text,
     fontSize: 28,
     fontWeight: 'bold',
     marginBottom: 12,
   },
   errorText: {
-    color: '#666',
+    color: colors.textSecondary,
     fontSize: 16,
     lineHeight: 24,
     marginBottom: 24,
@@ -296,13 +298,13 @@ const styles = StyleSheet.create({
   },
   // No token state
   title: {
-    color: '#1a1a1a',
+    color: colors.text,
     fontSize: 28,
     fontWeight: 'bold',
     marginBottom: 12,
   },
   subtitle: {
-    color: '#666',
+    color: colors.textSecondary,
     fontSize: 16,
     lineHeight: 24,
     marginBottom: 24,
@@ -311,8 +313,8 @@ const styles = StyleSheet.create({
   },
   // Tips container
   tipsContainer: {
-    backgroundColor: '#eff6ff',
-    borderColor: '#bfdbfe',
+    backgroundColor: colors.info + '15',
+    borderColor: colors.info + '40',
     borderRadius: 12,
     borderWidth: 1,
     marginBottom: 24,
@@ -320,7 +322,7 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   tipsTitle: {
-    color: '#1e40af',
+    color: colors.info,
     fontSize: 14,
     fontWeight: '600',
     marginBottom: 12,
@@ -334,15 +336,15 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   tipText: {
-    color: '#1e40af',
+    color: colors.info,
     flex: 1,
     fontSize: 14,
   },
   // Success message
   successMessageContainer: {
     alignItems: 'center',
-    backgroundColor: '#f0fdf4',
-    borderColor: '#bbf7d0',
+    backgroundColor: colors.success + '15',
+    borderColor: colors.success + '40',
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
@@ -351,7 +353,7 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   successMessage: {
-    color: '#166534',
+    color: colors.success,
     flex: 1,
     fontSize: 14,
     marginLeft: 8,
@@ -367,7 +369,7 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   primaryButtonText: {
-    color: '#fff',
+    color: colors.white,
     fontSize: 16,
     fontWeight: '600',
   },

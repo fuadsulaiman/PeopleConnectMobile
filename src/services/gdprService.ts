@@ -12,155 +12,69 @@ const getAccessTokenFn = (): string | null => {
   return sdk.getAccessToken();
 };
 
-export interface DataExportStatus {
-  status: 'pending' | 'processing' | 'ready' | 'expired' | 'failed';
-  requestedAt: string;
-  completedAt?: string;
-  expiresAt?: string;
-  downloadUrl?: string;
-  fileName?: string;
-  message?: string;
-}
+const getCurrentUserId = (): string | null => {
+  const authStore = require('../stores/authStore');
+  return authStore.useAuthStore.getState().user?.id || null;
+};
 
-export interface DataExportRequest {
+export interface DataExportResult {
   success: boolean;
-  message: string;
-  data: {
-    requestId: string;
-    status: string;
-    estimatedTimeInMinutes: number;
-  };
+  data: any;
+  fileName: string;
 }
 
 /**
- * Request a GDPR data export
- * This initiates an async process that generates a ZIP file of all user data
+ * Export user data for GDPR compliance
+ * Backend endpoint: GET /api/users/{id}/gdpr/export
+ * Returns JSON data directly (synchronous - not an async job)
  */
-export async function requestDataExport(): Promise<DataExportRequest> {
-  try {
-    const accessToken = getAccessTokenFn();
-    if (!accessToken) {
-      throw new Error('No access token found');
-    }
-
-    const response = await fetch(`${config.API_BASE_URL}/users/me/export-data`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        'Content-Type': 'application/json',
-      },
-    });
-
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({}));
-      throw new Error(error.message || `HTTP ${response.status}`);
-    }
-
-    const data = await response.json();
-    return data;
-  } catch (error) {
-    console.error('Error requesting data export:', error);
-    throw error;
-  }
-}
-
-/**
- * Get the status of a data export request
- * Returns the current status and download URL when ready
- */
-export async function getDataExportStatus(): Promise<DataExportStatus> {
-  try {
-    const accessToken = getAccessTokenFn();
-    if (!accessToken) {
-      throw new Error('No access token found');
-    }
-
-    const response = await fetch(`${config.API_BASE_URL}/users/me/export-status`, {
-      method: 'GET',
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
-    });
-
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({}));
-      throw new Error(error.message || `HTTP ${response.status}`);
-    }
-
-    const data = await response.json();
-
-    // Unwrap if wrapped in success/data format
-    if (data && typeof data === 'object' && 'success' in data && 'data' in data) {
-      return data.data as DataExportStatus;
-    }
-
-    return data as DataExportStatus;
-  } catch (error) {
-    console.error('Error getting data export status:', error);
-    throw error;
-  }
-}
-
-/**
- * Poll for data export status until ready or timeout
- * @param maxAttempts - Maximum number of polling attempts (default: 120, ~2 hours with 60s intervals)
- * @param intervalMs - Interval between polls in milliseconds (default: 60000, 1 minute)
- */
-export async function pollDataExportStatus(
-  maxAttempts: number = 120,
-  intervalMs: number = 60000
-): Promise<DataExportStatus> {
-  let attempts = 0;
-
-  while (attempts < maxAttempts) {
-    try {
-      const status = await getDataExportStatus();
-
-      if (status.status === 'ready' || status.status === 'failed' || status.status === 'expired') {
-        return status;
-      }
-
-      // Wait before next poll
-      await new Promise((resolve) => setTimeout(resolve, intervalMs));
-      attempts++;
-    } catch (error) {
-      console.error(`Poll attempt ${attempts + 1} failed:`, error);
-      // Continue polling even if a single attempt fails
-      await new Promise((resolve) => setTimeout(resolve, intervalMs));
-      attempts++;
-    }
-  }
-
-  throw new Error(`Data export polling timed out after ${maxAttempts} attempts`);
-}
-
-/**
- * Download the exported data file
- * @param downloadUrl - The download URL from the export status
- * @param fileName - Optional custom file name for saving
- */
-export async function downloadDataExport(
-  _downloadUrl: string,
-  fileName: string = 'peopleconnect-data-export.zip'
-): Promise<{ success: boolean; fileName: string }> {
+export async function exportUserData(): Promise<DataExportResult> {
   const accessToken = getAccessTokenFn();
   if (!accessToken) {
     throw new Error('No access token found');
   }
 
-  // For React Native, we'll need to use the share or document picker
-  // For now, return the download URL for the UI to handle
+  const userId = getCurrentUserId();
+  if (!userId) {
+    throw new Error('No user ID found');
+  }
+
+  const response = await fetch(`${config.API_BASE_URL}/users/${userId}/gdpr/export`, {
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  if (!response.ok) {
+    if (response.status === 403) {
+      throw new Error('Data export is currently disabled by the administrator');
+    }
+    if (response.status === 404) {
+      throw new Error('User not found');
+    }
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || `Export failed (HTTP ${response.status})`);
+  }
+
+  // The backend returns a JSON file directly
+  const contentDisposition = response.headers.get('content-disposition') || '';
+  const fileNameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+  const fileName = fileNameMatch
+    ? fileNameMatch[1].replace(/['"]/g, '')
+    : `gdpr-export-${new Date().toISOString().slice(0, 10)}.json`;
+
+  const data = await response.json();
+
   return {
     success: true,
+    data,
     fileName,
   };
 }
 
 export const gdprService = {
-  requestDataExport,
-  getDataExportStatus,
-  pollDataExportStatus,
-  downloadDataExport,
+  exportUserData,
 };
 
 export default gdprService;

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -14,6 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { ProfileStackParamList } from '../../navigation/types';
 import { useAuthStore } from '../../stores/authStore';
+import { useTheme } from '../../hooks';
 // CRITICAL: Do NOT import SDK at top level - it causes module initialization failures on Windows
 const getUsers = () => {
   const sdkModule = require('../../services/sdk');
@@ -33,6 +34,8 @@ import ImageResizer from 'react-native-image-resizer';
 type Props = NativeStackScreenProps<ProfileStackParamList, 'EditProfile'>;
 
 export const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const { user, setUser } = useAuthStore();
   const [displayName, setDisplayName] = useState(user?.displayName || user?.name || '');
   const [bio, setBio] = useState(user?.bio || user?.statusMessage || '');
@@ -183,7 +186,7 @@ export const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
         <Text style={styles.headerTitle}>Edit Profile</Text>
         <TouchableOpacity style={styles.saveButton} onPress={handleSave} disabled={isLoading}>
           {isLoading ? (
-            <ActivityIndicator size="small" color="#007AFF" />
+            <ActivityIndicator size="small" color={colors.primary} />
           ) : (
             <Text style={styles.saveButtonText}>Save</Text>
           )}
@@ -215,7 +218,7 @@ export const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
               value={displayName}
               onChangeText={setDisplayName}
               placeholder="Enter your display name"
-              placeholderTextColor="#999"
+              placeholderTextColor={colors.textSecondary}
               maxLength={50}
             />
           </View>
@@ -246,7 +249,7 @@ export const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
               value={bio}
               onChangeText={setBio}
               placeholder="Tell us about yourself..."
-              placeholderTextColor="#999"
+              placeholderTextColor={colors.textSecondary}
               multiline
               numberOfLines={4}
               maxLength={200}
@@ -259,9 +262,9 @@ export const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof import('../../hooks').useTheme>['colors']) => StyleSheet.create({
   avatarBadge: {
-    backgroundColor: '#007AFF',
+    backgroundColor: colors.primary,
     borderRadius: 12,
     bottom: 0,
     paddingHorizontal: 8,
@@ -270,7 +273,7 @@ const styles = StyleSheet.create({
     right: 0,
   },
   avatarBadgeText: {
-    color: '#fff',
+    color: colors.white,
     fontSize: 10,
     fontWeight: '600',
   },
@@ -282,34 +285,34 @@ const styles = StyleSheet.create({
     padding: 8,
   },
   backIcon: {
-    color: '#007AFF',
+    color: colors.primary,
     fontSize: 16,
   },
   changePhotoButton: {
     marginTop: 12,
   },
   changePhotoText: {
-    color: '#007AFF',
+    color: colors.primary,
     fontSize: 14,
     fontWeight: '600',
   },
   container: {
-    backgroundColor: '#fff',
+    backgroundColor: colors.background,
     flex: 1,
   },
   content: {
     flex: 1,
   },
   disabledInput: {
-    backgroundColor: '#f5f5f5',
-    color: '#999',
+    backgroundColor: colors.surface,
+    color: colors.textSecondary,
   },
   formSection: {
     paddingHorizontal: 16,
   },
   header: {
     alignItems: 'center',
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: colors.border,
     borderBottomWidth: 1,
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -317,20 +320,20 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   headerTitle: {
-    color: '#1a1a1a',
+    color: colors.text,
     fontSize: 18,
     fontWeight: '600',
   },
   hint: {
-    color: '#999',
+    color: colors.textSecondary,
     fontSize: 12,
     marginTop: 4,
   },
   input: {
-    borderColor: '#e0e0e0',
+    borderColor: colors.border,
     borderRadius: 12,
     borderWidth: 1,
-    color: '#1a1a1a',
+    color: colors.text,
     fontSize: 16,
     padding: 14,
   },
@@ -338,7 +341,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   label: {
-    color: '#1a1a1a',
+    color: colors.text,
     fontSize: 14,
     fontWeight: '600',
     marginBottom: 8,
@@ -347,7 +350,7 @@ const styles = StyleSheet.create({
     padding: 8,
   },
   saveButtonText: {
-    color: '#007AFF',
+    color: colors.primary,
     fontSize: 16,
     fontWeight: '600',
   },
