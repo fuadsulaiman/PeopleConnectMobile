@@ -40,7 +40,6 @@
       "@/assets/*": ["src/assets/*"]
     }
   },
-  "exclude": ["src/services/webrtcService.ts"],
   "include": [
     "src/**/*",
     "App.tsx",
