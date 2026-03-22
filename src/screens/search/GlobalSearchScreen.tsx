@@ -114,6 +114,33 @@ const GlobalSearchScreen: React.FC<GlobalSearchScreenProps> = ({ navigation }) =
       // Normalize the response data
       const data = response as any;
 
+      // Defense-in-depth: filter out messages that should not appear in search results
+      const now = new Date();
+      const filteredMessages = (data.messages || []).filter((m: any) => {
+        // Exclude view-once messages
+        if (m.isViewOnce || m.IsViewOnce || m.viewOnce) {
+          return false;
+        }
+        // Exclude expired disappearing messages
+        const expiresAt = m.expiresAt || m.ExpiresAt;
+        if (expiresAt && new Date(expiresAt) < now) {
+          return false;
+        }
+        // Exclude deleted messages
+        if (m.deletedAt || m.DeletedAt || m.isDeleted || m.IsDeleted) {
+          return false;
+        }
+        return true;
+      });
+
+      // Defense-in-depth: filter out deleted conversations
+      const filteredConversations = (data.conversations || []).filter((c: any) => {
+        if (c.deletedAt || c.DeletedAt || c.isDeleted || c.IsDeleted) {
+          return false;
+        }
+        return true;
+      });
+
       setResults({
         users: (data.users || []).map((u: any) => ({
           id: u.id,
@@ -124,7 +151,7 @@ const GlobalSearchScreen: React.FC<GlobalSearchScreenProps> = ({ navigation }) =
           isOnline: u.isOnline || u.status?.toLowerCase() === 'online',
           status: u.status,
         })),
-        messages: (data.messages || []).map((m: any) => ({
+        messages: filteredMessages.map((m: any) => ({
           id: m.id,
           conversationId: m.conversationId,
           conversationName: m.conversationName || 'Unknown',
@@ -133,7 +160,7 @@ const GlobalSearchScreen: React.FC<GlobalSearchScreenProps> = ({ navigation }) =
           sentAt: m.sentAt || m.createdAt,
           senderId: m.senderId,
         })),
-        conversations: (data.conversations || []).map((c: any) => ({
+        conversations: filteredConversations.map((c: any) => ({
           id: c.id,
           name: c.name || 'Unknown',
           isGroup: c.type === 'Chatroom' || c.isGroup === true,

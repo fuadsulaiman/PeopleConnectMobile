@@ -7,6 +7,7 @@ import { ProfileStackParamList } from '../../navigation/types';
 import { useTheme } from '../../hooks';
 import { useAuthStore } from '../../stores/authStore';
 import { useThemeStore } from '../../stores/themeStore';
+import { useAppTranslation } from '../../i18n/useTranslation';
 
 type Props = NativeStackScreenProps<ProfileStackParamList, 'Settings'>;
 
@@ -25,28 +26,29 @@ const SettingsScreen: React.FC<Props> = ({ navigation }) => {
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { logout: _logout } = useAuthStore();
   const { isDarkMode, setDarkMode } = useThemeStore();
+  const { t } = useAppTranslation();
 
   const sections: { title: string; items: SettingItem[] }[] = [
     {
-      title: 'Account',
+      title: t('settings.account'),
       items: [
         {
           icon: 'key-outline',
-          title: 'Change Password',
+          title: t('settings.changePassword'),
           type: 'navigation',
           iconColor: colors.primary,
           onPress: () => navigation.navigate('ChangePassword'),
         },
         {
           icon: 'shield-checkmark-outline',
-          title: 'Two-Factor Authentication',
+          title: t('settings.twoFactorAuth'),
           type: 'navigation',
           iconColor: colors.success,
           onPress: () => navigation.navigate('TwoFactorSettings'),
         },
         {
           icon: 'phone-portrait-outline',
-          title: 'Active Sessions',
+          title: t('settings.activeSessions'),
           type: 'navigation',
           iconColor: colors.secondary,
           onPress: () => navigation.navigate('Devices'),
@@ -54,11 +56,11 @@ const SettingsScreen: React.FC<Props> = ({ navigation }) => {
       ],
     },
     {
-      title: 'Notifications',
+      title: t('settings.notifications'),
       items: [
         {
           icon: 'notifications-outline',
-          title: 'Notification Settings',
+          title: t('settings.notificationSettings'),
           type: 'navigation',
           iconColor: colors.warning,
           onPress: () => navigation.navigate('NotificationSettings'),
@@ -66,18 +68,18 @@ const SettingsScreen: React.FC<Props> = ({ navigation }) => {
       ],
     },
     {
-      title: 'Privacy',
+      title: t('settings.privacy'),
       items: [
         {
           icon: 'eye-outline',
-          title: 'Privacy Settings',
+          title: t('settings.privacySettings'),
           type: 'navigation',
           iconColor: colors.primary,
           onPress: () => navigation.navigate('PrivacySettings'),
         },
         {
           icon: 'ban-outline',
-          title: 'Blocked Users',
+          title: t('settings.blockedUsers'),
           type: 'navigation',
           iconColor: colors.error,
           onPress: () => navigation.navigate('BlockedUsers'),
@@ -85,11 +87,11 @@ const SettingsScreen: React.FC<Props> = ({ navigation }) => {
       ],
     },
     {
-      title: 'Appearance',
+      title: t('settings.appearance'),
       items: [
         {
           icon: 'moon-outline',
-          title: 'Dark Mode',
+          title: t('settings.darkMode'),
           type: 'toggle',
           value: isDarkMode,
           iconColor: colors.textSecondary,
@@ -98,49 +100,49 @@ const SettingsScreen: React.FC<Props> = ({ navigation }) => {
       ],
     },
     {
-      title: 'Data & Storage',
+      title: t('settings.dataAndStorage'),
       items: [
         {
           icon: 'folder-outline',
-          title: 'Storage Usage',
+          title: t('settings.storageUsage'),
           type: 'navigation',
           iconColor: colors.primary,
           onPress: () => navigation.navigate('StorageUsage'),
         },
         {
           icon: 'download-outline',
-          title: 'Auto-Download Media',
+          title: t('settings.autoDownload'),
           type: 'navigation',
           iconColor: colors.success,
           onPress: () => navigation.navigate('AutoDownload'),
         },
         {
           icon: 'trash-outline',
-          title: 'Clear Cache',
+          title: t('settings.clearCache'),
           type: 'action',
           iconColor: colors.warning,
           onPress: () => {
-            Alert.alert('Clear Cache', 'Are you sure you want to clear the app cache?', [
-              { text: 'Cancel', style: 'cancel' },
-              { text: 'Clear', onPress: () => Alert.alert('Success', 'Cache has been cleared.') },
+            Alert.alert(t('settings.clearCache'), t('settings.clearCacheConfirm'), [
+              { text: t('common.cancel'), style: 'cancel' },
+              { text: t('common.clear'), onPress: () => Alert.alert(t('common.success'), t('settings.cacheCleared')) },
             ]);
           },
         },
       ],
     },
     {
-      title: 'Support',
+      title: t('settings.support'),
       items: [
         {
           icon: 'help-circle-outline',
-          title: 'Help & Support',
+          title: t('settings.helpAndSupport'),
           type: 'navigation',
           iconColor: colors.primary,
           onPress: () => navigation.navigate('HelpSupport'),
         },
         {
           icon: 'information-circle-outline',
-          title: 'About',
+          title: t('settings.about'),
           type: 'navigation',
           iconColor: colors.textSecondary,
           onPress: () => navigation.navigate('About'),
@@ -148,18 +150,18 @@ const SettingsScreen: React.FC<Props> = ({ navigation }) => {
       ],
     },
     {
-      title: 'Danger Zone',
+      title: t('settings.dangerZone'),
       items: [
         {
           icon: 'cloud-download-outline',
-          title: 'Export My Data',
+          title: t('settings.exportMyData'),
           type: 'action',
           iconColor: colors.primary,
           onPress: () => navigation.navigate('DataExport'),
         },
         {
           icon: 'close-circle-outline',
-          title: 'Delete Account',
+          title: t('settings.deleteAccount'),
           type: 'action',
           iconColor: colors.error,
           onPress: () => navigation.navigate('DeleteAccount'),
@@ -186,7 +188,7 @@ const SettingsScreen: React.FC<Props> = ({ navigation }) => {
           <Icon name={item.icon} size={20} color={item.iconColor || colors.primary} />
         </View>
         <Text
-          style={[styles.settingTitle, item.title === 'Delete Account' && { color: colors.error }]}
+          style={[styles.settingTitle, item.title === t('settings.deleteAccount') && { color: colors.error }]}
         >
           {item.title}
         </Text>
@@ -211,7 +213,7 @@ const SettingsScreen: React.FC<Props> = ({ navigation }) => {
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
           <Icon name="chevron-back" size={24} color={colors.primary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Settings</Text>
+        <Text style={styles.headerTitle}>{t('settings.title')}</Text>
         <View style={styles.placeholder} />
       </View>
 
@@ -225,7 +227,7 @@ const SettingsScreen: React.FC<Props> = ({ navigation }) => {
 
         <View style={styles.footer}>
           <Text style={styles.footerText}>PeopleConnect</Text>
-          <Text style={styles.versionText}>Version 1.0.0</Text>
+          <Text style={styles.versionText}>{t('app.version', { version: '1.0.0' })}</Text>
         </View>
       </ScrollView>
     </SafeAreaView>

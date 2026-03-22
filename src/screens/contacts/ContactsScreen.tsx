@@ -15,6 +15,7 @@ import { useContactsStore } from '../../stores/contactsStore';
 import { useTheme } from '../../hooks';
 import { ContactsScreenProps } from '../../navigation/types';
 import { Contact, ContactRequest } from '../../types';
+import { useAppTranslation } from '../../i18n/useTranslation';
 
 const ContactsScreen: React.FC<ContactsScreenProps> = ({ navigation }) => {
   const {
@@ -30,6 +31,7 @@ const ContactsScreen: React.FC<ContactsScreenProps> = ({ navigation }) => {
   const [activeTab, setActiveTab] = useState<'all' | 'requests'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+  const { t } = useAppTranslation();
 
   // Create dynamic styles based on theme colors
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -105,7 +107,7 @@ const ContactsScreen: React.FC<ContactsScreenProps> = ({ navigation }) => {
         color={colors.textSecondary}
       />
       <Text style={styles.emptyText}>
-        {activeTab === 'all' ? 'No contacts yet' : 'No pending requests'}
+        {activeTab === 'all' ? t('contacts.noContacts') : t('contacts.noPendingRequests')}
       </Text>
     </View>
   );
@@ -116,7 +118,7 @@ const ContactsScreen: React.FC<ContactsScreenProps> = ({ navigation }) => {
         <Icon name="search" size={20} color={colors.textSecondary} style={styles.searchIcon} />
         <TextInput
           style={styles.searchInput}
-          placeholder="Search contacts..."
+          placeholder={t('contacts.searchContacts')}
           placeholderTextColor={colors.textSecondary}
           value={searchQuery}
           onChangeText={setSearchQuery}
@@ -128,7 +130,7 @@ const ContactsScreen: React.FC<ContactsScreenProps> = ({ navigation }) => {
           onPress={() => setActiveTab('all')}
         >
           <Text style={[styles.tabText, activeTab === 'all' && styles.tabTextActive]}>
-            All ({contacts.length})
+            {t('contacts.all', { count: contacts.length })}
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -136,7 +138,7 @@ const ContactsScreen: React.FC<ContactsScreenProps> = ({ navigation }) => {
           onPress={() => setActiveTab('requests')}
         >
           <Text style={[styles.tabText, activeTab === 'requests' && styles.tabTextActive]}>
-            Requests ({requests.length})
+            {t('contacts.requests', { count: requests.length })}
           </Text>
         </TouchableOpacity>
       </View>

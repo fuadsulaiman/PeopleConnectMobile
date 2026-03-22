@@ -21,6 +21,35 @@ const { width: screenWidth } = Dimensions.get('window');
 const MAX_IMAGE_WIDTH = screenWidth * 0.65;
 const MAX_MESSAGE_LENGTH = 300;
 
+// Render message status icon for own messages
+const getStatusIconProps = (
+  status: string | undefined
+): { name: string; color: string } => {
+  const mutedColor = 'rgba(255,255,255,0.6)';
+  const activeColor = '#4FC3F7';
+  const errorColor = '#FF5252';
+
+  switch (status) {
+    case 'sending':
+      return { name: 'time-outline', color: mutedColor };
+    case 'sent':
+      return { name: 'checkmark', color: mutedColor };
+    case 'delivered':
+      return { name: 'checkmark-done', color: mutedColor };
+    case 'read':
+    case 'Read':
+      return { name: 'checkmark-done', color: activeColor };
+    case 'viewed':
+      return { name: 'eye', color: activeColor };
+    case 'played':
+      return { name: 'play', color: activeColor };
+    case 'failed':
+      return { name: 'alert-circle', color: errorColor };
+    default:
+      return { name: 'checkmark', color: mutedColor };
+  }
+};
+
 interface MessageBubbleProps {
   message: Message;
   isOwn: boolean;
@@ -510,24 +539,17 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
               {message.isEdited && (
                 <Text style={[styles.editedLabel, isOwn && styles.editedLabelOwn]}>edited</Text>
               )}
-              {isOwn && (
-                <Icon
-                  name={
-                    message.status === 'read' || message.status === 'Read'
-                      ? 'checkmark-done'
-                      : 'checkmark'
-                  }
-                  size={16}
-                  color={
-                    message.status === 'read' || message.status === 'Read'
-                      ? '#4FC3F7'
-                      : isOwn
-                        ? 'rgba(255,255,255,0.6)'
-                        : colors.textSecondary
-                  }
-                  style={{ marginLeft: 4 }}
-                />
-              )}
+              {isOwn && (() => {
+                const iconProps = getStatusIconProps(message.status);
+                return (
+                  <Icon
+                    name={iconProps.name}
+                    size={16}
+                    color={iconProps.color}
+                    style={{ marginLeft: 4 }}
+                  />
+                );
+              })()}
             </View>
           </View>
           {reactions.length > 0 && (
