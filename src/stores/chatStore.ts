@@ -55,6 +55,57 @@ const toAbsoluteUrl = (url: string | null | undefined): string | undefined => {
   return `${baseUrl}${url}`;
 };
 
+// Shared utility to generate message preview text from a message object
+// Used by fetchConversations, fetchMoreConversations, addMessage, deleteMessage, etc.
+export const getMessagePreviewText = (msg: any): string => {
+  if (!msg) return '';
+
+  const content = msg.content || msg.Content || '';
+  const msgType = (msg.type || msg.Type || 'text').toLowerCase();
+  const attachments = msg.attachments || msg.Attachments || [];
+  const hasAttachments = attachments.length > 0;
+  const isViewOnce = msg.isViewOnce || msg.IsViewOnce || msg.viewOnce || false;
+  const viewOnceViewedAt = msg.viewOnceViewedAt || msg.ViewOnceViewedAt;
+  const messageStatus = (msg.status || msg.Status || '').toLowerCase();
+  const isViewOnceViewed = viewOnceViewedAt || messageStatus === 'viewed';
+
+  // Helper to check attachment file extensions
+  const hasAttachmentMatching = (pattern: RegExp) =>
+    hasAttachments && attachments.some((a: any) => pattern.test(a.url || a.Url || a.fileName || a.FileName || ''));
+
+  const isImage = msgType === 'image' || hasAttachmentMatching(/\.(jpg|jpeg|png|gif|webp|bmp|svg)(\?|$)/i);
+  const isVideo = msgType === 'video' || hasAttachmentMatching(/\.(mp4|webm|mov|avi|mkv|m4v)(\?|$)/i);
+  const isAudio = msgType === 'audio' || msgType === 'voice' || hasAttachmentMatching(/\.(mp3|wav|ogg|m4a|aac|flac)(\?|$)/i);
+  const isFile = msgType === 'file' || msgType === 'document';
+  const isLocation = msgType === 'location' || (content && content.includes('"latitude"'));
+  const isSystem = msgType === 'system';
+  const isVoiceCall = msgType === 'voicecall';
+  const isVideoCall = msgType === 'videocall';
+
+  if (isViewOnce) {
+    if (isViewOnceViewed) {
+      if (isImage) return '📷 Photo opened';
+      if (isVideo) return '🎬 Video opened';
+      return '💬 Message opened';
+    }
+    if (isImage) return '🔒 View once photo';
+    if (isVideo) return '🔒 View once video';
+    return '🔒 View once message';
+  }
+
+  if (isImage) return content || '📷 Photo';
+  if (isVideo) return content || '🎬 Video';
+  if (isAudio) return content || '🎵 Voice message';
+  if (isFile) return content || '📎 File';
+  if (isLocation) return '📍 Location';
+  if (isVoiceCall) return '📞 Voice call';
+  if (isVideoCall) return '📹 Video call';
+  if (isSystem) return 'ℹ️ ' + (content || 'System message');
+  if (!content && hasAttachments) return '📎 Attachment';
+
+  return content;
+};
+
 export type MessageStatus =
   | 'sending'
   | 'sent'
@@ -220,99 +271,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       const totalCount = (result as any).totalCount || rawList.length;
       const hasMore = rawList.length >= 20 && rawList.length < totalCount;
 
-      const formatPreview = (lastMessage: any): string => {
-        if (!lastMessage) {
-          return '';
-        }
-
-        const content = lastMessage.content || '';
-        const msgType = lastMessage.type?.toLowerCase() || 'text';
-        const hasAttachments = lastMessage.attachments && lastMessage.attachments.length > 0;
-        const isViewOnce = lastMessage.isViewOnce || lastMessage.IsViewOnce || lastMessage.viewOnce;
-        const viewOnceViewedAt = lastMessage.viewOnceViewedAt || lastMessage.ViewOnceViewedAt;
-        const messageStatus = (lastMessage.status || lastMessage.Status || '').toLowerCase();
-        const isViewOnceViewed = viewOnceViewedAt || messageStatus === 'viewed';
-
-        if (isViewOnce) {
-          if (isViewOnceViewed) {
-            if (
-              msgType === 'image' ||
-              (hasAttachments &&
-                lastMessage.attachments?.some((a: any) =>
-                  /\.(jpg|jpeg|png|gif|webp|bmp|svg)(\?|$)/i.test(a.url || a)
-                ))
-            ) {
-              return '📷 Photo opened';
-            } else if (
-              msgType === 'video' ||
-              (hasAttachments &&
-                lastMessage.attachments?.some((a: any) =>
-                  /\.(mp4|webm|mov|avi|mkv)(\?|$)/i.test(a.url || a)
-                ))
-            ) {
-              return '🎬 Video opened';
-            } else {
-              return '💬 Message opened';
-            }
-          }
-          if (
-            msgType === 'image' ||
-            (hasAttachments &&
-              lastMessage.attachments?.some((a: any) =>
-                /\.(jpg|jpeg|png|gif|webp|bmp|svg)(\?|$)/i.test(a.url || a)
-              ))
-          ) {
-            return '🔒 View once photo';
-          } else if (
-            msgType === 'video' ||
-            (hasAttachments &&
-              lastMessage.attachments?.some((a: any) =>
-                /\.(mp4|webm|mov|avi|mkv)(\?|$)/i.test(a.url || a)
-              ))
-          ) {
-            return '🔒 View once video';
-          } else {
-            return '🔒 View once message';
-          }
-        }
-
-        if (
-          msgType === 'image' ||
-          (hasAttachments &&
-            lastMessage.attachments?.some((a: any) =>
-              /\.(jpg|jpeg|png|gif|webp|bmp|svg)(\?|$)/i.test(a.url || a)
-            ))
-        ) {
-          return content || '📷 Photo';
-        } else if (
-          msgType === 'video' ||
-          (hasAttachments &&
-            lastMessage.attachments?.some((a: any) =>
-              /\.(mp4|webm|mov|avi|mkv)(\?|$)/i.test(a.url || a)
-            ))
-        ) {
-          return content || '🎬 Video';
-        } else if (
-          msgType === 'audio' ||
-          msgType === 'voice' ||
-          (hasAttachments &&
-            lastMessage.attachments?.some((a: any) =>
-              /\.(mp3|wav|ogg|m4a|aac)(\?|$)/i.test(a.url || a)
-            ))
-        ) {
-          return content || '🎵 Voice message';
-        } else if (msgType === 'file' || msgType === 'document' || (hasAttachments && !content)) {
-          return content || '📎 File';
-        } else if (msgType === 'location' || (content && content.includes('"latitude"'))) {
-          return '📍 Location';
-        } else if (msgType === 'system') {
-          return `ℹ️ ${content || 'System message'}`;
-        } else if (!content && hasAttachments) {
-          return '📎 Attachment';
-        }
-
-        return content;
-      };
+      const formatPreview = getMessagePreviewText;
 
       const currentState = get();
       const currentConversations = currentState.conversations;
@@ -457,9 +416,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
           let lastMessagePreview = '';
           if (localLastMessage) {
-            lastMessagePreview = localLastMessage.content || '';
+            lastMessagePreview = getMessagePreviewText(localLastMessage);
           } else if (conv.lastMessage) {
-            lastMessagePreview = conv.lastMessage.content || '';
+            lastMessagePreview = getMessagePreviewText(conv.lastMessage);
           }
 
           return {
@@ -495,7 +454,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         .map((conv: any) => ({
           ...conv,
           avatarUrl: toAbsoluteUrl(conv.avatarUrl),
-          lastMessagePreview: conv.lastMessage?.content || '',
+          lastMessagePreview: getMessagePreviewText(conv.lastMessage),
           lastMessageAt: conv.lastMessage?.createdAt || conv.lastMessageAt,
         }));
 
@@ -580,23 +539,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       const isActive = state.activeConversationId === conversationId;
 
       const lastMsg = messageList.length > 0 ? messageList[messageList.length - 1] : null;
-      let lastMsgPreview = '';
-      if (lastMsg) {
-        const msgType = (lastMsg.type || 'text').toLowerCase();
-        const hasAttachments = lastMsg.attachments && lastMsg.attachments.length > 0;
-
-        if (msgType === 'image' || (hasAttachments && lastMsg.attachments?.some((a: any) => /\.(jpg|jpeg|png|gif|webp|bmp|svg)(\?|$)/i.test(a.url || a)))) {
-          lastMsgPreview = lastMsg.content || '📷 Photo';
-        } else if (msgType === 'video' || (hasAttachments && lastMsg.attachments?.some((a: any) => /\.(mp4|webm|mov|avi|mkv)(\?|$)/i.test(a.url || a)))) {
-          lastMsgPreview = lastMsg.content || '🎬 Video';
-        } else if (msgType === 'audio' || msgType === 'voice' || (hasAttachments && lastMsg.attachments?.some((a: any) => /\.(mp3|wav|ogg|m4a|aac)(\?|$)/i.test(a.url || a)))) {
-          lastMsgPreview = lastMsg.content || '🎵 Voice message';
-        } else if (msgType === 'file' || msgType === 'document' || (hasAttachments && !lastMsg.content)) {
-          lastMsgPreview = '📎 File';
-        } else {
-          lastMsgPreview = lastMsg.content || '';
-        }
-      }
+      const lastMsgPreview = lastMsg ? getMessagePreviewText(lastMsg) : '';
 
       set((state) => ({
         messages: {
@@ -1014,25 +957,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
         const newLastMessage =
           remainingMessages.length > 0 ? remainingMessages[remainingMessages.length - 1] : null;
 
-        let newPreview = '';
-        let newLastMessageAt: string | undefined;
-        if (newLastMessage) {
-          newLastMessageAt = newLastMessage.createdAt;
-          const msgType = (newLastMessage.type || 'text').toLowerCase();
-          const hasAttachments = newLastMessage.attachments && newLastMessage.attachments.length > 0;
-
-          if (msgType === 'image' || (hasAttachments && newLastMessage.attachments?.some((a: any) => /\.(jpg|jpeg|png|gif|webp|bmp|svg)(\?|$)/i.test(a.url || a)))) {
-            newPreview = newLastMessage.content || '📷 Photo';
-          } else if (msgType === 'video' || (hasAttachments && newLastMessage.attachments?.some((a: any) => /\.(mp4|webm|mov|avi|mkv)(\?|$)/i.test(a.url || a)))) {
-            newPreview = newLastMessage.content || '🎬 Video';
-          } else if (msgType === 'audio' || msgType === 'voice' || (hasAttachments && newLastMessage.attachments?.some((a: any) => /\.(mp3|wav|ogg|m4a|aac)(\?|$)/i.test(a.url || a)))) {
-            newPreview = newLastMessage.content || '🎵 Voice message';
-          } else if (msgType === 'file' || msgType === 'document' || (hasAttachments && !newLastMessage.content)) {
-            newPreview = '📎 File';
-          } else {
-            newPreview = newLastMessage.content || '';
-          }
-        }
+        const newPreview = newLastMessage ? getMessagePreviewText(newLastMessage) : '';
+        const newLastMessageAt: string | undefined = newLastMessage?.createdAt;
 
         return {
           messages: {
@@ -1081,50 +1007,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
         return state;
       }
 
-      let previewText = message.content;
-      const msgType = message.type?.toLowerCase() || 'text';
-      const hasAttachments = message.attachments && message.attachments.length > 0;
-      const isViewOnce = (message as any).isViewOnce || (message as any).IsViewOnce || (message as any).viewOnce;
-      const viewOnceViewedAt = (message as any).viewOnceViewedAt || (message as any).ViewOnceViewedAt;
-      const messageStatus = ((message as any).status || '').toLowerCase();
-      const isViewOnceViewed = viewOnceViewedAt || messageStatus === 'viewed';
-
-      if (isViewOnce) {
-        if (isViewOnceViewed) {
-          if (msgType === 'image' || (hasAttachments && message.attachments?.some((a: any) => /\.(jpg|jpeg|png|gif|webp|bmp|svg)(\?|$)/i.test(a.url || a)))) {
-            previewText = '📷 Photo opened';
-          } else if (msgType === 'video' || (hasAttachments && message.attachments?.some((a: any) => /\.(mp4|webm|mov|avi|mkv)(\?|$)/i.test(a.url || a)))) {
-            previewText = '🎬 Video opened';
-          } else {
-            previewText = '💬 Message opened';
-          }
-        } else if (msgType === 'image' || (hasAttachments && message.attachments?.some((a: any) => /\.(jpg|jpeg|png|gif|webp|bmp|svg)(\?|$)/i.test(a.url || a)))) {
-          previewText = '🔒 View once photo';
-        } else if (msgType === 'video' || (hasAttachments && message.attachments?.some((a: any) => /\.(mp4|webm|mov|avi|mkv)(\?|$)/i.test(a.url || a)))) {
-          previewText = '🔒 View once video';
-        } else {
-          previewText = '🔒 View once message';
-        }
-      } else if (msgType === 'image' || (hasAttachments && message.attachments?.some((a: any) => /\.(jpg|jpeg|png|gif|webp|bmp|svg)(\?|$)/i.test(a.url || a)))) {
-        previewText = '📷 Photo';
-      } else if (msgType === 'video' || (hasAttachments && message.attachments?.some((a: any) => /\.(mp4|webm|mov|avi|mkv)(\?|$)/i.test(a.url || a)))) {
-        previewText = '🎬 Video';
-      } else if (msgType === 'audio' || msgType === 'voice' || (hasAttachments && message.attachments?.some((a: any) => /\.(mp3|wav|ogg|m4a|aac)(\?|$)/i.test(a.url || a)))) {
-        previewText = '🎵 Voice message';
-      } else if (msgType === 'file' || msgType === 'document' || (hasAttachments && !previewText)) {
-        previewText = '📎 File';
-      } else if (msgType === 'location' || (message.content && message.content.includes('"latitude"'))) {
-        previewText = '📍 Location';
-      } else if (msgType === 'system') {
-        previewText = `ℹ️ ${message.content || 'System message'}`;
-      } else if (!previewText && hasAttachments) {
-        previewText = '📎 Attachment';
-      }
+      const previewText = getMessagePreviewText(message);
 
       const { useAuthStore } = require('./authStore');
       const currentUser = useAuthStore.getState().user;
       const isFromOther = message.senderId !== currentUser?.id;
-      const isSystemMsg = msgType === 'system';
+      const isSystemMsg = (message.type?.toLowerCase() || 'text') === 'system';
 
       const shouldIncrementUnread =
         isFromOther && state.activeConversationId !== message.conversationId && !isSystemMsg;

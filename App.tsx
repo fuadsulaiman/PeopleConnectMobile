@@ -697,19 +697,8 @@ function App(): React.JSX.Element {
           });
         }
 
-        // Only update unread count if not viewing this conversation
-        // Don't count system messages as unread
-        if (!isViewingConversation && !isSystemMessage) {
-          const freshState = chatStoreModule.useChatStore.getState();
-          const currentConversation = freshState.conversations.find(
-            (c) => c.id === message.conversationId
-          );
-          const currentUnread = currentConversation?.unreadCount || 0;
-          freshState.updateConversation({
-            id: message.conversationId,
-            unreadCount: currentUnread + 1,
-          });
-        }
+        // Note: unread count is already incremented by chatStore.addMessage()
+        // No need to increment again here
       });
 
       // Register handler for message status changes (delivered, read, etc.)

@@ -32,6 +32,7 @@ const conversationsApi = { pin: (id: string) => getConversations().pin(id), unpi
 import { Conversation } from '../../types';
 import { Avatar } from '../../components/common/Avatar';
 import { EmptyState } from '../../components/common/EmptyState';
+import { useAppTranslation } from '../../i18n/useTranslation';
 
 type Props = NativeStackScreenProps<ChatStackParamList, 'Conversations'>;
 
@@ -52,6 +53,7 @@ export const ConversationsScreen: React.FC<Props> = ({ navigation }) => {
   const { onlineUsers, version: presenceVersion } = usePresenceStore();
   const { colors } = useTheme();
   const rootNavigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const { t } = useAppTranslation();
 
   // Create dynamic styles based on theme colors
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -118,10 +120,10 @@ export const ConversationsScreen: React.FC<Props> = ({ navigation }) => {
         }
       } catch (error) {
         console.error('Failed to pin/unpin conversation:', error);
-        Alert.alert('Error', 'Failed to update pin status');
+        Alert.alert(t('common.error'), t('chat.failedToUpdatePin'));
       }
     },
-    [closeSwipeable, updateConversation]
+    [closeSwipeable, updateConversation, t]
   );
 
   const handleArchive = useCallback(
@@ -138,25 +140,25 @@ export const ConversationsScreen: React.FC<Props> = ({ navigation }) => {
         }
       } catch (error) {
         console.error('Failed to archive/unarchive conversation:', error);
-        Alert.alert('Error', 'Failed to update archive status');
+        Alert.alert(t('common.error'), t('chat.failedToUpdateArchive'));
       }
     },
-    [closeSwipeable, updateConversation]
+    [closeSwipeable, updateConversation, t]
   );
 
   const handleDelete = useCallback(
     (item: Conversation) => {
       closeSwipeable(item.id);
       const isDM = item.type === 'DirectMessage';
-      const title = isDM ? 'Delete Conversation' : 'Leave Group';
+      const title = isDM ? t('chat.deleteConversation') : t('chat.leaveGroup');
       const message = isDM
-        ? 'Are you sure you want to delete this conversation? This action cannot be undone.'
-        : 'Are you sure you want to leave this group?';
+        ? t('chat.deleteConversationConfirm')
+        : t('chat.leaveGroupConfirm');
 
       Alert.alert(title, message, [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: isDM ? 'Delete' : 'Leave',
+          text: isDM ? t('common.delete') : t('common.leave'),
           style: 'destructive',
           onPress: async () => {
             try {
@@ -169,13 +171,13 @@ export const ConversationsScreen: React.FC<Props> = ({ navigation }) => {
               chatStoreModule.useChatStore.getState().removeConversation(item.id);
             } catch (error) {
               console.error(isDM ? 'Failed to delete conversation:' : 'Failed to leave group:', error);
-              Alert.alert('Error', isDM ? 'Failed to delete conversation' : 'Failed to leave group');
+              Alert.alert(t('common.error'), isDM ? t('chat.failedToDelete') : t('chat.failedToLeave'));
             }
           },
         },
       ]);
     },
-    [closeSwipeable]
+    [closeSwipeable, t]
   );
 
   const handleMute = useCallback(
@@ -191,10 +193,10 @@ export const ConversationsScreen: React.FC<Props> = ({ navigation }) => {
         }
       } catch (error) {
         console.error('Failed to mute/unmute conversation:', error);
-        Alert.alert('Error', 'Failed to update notification settings');
+        Alert.alert(t('common.error'), t('chat.failedToMute'));
       }
     },
-    [closeSwipeable, updateConversation]
+    [closeSwipeable, updateConversation, t]
   );
 
   const renderLeftActions = useCallback(
@@ -220,12 +222,12 @@ export const ConversationsScreen: React.FC<Props> = ({ navigation }) => {
               size={22}
               color="#fff"
             />
-            <Text style={styles.swipeActionText}>{item.isMuted ? 'Unmute' : 'Mute'}</Text>
+            <Text style={styles.swipeActionText}>{item.isMuted ? t('common.unmute') : t('common.mute')}</Text>
           </TouchableOpacity>
         </Animated.View>
       );
     },
-    [handleMute, styles]
+    [handleMute, styles, t]
   );
 
   const renderRightActions = useCallback(
@@ -247,26 +249,26 @@ export const ConversationsScreen: React.FC<Props> = ({ navigation }) => {
             onPress={() => handlePin(item)}
           >
             <Icon name={item.isPinned ? 'pin-outline' : 'pin'} size={22} color="#fff" />
-            <Text style={styles.swipeActionText}>{item.isPinned ? 'Unpin' : 'Pin'}</Text>
+            <Text style={styles.swipeActionText}>{item.isPinned ? t('common.unpin') : t('common.pin')}</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.swipeAction, styles.archiveAction]}
             onPress={() => handleArchive(item)}
           >
             <Icon name={item.isArchived ? 'archive-outline' : 'archive'} size={22} color="#fff" />
-            <Text style={styles.swipeActionText}>{item.isArchived ? 'Unarchive' : 'Archive'}</Text>
+            <Text style={styles.swipeActionText}>{item.isArchived ? t('common.unarchive') : t('common.archive')}</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.swipeAction, item.type === 'DirectMessage' ? styles.deleteAction : styles.leaveAction]}
             onPress={() => handleDelete(item)}
           >
             <Icon name={item.type === 'DirectMessage' ? 'trash-outline' : 'exit-outline'} size={22} color="#fff" />
-            <Text style={styles.swipeActionText}>{item.type === 'DirectMessage' ? 'Delete' : 'Leave'}</Text>
+            <Text style={styles.swipeActionText}>{item.type === 'DirectMessage' ? t('common.delete') : t('common.leave')}</Text>
           </TouchableOpacity>
         </Animated.View>
       );
     },
-    [handlePin, handleArchive, handleDelete, styles]
+    [handlePin, handleArchive, handleDelete, styles, t]
   );
 
   const formatLastMessageTime = (date: string | undefined) => {
@@ -280,7 +282,7 @@ export const ConversationsScreen: React.FC<Props> = ({ navigation }) => {
     if (diffDays === 0) {
       return messageDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     } else if (diffDays === 1) {
-      return 'Yesterday';
+      return t('common.yesterday');
     } else if (diffDays < 7) {
       return messageDate.toLocaleDateString([], { weekday: 'short' });
     } else {
@@ -288,9 +290,45 @@ export const ConversationsScreen: React.FC<Props> = ({ navigation }) => {
     }
   };
 
-  const formatMessagePreview = (preview: string | undefined, _conversation: Conversation) => {
+  const formatMessagePreview = (preview: string | undefined, conversation: Conversation) => {
+    // If preview is empty, try to generate one from the lastMessage object
+    if (!preview && conversation.lastMessage) {
+      const msg = conversation.lastMessage;
+      const msgType = (msg.type || 'text').toLowerCase();
+      const hasAttachments = msg.attachments && msg.attachments.length > 0;
+
+      if (msgType === 'image' || (hasAttachments && msg.attachments?.some((a: any) => /\.(jpg|jpeg|png|gif|webp|bmp|svg)(\?|$)/i.test(a.url || a.fileName || '')))) {
+        return '📷 ' + t('chat.photo');
+      }
+      if (msgType === 'video' || (hasAttachments && msg.attachments?.some((a: any) => /\.(mp4|webm|mov|avi|mkv|m4v)(\?|$)/i.test(a.url || a.fileName || '')))) {
+        return '🎬 ' + t('chat.video');
+      }
+      if (msgType === 'audio' || msgType === 'voice' || (hasAttachments && msg.attachments?.some((a: any) => /\.(mp3|wav|ogg|m4a|aac|flac)(\?|$)/i.test(a.url || a.fileName || '')))) {
+        return '🎵 ' + t('chat.voiceMessage');
+      }
+      if (msgType === 'file' || msgType === 'document') {
+        return '📎 ' + t('chat.file');
+      }
+      if (msgType === 'location') {
+        return '📍 ' + t('chat.location');
+      }
+      if (msgType === 'voicecall') {
+        return '📞 ' + t('chat.voiceCall');
+      }
+      if (msgType === 'videocall') {
+        return '📹 ' + t('chat.videoCall');
+      }
+      if (msgType === 'system') {
+        return msg.content || t('chat.noMessagesYet');
+      }
+      if (hasAttachments) {
+        return '📎 ' + t('chat.attachment');
+      }
+      return msg.content || t('chat.noMessagesYet');
+    }
+
     if (!preview) {
-      return 'No messages yet';
+      return t('chat.noMessagesYet');
     }
 
     // Already formatted with emoji
@@ -299,33 +337,38 @@ export const ConversationsScreen: React.FC<Props> = ({ navigation }) => {
       preview.startsWith('🎬') ||
       preview.startsWith('🎵') ||
       preview.startsWith('📎') ||
-      preview.startsWith('📍')
+      preview.startsWith('📍') ||
+      preview.startsWith('🔒') ||
+      preview.startsWith('💬') ||
+      preview.startsWith('📞') ||
+      preview.startsWith('📹') ||
+      preview.startsWith('ℹ️')
     ) {
       return preview;
     }
 
     // Check for location JSON
     if (preview.includes('"latitude"') && preview.includes('"longitude"')) {
-      return '📍 Location';
+      return '📍 ' + t('chat.location');
     }
 
     // Check for media URLs in preview
     if (/\.(jpg|jpeg|png|gif|webp|bmp|svg)(\?|$)/i.test(preview)) {
-      return '📷 Photo';
+      return '📷 ' + t('chat.photo');
     }
     if (/\.(mp4|webm|mov|avi|mkv|m4v)(\?|$)/i.test(preview)) {
-      return '🎬 Video';
+      return '🎬 ' + t('chat.video');
     }
     if (/\.(mp3|wav|ogg|m4a|aac|flac)(\?|$)/i.test(preview)) {
-      return '🎵 Voice message';
+      return '🎵 ' + t('chat.voiceMessage');
     }
     if (/\.(pdf|doc|docx|xls|xlsx|ppt|pptx|txt|zip|rar)(\?|$)/i.test(preview)) {
-      return '📎 File';
+      return '📎 ' + t('chat.file');
     }
 
     // Check for [Media] placeholder
     if (preview === '[Media]' || preview === '[media]') {
-      return '📎 Attachment';
+      return '📎 ' + t('chat.attachment');
     }
 
     return preview;
@@ -386,7 +429,7 @@ export const ConversationsScreen: React.FC<Props> = ({ navigation }) => {
               </Text>
               {isPlatform && (
                 <View style={styles.officialBadge}>
-                  <Text style={styles.officialBadgeText}>Official</Text>
+                  <Text style={styles.officialBadgeText}>{t('common.official')}</Text>
                 </View>
               )}
             </View>
@@ -419,8 +462,8 @@ export const ConversationsScreen: React.FC<Props> = ({ navigation }) => {
                     <Icon name="mic" size={12} color={colors.error} style={{ marginRight: 4 }} />
                     <Text style={[styles.typingText, { color: colors.error }]} numberOfLines={1}>
                       {names.length === 1
-                        ? `${names[0]} is recording...`
-                        : `${names.join(', ')} are recording...`}
+                        ? t('chat.isRecording', { name: names[0] })
+                        : t('chat.areRecording', { names: names.join(', ') })}
                     </Text>
                   </View>
                 );
@@ -438,8 +481,8 @@ export const ConversationsScreen: React.FC<Props> = ({ navigation }) => {
                   <View style={styles.typingIndicator}>
                     <Text style={[styles.typingText, { color: colors.primary }]} numberOfLines={1}>
                       {names.length === 1
-                        ? `${names[0]} is typing...`
-                        : `${names.join(', ')} are typing...`}
+                        ? t('chat.isTyping', { name: names[0] })
+                        : t('chat.areTyping', { names: names.join(', ') })}
                     </Text>
                   </View>
                 );
@@ -494,7 +537,7 @@ export const ConversationsScreen: React.FC<Props> = ({ navigation }) => {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Messages</Text>
+        <Text style={styles.headerTitle}>{t('chat.messages')}</Text>
         <View style={styles.headerButtons}>
           <TouchableOpacity
             style={styles.notificationButton}
@@ -541,9 +584,9 @@ export const ConversationsScreen: React.FC<Props> = ({ navigation }) => {
           !isLoading ? (
             <EmptyState
               icon={<Icon name="chatbubbles-outline" size={64} color={colors.textTertiary} />}
-              title="No Conversations"
-              message="Start a new conversation to begin chatting"
-              actionLabel="Start Chat"
+              title={t('chat.noConversations')}
+              message={t('chat.noConversationsMessage')}
+              actionLabel={t('chat.startChat')}
               onAction={handleNewChat}
             />
           ) : null
