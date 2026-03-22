@@ -1937,11 +1937,25 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
     }
   };
 
+  // Check if a message is ephemeral (view-once or disappearing) - Reply/Forward not allowed
+  const isEphemeralMessage = useCallback((message: Message | null): boolean => {
+    if (!message) return false;
+    const msg = message as any;
+    const viewOnce = msg.isViewOnce || msg.IsViewOnce || msg.viewOnce;
+    const expiresAt = msg.expiresAt || msg.ExpiresAt;
+    return !!(viewOnce || expiresAt);
+  }, []);
+
   // Handle reply action when message is swiped
   const handleReply = useCallback(
     (message: Message) => {
       // Check if reply is allowed
       if (!replyAllowed) {
+        return;
+      }
+
+      // Block reply for view-once and disappearing messages
+      if (isEphemeralMessage(message)) {
         return;
       }
 
@@ -1951,7 +1965,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
         swipeableRefs.current[message.id]?.close();
       }
     },
-    [replyAllowed]
+    [replyAllowed, isEphemeralMessage]
   );
 
   // Clear reply
@@ -1988,11 +2002,17 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
       return;
     }
 
+    // Block reply for view-once and disappearing messages
+    if (isEphemeralMessage(selectedMessage)) {
+      closeMessageActions();
+      return;
+    }
+
     if (selectedMessage) {
       setReplyToMessage(selectedMessage);
     }
     closeMessageActions();
-  }, [selectedMessage, closeMessageActions, replyAllowed]);
+  }, [selectedMessage, closeMessageActions, replyAllowed, isEphemeralMessage]);
 
   // Open edit modal
   const handleEditMessage = useCallback(() => {
@@ -2178,6 +2198,12 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
 
   // Forward message - open modal and load targets
   const handleForwardMessage = useCallback(async () => {
+    // Block forward for view-once and disappearing messages
+    if (isEphemeralMessage(selectedMessage)) {
+      closeMessageActions();
+      return;
+    }
+
     setMessageActionsVisible(false);
     setForwardModalVisible(true);
     setForwardLoading(true);
@@ -2212,7 +2238,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
     } finally {
       setForwardLoading(false);
     }
-  }, [conversationId]);
+  }, [conversationId, selectedMessage, isEphemeralMessage, closeMessageActions]);
 
   // Handle forward to a target (conversation or user)
   const handleForwardTo = useCallback(
@@ -2620,6 +2646,11 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
 
     // Don't allow reply to system or call messages
     if (messageType === 'system' || messageType === 'voicecall' || messageType === 'videocall') {
+      return messageContent;
+    }
+
+    // Don't allow swipe-to-reply for view-once or disappearing messages
+    if (isEphemeralMessage(item)) {
       return messageContent;
     }
 
@@ -3074,8 +3105,8 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
           onPress={closeMessageActions}
         >
           <View style={styles.messageActionsContainer}>
-            {/* Reply - only if settings allow */}
-            {replyAllowed && (
+            {/* Reply - only if settings allow AND not ephemeral (view-once/disappearing) */}
+            {replyAllowed && !isEphemeralMessage(selectedMessage) && (
               <TouchableOpacity style={styles.messageActionItem} onPress={handleReplyFromMenu}>
                 <Icon name="arrow-undo-outline" size={24} color={colors.text} />
                 <Text style={styles.messageActionText}>Reply</Text>
@@ -3085,10 +3116,13 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
               <Icon name="happy-outline" size={24} color={colors.text} />
               <Text style={styles.messageActionText}>React</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.messageActionItem} onPress={handleForwardMessage}>
-              <Icon name="arrow-redo-outline" size={24} color={colors.text} />
-              <Text style={styles.messageActionText}>Forward</Text>
-            </TouchableOpacity>
+            {/* Forward - not allowed for ephemeral (view-once/disappearing) messages */}
+            {!isEphemeralMessage(selectedMessage) && (
+              <TouchableOpacity style={styles.messageActionItem} onPress={handleForwardMessage}>
+                <Icon name="arrow-redo-outline" size={24} color={colors.text} />
+                <Text style={styles.messageActionText}>Forward</Text>
+              </TouchableOpacity>
+            )}
             {/* Edit - only for own messages AND within time limit */}
             {selectedMessage &&
               selectedMessage.senderId === user?.id &&
