@@ -30,7 +30,7 @@ import { useSettingsStore } from '../../stores/settingsStore';
 import { useTheme } from '../../hooks';
 import { config } from '../../constants';
 import { ChatScreenProps } from '../../navigation/types';
-import { Message } from '../../types';
+import { Message, Reaction } from '../../types';
 import { MediaViewer } from '../../components/MediaViewer';
 import { VideoRecorder } from '../../components/VideoRecorder';
 import { Avatar } from '../../components/common/Avatar';
@@ -456,6 +456,109 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
       unsubscribe();
     };
   }, [conversationId, isBroadcast, user?.id]);
+
+  // Subscribe to reaction events from other users
+  useEffect(() => {
+    if (isBroadcast) {
+      return;
+    }
+
+    const signalRService = getSignalRService();
+    const unsubscribe = signalRService.onReaction((data: any) => {
+      const reactionConversationId = data?.conversationId || data?.ConversationId;
+      const reactionMessageId = data?.messageId || data?.MessageId;
+      const reactionEmoji = data?.emoji || data?.Emoji;
+      const reactionUserId = data?.userId || data?.UserId;
+      const isAdded = data?.added === true;
+      const isRemoved = data?.removed === true;
+
+      // Only handle reactions for this conversation
+      if (reactionConversationId !== conversationId) {
+        return;
+      }
+
+      if (!reactionMessageId || !reactionEmoji) {
+        return;
+      }
+
+      // Find the message in current conversation messages
+      const currentMessages = chatStoreModule.useChatStore.getState().messages[conversationId] || [];
+      const targetMessage = currentMessages.find(
+        (m: Message) => m.id?.toLowerCase() === reactionMessageId?.toLowerCase()
+      );
+
+      if (!targetMessage) {
+        return;
+      }
+
+      const existingReactions: Reaction[] = targetMessage.reactions || [];
+
+      let updatedReactions: Reaction[];
+
+      if (isAdded) {
+        // Check if this emoji already exists in reactions
+        const existingReaction = existingReactions.find(
+          (r: Reaction) => r.emoji === reactionEmoji
+        );
+
+        if (existingReaction) {
+          // Check if this user already reacted with this emoji
+          const userAlreadyReacted = existingReaction.users.some(
+            (u: { userId: string }) => u.userId === reactionUserId
+          );
+          if (userAlreadyReacted) {
+            return; // Duplicate event, ignore
+          }
+          updatedReactions = existingReactions.map((r: Reaction) =>
+            r.emoji === reactionEmoji
+              ? {
+                  ...r,
+                  count: r.count + 1,
+                  users: [...r.users, { userId: reactionUserId }],
+                  hasReacted: reactionUserId === user?.id ? true : r.hasReacted,
+                }
+              : r
+          );
+        } else {
+          // New emoji reaction
+          updatedReactions = [
+            ...existingReactions,
+            {
+              emoji: reactionEmoji,
+              count: 1,
+              users: [{ userId: reactionUserId }],
+              hasReacted: reactionUserId === user?.id,
+            },
+          ];
+        }
+      } else if (isRemoved) {
+        updatedReactions = existingReactions
+          .map((r: Reaction) => {
+            if (r.emoji !== reactionEmoji) {
+              return r;
+            }
+            const filteredUsers = r.users.filter(
+              (u: { userId: string }) => u.userId !== reactionUserId
+            );
+            return {
+              ...r,
+              count: Math.max(0, r.count - 1),
+              users: filteredUsers,
+              hasReacted: reactionUserId === user?.id ? false : r.hasReacted,
+            };
+          })
+          .filter((r: Reaction) => r.count > 0); // Remove reactions with zero count
+      } else {
+        return; // Unknown event type
+      }
+
+      updateMessage(conversationId, reactionMessageId, { reactions: updatedReactions });
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [conversationId, isBroadcast, user?.id, updateMessage]);
 
   // Send typing indicator (debounced)
   const sendTypingIndicator = useCallback(() => {
