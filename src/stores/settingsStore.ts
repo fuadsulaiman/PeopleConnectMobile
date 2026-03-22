@@ -70,6 +70,9 @@ interface SettingsState {
   lastFetched: number | null;
 
   fetchPublicSettings: () => Promise<void>;
+  fetchPublicSettingsForce: () => Promise<void>;
+  isMaintenanceMode: () => boolean;
+  getMaintenanceMessage: () => string;
   getSiteName: () => string;
   getSiteLogo: () => string | undefined;
   isViewOnceEnabled: () => boolean;
@@ -139,6 +142,51 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         isLoading: false,
       });
     }
+  },
+
+  fetchPublicSettingsForce: async () => {
+    // Force fetch without cache check - used by maintenance mode polling
+    set({ isLoading: true, error: null });
+
+    try {
+      const response = await fetch(`${config.API_BASE_URL}/settings/public`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch settings: ${response.status}`);
+      }
+
+      const result = await response.json();
+
+      // Handle wrapped response { success, data } or direct data
+      const data = result.data || result;
+
+      set({
+        publicSettings: data,
+        isLoading: false,
+        lastFetched: Date.now(),
+      });
+    } catch (error: any) {
+      console.error('Failed to fetch public settings (force):', error);
+      set({
+        error: error.message || 'Failed to fetch settings',
+        isLoading: false,
+      });
+    }
+  },
+
+  isMaintenanceMode: () => {
+    const state = get();
+    return state.publicSettings?.general?.maintenanceMode ?? false;
+  },
+
+  getMaintenanceMessage: () => {
+    const state = get();
+    return state.publicSettings?.general?.maintenanceMessage || '';
   },
 
   getSiteName: () => {

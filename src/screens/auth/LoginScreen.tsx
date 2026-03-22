@@ -18,6 +18,7 @@ import { useSettingsStore } from '../../stores/settingsStore';
 import { useTheme } from '../../hooks';
 import { LoginScreenProps } from '../../navigation/types';
 import { biometricService } from '../../services/biometricService';
+import { useAppTranslation } from '../../i18n/useTranslation';
 
 const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
   const [username, setUsername] = useState('');
@@ -32,8 +33,12 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
   const { fetchPublicSettings, getSiteName, getSiteLogo } = useSettingsStore();
   const { colors } = useTheme();
   const siteLogo = getSiteLogo();
+  const { t } = useAppTranslation();
 
   const styles = useMemo(() => createStyles(colors), [colors]);
+
+  // Check if error looks like a ban message (contains "banned" keyword)
+  const isBanError = error ? /banned/i.test(error) : false;
 
   // Fetch public settings and biometric status on mount
   useEffect(() => {
@@ -65,16 +70,16 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
     }
   }, [requiresTwoFactor, tempToken, navigation]);
 
-  // Show error alerts
+  // Show error alert only for non-ban errors (ban errors shown inline)
   useEffect(() => {
-    if (error) {
-      Alert.alert('Login Failed', error, [{ text: 'OK', onPress: clearError }]);
+    if (error && !isBanError) {
+      Alert.alert(t('auth.loginFailed'), error, [{ text: t('common.ok'), onPress: clearError }]);
     }
-  }, [error, clearError]);
+  }, [error, isBanError, clearError, t]);
 
   const handleLogin = async () => {
     if (!username.trim() || !password.trim()) {
-      Alert.alert('Error', 'Please enter both username and password');
+      Alert.alert(t('common.error'), t('auth.enterBothFields'));
       return;
     }
 
@@ -102,11 +107,11 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
         if (!success) {
           // Credentials might be outdated, disable biometric
           Alert.alert(
-            'Authentication Failed',
-            'Your saved credentials may be outdated. Please sign in with your password.',
+            t('auth.authFailed'),
+            t('auth.savedCredentialsOutdated'),
             [
               {
-                text: 'OK',
+                text: t('common.ok'),
                 onPress: async () => {
                   await biometricService.disableBiometric();
                   setBiometricEnabled(false);
@@ -119,8 +124,8 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
     } catch (err: any) {
       console.error('Biometric login error:', err);
       Alert.alert(
-        'Error',
-        'Biometric authentication failed. Please try again or use your password.'
+        t('common.error'),
+        t('auth.authFailedBiometric')
       );
     } finally {
       setIsAuthenticatingBiometric(false);
@@ -152,10 +157,24 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
             <Icon name="chatbubbles" size={80} color={colors.primary} />
           )}
           <Text style={styles.title}>{getSiteName()}</Text>
-          <Text style={styles.subtitle}>Sign in to continue</Text>
+          <Text style={styles.subtitle}>{t('auth.signInToContinue')}</Text>
         </View>
 
         <View style={styles.form}>
+          {/* Ban Error Banner - shown inline for long ban messages */}
+          {isBanError && error && (
+            <View style={styles.banErrorContainer}>
+              <View style={styles.banErrorHeader}>
+                <Icon name="ban-outline" size={22} color={colors.error} />
+                <Text style={styles.banErrorTitle}>{t('auth.accountBanned')}</Text>
+              </View>
+              <Text style={styles.banErrorMessage}>{error}</Text>
+              <TouchableOpacity onPress={clearError} style={styles.banErrorDismiss}>
+                <Text style={styles.banErrorDismissText}>{t('common.ok')}</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
           {/* Username Input */}
           <View style={styles.inputContainer}>
             <Icon
@@ -166,7 +185,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
             />
             <TextInput
               style={styles.input}
-              placeholder="Username"
+              placeholder={t('auth.username')}
               placeholderTextColor={colors.textSecondary}
               value={username}
               onChangeText={setUsername}
@@ -186,7 +205,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
             />
             <TextInput
               style={styles.input}
-              placeholder="Password"
+              placeholder={t('auth.password')}
               placeholderTextColor={colors.textSecondary}
               value={password}
               onChangeText={setPassword}
@@ -207,7 +226,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
             onPress={() => navigation.navigate('ForgotPassword')}
             style={styles.forgotPassword}
           >
-            <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
+            <Text style={styles.forgotPasswordText}>{t('auth.forgotPassword')}</Text>
           </TouchableOpacity>
 
           {/* Login Button */}
@@ -222,7 +241,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
             {isLoading ? (
               <ActivityIndicator color={colors.white} />
             ) : (
-              <Text style={styles.loginButtonText}>Sign In</Text>
+              <Text style={styles.loginButtonText}>{t('auth.signIn')}</Text>
             )}
           </TouchableOpacity>
 
@@ -241,7 +260,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
               ) : (
                 <>
                   <Icon name={getBiometricIcon()} size={24} color={colors.primary} />
-                  <Text style={styles.biometricButtonText}>Sign in with {biometricType}</Text>
+                  <Text style={styles.biometricButtonText}>{t('auth.signInWith', { method: biometricType })}</Text>
                 </>
               )}
             </TouchableOpacity>
@@ -249,9 +268,9 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
         </View>
 
         <View style={styles.footer}>
-          <Text style={styles.footerText}>Do not have an account?</Text>
+          <Text style={styles.footerText}>{t('auth.dontHaveAccount')}</Text>
           <TouchableOpacity onPress={() => navigation.navigate('Register')}>
-            <Text style={styles.registerLink}>Sign Up</Text>
+            <Text style={styles.registerLink}>{t('auth.signUp')}</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -261,6 +280,41 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
 
 const createStyles = (colors: any) =>
   StyleSheet.create({
+    banErrorContainer: {
+      backgroundColor: colors.surface,
+      borderColor: colors.error,
+      borderRadius: 12,
+      borderWidth: 1,
+      marginBottom: 20,
+      padding: 16,
+    },
+    banErrorDismiss: {
+      alignSelf: 'flex-end',
+      marginTop: 12,
+      paddingHorizontal: 16,
+      paddingVertical: 6,
+    },
+    banErrorDismissText: {
+      color: colors.primary,
+      fontSize: 14,
+      fontWeight: '600',
+    },
+    banErrorHeader: {
+      alignItems: 'center',
+      flexDirection: 'row',
+      marginBottom: 8,
+    },
+    banErrorMessage: {
+      color: colors.textSecondary,
+      fontSize: 14,
+      lineHeight: 20,
+    },
+    banErrorTitle: {
+      color: colors.error,
+      fontSize: 16,
+      fontWeight: '700',
+      marginLeft: 8,
+    },
     biometricButton: {
       alignItems: 'center',
       backgroundColor: colors.surface,

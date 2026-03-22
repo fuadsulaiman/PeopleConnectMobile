@@ -7,6 +7,7 @@ import Icon from 'react-native-vector-icons/Ionicons';
 
 import { useAuthStore } from '../stores/authStore';
 import { useCallStore } from '../stores/callStore';
+import { useSettingsStore } from '../stores/settingsStore';
 import { colors } from '../constants/colors';
 import {
   RootStackParamList,
@@ -28,6 +29,9 @@ import TwoFactorScreen from '../screens/auth/TwoFactorScreen';
 import ForgotPasswordScreen from '../screens/auth/ForgotPasswordScreen';
 import ResetPasswordScreen from '../screens/auth/ResetPasswordScreen';
 import VerifyEmailScreen from '../screens/auth/VerifyEmailScreen';
+
+// Maintenance Screen
+import MaintenanceScreen from '../screens/MaintenanceScreen';
 
 // Chat Screens - default imports
 import ConversationsScreen from '../screens/chat/ConversationsScreen';
@@ -293,12 +297,22 @@ const MainNavigator: React.FC = () => (
 const RootNavigator: React.FC = () => {
   const { isAuthenticated, isLoading, checkAuth } = useAuthStore();
   const { callState, currentCall } = useCallStore();
+  const { publicSettings, fetchPublicSettings, isMaintenanceMode } = useSettingsStore();
   // Use the exported navigationRef for navigation from App.tsx
   const hasNavigatedToCallRef = useRef(false);
+  const isInMaintenance = isMaintenanceMode();
 
   useEffect(() => {
-    checkAuth();
-  }, [checkAuth]);
+    // Fetch public settings first (includes maintenance mode check)
+    fetchPublicSettings();
+  }, [fetchPublicSettings]);
+
+  useEffect(() => {
+    // Only check auth if not in maintenance mode
+    if (!isInMaintenance) {
+      checkAuth();
+    }
+  }, [checkAuth, isInMaintenance]);
 
   // Watch for incoming calls and navigate to ActiveCall screen
   useEffect(() => {
@@ -325,6 +339,11 @@ const RootNavigator: React.FC = () => {
       hasNavigatedToCallRef.current = false;
     }
   }, [callState, currentCall, isAuthenticated]);
+
+  // Show maintenance screen when maintenance mode is active
+  if (isInMaintenance) {
+    return <MaintenanceScreen />;
+  }
 
   if (isLoading) {
     return (
